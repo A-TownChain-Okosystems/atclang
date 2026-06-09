@@ -1,50 +1,48 @@
 # atclang
 
-> **ATCLang v0.3.0 — Proprietäre Programmiersprache (Lexer, Parser, VM, REPL)**
+> **ATCLang v0.3.0, proprietäre Sprache (Lexer, Parser, VM)**
 
-[![Layer](https://img.shields.io/badge/Layer-L2–L4%20(Language)-purple)](https://github.com/ShivaCoreDev/kai-os-wiki)
-[![KAI-OS](https://img.shields.io/badge/KAI--OS-v2.0.0-blue)](https://github.com/ShivaCoreDev/kai-os-wiki)
-[![Ökosystem](https://img.shields.io/badge/Ökosystem-A--TownChain-green)](https://github.com/A-TownChain-Okosystems/a-townchain-os/blob/feature/kai-os-integration/ECOSYSTEM.md)
+[![Layer](https://img.shields.io/badge/Layer-L2–L4-purple)](https://github.com/A-TownChain-Okosystems)
+[![KAI-OS](https://img.shields.io/badge/KAI--OS-v2.0.0-blue)](https://github.com/A-TownChain-Okosystems/a-townchain-os/blob/main/docs/kai-os-wiki.md)
+[![Org](https://img.shields.io/badge/Org-A--TownChain--Okosystems-green)](https://github.com/A-TownChain-Okosystems)
 [![Wiki](https://img.shields.io/badge/Wiki-📖-blue)](https://github.com/A-TownChain-Okosystems/atclang-wiki)
 
 ---
 
 ## 📦 Teil des A-TownChain Ökosystems
 
-Dieses Repository ist **L2–L4 (Language)** im A-TownChain Ökosystem.
-
-**Haupt-Repo:** [atclang Ökosystem-Core](https://github.com/A-TownChain-Okosystems/a-townchain-os)
-**Dokumentation:** [KAI-OS Wiki (31 Kapitel)](https://github.com/ShivaCoreDev/kai-os-wiki)  |  [Repo-Wiki](https://github.com/A-TownChain-Okosystems/atclang-wiki)
-**Alle Repos:** [→ ECOSYSTEM.md](https://github.com/A-TownChain-Okosystems/a-townchain-os/blob/feature/kai-os-integration/ECOSYSTEM.md)
+**Org:** [A-TownChain-Okosystems](https://github.com/A-TownChain-Okosystems)
+**Haupt-Repo:** [a-townchain-os](https://github.com/A-TownChain-Okosystems/a-townchain-os)
+**KAI-OS Wiki (31 Kapitel):** [→ docs/kai-os-wiki.md](https://github.com/A-TownChain-Okosystems/a-townchain-os/blob/main/docs/kai-os-wiki.md)
+**Alle Repos:** [→ ECOSYSTEM.md](https://github.com/A-TownChain-Okosystems/a-townchain-os/blob/main/ECOSYSTEM.md)  |  [Repo-Wiki](https://github.com/A-TownChain-Okosystems/atclang-wiki)
 
 ---
 
 ## 🔗 Abhängigkeiten
 
-**Dieses Repo nutzt:** — (Basis-Modul)
+**Nutzt:** — (Basis-Modul)
 
 **Wird genutzt von:**
-- [a-townchain-os](https://github.com/A-TownChain-Okosystems/a-townchain-os)
 - [atc-contracts](https://github.com/A-TownChain-Okosystems/atc-contracts)
 
 ---
 
-## 🗺️ Alle Repos im Überblick
+## 🗺️ Alle Repos
 
 | Repo | Layer | Beschreibung |
 |------|-------|-------------|
-| [a-townchain-os](https://github.com/A-TownChain-Okosystems/a-townchain-os) | `L2-L4` | Haupt-Repo — KAI-OS Core, AI-Blockchain, Orchestrator |
-| [shivaos-kernel](https://github.com/A-TownChain-Okosystems/shivaos-kernel) | `L2` | ShivaOS Microkernel — Prozess-Manager, IPC, ATCFS, Cons |
-| [atcnet](https://github.com/A-TownChain-Okosystems/atcnet) | `L5` | P2P Netzwerk-Stack — Kademlia DHT, Bootstrap, Gossip |
-| [atc-gateway](https://github.com/A-TownChain-Okosystems/atc-gateway) | `L7` | API Gateway Port 4000 — Routing, Auth, Rate-Limit, Circ |
-| [atclang](https://github.com/A-TownChain-Okosystems/atclang) | `L2-L4` | ATCLang v0.3.0 — Proprietäre Programmiersprache (Lexer, |
-| [atc-contracts](https://github.com/A-TownChain-Okosystems/atc-contracts) | `L4/L11` | Smart Contracts — ATC-8300 Token, ATC-9000 NFT, ATC-990 |
-| [shivamon](https://github.com/A-TownChain-Okosystems/shivamon) | `L12` | Shivamon NFT Gaming — Battle Engine, Breeding, Marketpl |
-| [franchise-factory](https://github.com/A-TownChain-Okosystems/franchise-factory) | `L10/L8` | Franchise Factory — DAO, Vault, Revenue-Share, Governan |
-| [atc-ui](https://github.com/A-TownChain-Okosystems/atc-ui) | `L10` | Neon Dashboard — Wallet, Explorer, Shivamon, Gemini AI, |
-| [atc-standards](https://github.com/A-TownChain-Okosystems/atc-standards) | `L0` | ATC-0001–0009 & ATS-1000–1007 Protokoll-Standards |
-| [atownchain-whitepaper](https://github.com/A-TownChain-Okosystems/atownchain-whitepaper) | `L0` | Offizielles Whitepaper v2.1.0 |
+| [a-townchain-os](https://github.com/A-TownChain-Okosystems/a-townchain-os) | `L2–L4` | Einziges Haupt-Repo — KAI-OS Core, AI, Blockchain |
+| [atc-kernel](https://github.com/A-TownChain-Okosystems/atc-kernel) | `L2` | ShivaOS Microkernel, IPC, ATCFS, Consensus |
+| [atcnet](https://github.com/A-TownChain-Okosystems/atcnet) | `L5` | P2P Netzwerk-Stack, Kademlia DHT, Bootstrap Node |
+| [atc-gateway](https://github.com/A-TownChain-Okosystems/atc-gateway) | `L7` | API Gateway :4000, Circuit-Breaker, Rate-Limit |
+| [atclang](https://github.com/A-TownChain-Okosystems/atclang) | `L2–L4` | ATCLang v0.3.0, proprietäre Sprache (Lexer, Parser, VM) |
+| [atc-contracts](https://github.com/A-TownChain-Okosystems/atc-contracts) | `L4/L11` | Smart Contracts: ATC-8300, ATC-9000, ATC-9900, Bridge |
+| [atc-shivamon](https://github.com/A-TownChain-Okosystems/atc-shivamon) | `L12` | NFT Gaming: Battle Engine, Breeding, Marketplace |
+| [atc-franchise](https://github.com/A-TownChain-Okosystems/atc-franchise) | `L10/L8` | Business DAO: Vault, Revenue-Share, Royalty (ATC-9900) |
+| [atc-ui](https://github.com/A-TownChain-Okosystems/atc-ui) | `L10` | Neon Dashboard: Wallet, Explorer, Shivamon, AI Chat |
+| [atc-standards](https://github.com/A-TownChain-Okosystems/atc-standards) | `L0` | Protokoll-Standards: ATC-0001–0009 + ATS-1000–1007 |
+| [atc-whitepaper](https://github.com/A-TownChain-Okosystems/atc-whitepaper) | `L0` | Offizielles Whitepaper v2.1.0 |
 
 ---
 
-*Teil des [A-TownChain Ökosystems](https://github.com/A-TownChain-Okosystems) · v2.0.0 · Stand: 2026-06-09*
+*[A-TownChain-Okosystems](https://github.com/A-TownChain-Okosystems) · v2.0.0 · Stand: 2026-06-09*
