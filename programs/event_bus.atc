@@ -1,0 +1,74 @@
+// ╔══════════════════════════════════════════════════════╗
+// ║  EventBus — Proprietäres Pub/Sub System            ║
+// ║  ATCLang v0.2.0 | ATS-1007 IPC konform            ║
+// ╚══════════════════════════════════════════════════════╝
+
+struct EventEntry {
+    event: string,
+    data:  string,
+    ts:    u64,
+}
+
+contract EventBus {
+    state listeners:  Map<string, Vec<string>>  // event → handler names
+    state history:    Vec<EventEntry>
+    state emit_count: u64 = 0
+    state MAX_HIST:   u64 = 500
+
+    fn subscribe(event: string, handler_name: string) {
+        if !self.listeners.contains(event) {
+            self.listeners[event] = Vec::new()
+        }
+        self.listeners[event].push(handler_name)
+        emit HandlerRegistered(event, handler_name)
+    }
+
+    fn unsubscribe(event: string, handler_name: string) -> bool {
+        if self.listeners.contains(event) {
+            self.listeners[event].remove(handler_name)
+            return true
+        }
+        return false
+    }
+
+    fn emit(event: string, data: string) -> u64 {
+        self.emit_count = safe_add(self.emit_count, 1)
+        // In History speichern
+        let entry: EventEntry = EventEntry { event: event, data: data[:120], ts: now() }
+        self.history.push(entry)
+        if u64(self.history.len()) > self.MAX_HIST {
+            self.history.remove(0)
+        }
+        // Handler-Anzahl zurückgeben
+        let count: u64 = 0
+        if self.listeners.contains(event) {
+            count = u64(self.listeners[event].len())
+        }
+        if self.listeners.contains("*") {
+            count = safe_add(count, u64(self.listeners["*"].len()))
+        }
+        return count
+    }
+
+    fn recent(n: u64) -> Vec<EventEntry> {
+        let start: u64 = 0
+        if u64(self.history.len()) > n {
+            start = u64(self.history.len()) - n
+        }
+        return self.history[start..]
+    }
+
+    fn stats() -> Map<string, u64> {
+        return {
+            "emits":    self.emit_count,
+            "events":   u64(self.listeners.len()),
+            "history":  u64(self.history.len()),
+        }
+    }
+
+    fn clear() {
+        self.listeners.clear()
+        self.history.clear()
+        self.emit_count = 0
+    }
+}
