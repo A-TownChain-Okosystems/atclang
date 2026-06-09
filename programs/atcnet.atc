@@ -1,0 +1,134 @@
+// ╔══════════════════════════════════════════════════════╗
+// ║  ATCNet — Proprietärer P2P Netzwerk-Stack          ║
+// ║  ATCLang v0.2.0 | ATC-0005 konform                 ║
+// ╚══════════════════════════════════════════════════════╝
+
+use ATC::Net::{ TCPSocket, UDPSocket }
+use ATC::Crypto::{ sha256, ECDSASigner }
+use ATC::Types::Address
+
+struct PeerInfo {
+    id:        bytes32,
+    host:      string,
+    port:      u16,
+    pub_key:   string,
+    connected: bool,
+    last_seen: u64,
+    latency_ms: u64,
+}
+
+enum MessageType {
+    HELLO,
+    HELLO_ACK,
+    PING,
+    PONG,
+    NEW_BLOCK,
+    NEW_TX,
+    GET_PEERS,
+    PEERS,
+    GET_BLOCK,
+    BLOCK,
+    CONSENSUS,
+    DISCONNECT,
+}
+
+struct NetMessage {
+    mtype:   MessageType,
+    payload: string,
+    sender:  bytes32,
+    ts:      u64,
+    ttl:     u8,
+}
+
+contract ATCNet {
+    state node_id:    bytes32
+    state host:       string = "0.0.0.0"
+    state port:       u16    = 4001
+    state peers:      Map<bytes32, PeerInfo>
+    state max_peers:  u64    = 50
+    state running:    bool   = false
+    state msg_count:  u64    = 0
+
+    fn init(host: string, port: u16) {
+        self.host    = host
+        self.port    = port
+        self.node_id = sha256(host + to_string(port) + to_string(now()))
+        emit NodeInitialized(self.node_id, host, port)
+    }
+
+    fn start() {
+        require(!self.running, "ATCNet läuft bereits")
+        self.running = true
+        emit NetworkStarted(self.node_id, self.host, self.port)
+    }
+
+    fn stop() {
+        self.running = false
+        emit NetworkStopped(self.node_id)
+    }
+
+    // Peer-Verbindung herstellen
+    fn connect(host: string, port: u16) -> bool {
+        require(self.running, "ATCNet nicht aktiv")
+        require(self.peers.len() < self.max_peers, "Max Peers erreicht")
+        let peer_id: bytes32 = sha256(host + to_string(port))
+        let peer: PeerInfo = PeerInfo {
+            id:         peer_id,
+            host:       host,
+            port:       port,
+            pub_key:    "",
+            connected:  true,
+            last_seen:  now(),
+            latency_ms: 0,
+        }
+        self.peers[peer_id] = peer
+        emit PeerConnected(peer_id, host, port)
+        return true
+    }
+
+    // Peer trennen
+    fn disconnect(peer_id: bytes32) {
+        if self.peers.contains(peer_id) {
+            let peer: PeerInfo = self.peers[peer_id]
+            peer.connected = false
+            self.peers[peer_id] = peer
+            emit PeerDisconnected(peer_id)
+        }
+    }
+
+    // Broadcast an alle Peers
+    fn broadcast(mtype: MessageType, payload: string) -> u64 {
+        require(self.running, "ATCNet nicht aktiv")
+        let msg: NetMessage = NetMessage {
+            mtype:   mtype,
+            payload: payload,
+            sender:  self.node_id,
+            ts:      now(),
+            ttl:     7,
+        }
+        let sent: u64 = 0
+        for peer_id in self.peers.keys() {
+            let peer: PeerInfo = self.peers[peer_id]
+            if peer.connected {
+                sent = safe_add(sent, 1)
+                self.msg_count = safe_add(self.msg_count, 1)
+            }
+        }
+        emit MessageBroadcast(mtype, sent)
+        return sent
+    }
+
+    // Block propagieren
+    fn propagate_block(block_hash: bytes32, block_data: string) -> u64 {
+        return self.broadcast(MessageType::NEW_BLOCK, to_string(block_hash) + "|" + block_data)
+    }
+
+    // TX propagieren
+    fn propagate_tx(tx_hash: bytes32, tx_data: string) -> u64 {
+        return self.broadcast(MessageType::NEW_TX, to_string(tx_hash) + "|" + tx_data)
+    }
+
+    fn peer_count() -> u64   { return u64(self.peers.len()) }
+    fn is_running() -> bool  { return self.running }
+    fn get_node_id() -> bytes32 { return self.node_id }
+}
