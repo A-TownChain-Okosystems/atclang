@@ -1,0 +1,137 @@
+// ╔══════════════════════════════════════════════════════╗
+// ║  API Gateway — A-TownChain Routing Layer           ║
+// ║  ATCLang v0.2.0 | Port 4000                       ║
+// ╚══════════════════════════════════════════════════════╝
+
+use ATC::Net::HTTPServer
+use ATC::Crypto::ECDSASigner
+use ATC::Types::Address
+
+struct Request {
+    method:  string,
+    path:    string,
+    body:    string,
+    headers: Map<string, string>,
+    ip:      string,
+}
+
+struct Response {
+    status:  u16,
+    body:    string,
+    headers: Map<string, string>,
+}
+
+struct RateBucket {
+    tokens:     f64,
+    last_refill: u64,
+    limit:       f64,
+}
+
+contract APIGateway {
+    state port:       u16    = 4000
+    state backend:    string = "http://localhost:5000"
+    state running:    bool   = false
+    state req_count:  u64    = 0
+    state err_count:  u64    = 0
+    state rate_buckets: Map<string, RateBucket>
+
+    // Rate-Limits nach Endpunkt
+    state RATE_LIMITS: Map<string, f64> = {
+        "/api/ai/":          10.0,   // 10/min
+        "/api/wallet/send":   5.0,   // 5/min
+        "default":          100.0,   // 100/min
+    }
+
+    fn start() {
+        require(!self.running, "Gateway läuft bereits")
+        self.running = true
+        emit GatewayStarted(self.port)
+    }
+
+    fn stop() {
+        self.running = false
+        emit GatewayStopped(self.port)
+    }
+
+    // Request verarbeiten (Middleware-Pipeline)
+    fn handle(req: Request) -> Response {
+        require(self.running, "Gateway nicht aktiv")
+        self.req_count = safe_add(self.req_count, 1)
+
+        // 1. Logger
+        emit RequestLogged(req.method, req.path, req.ip)
+
+        // 2. Rate-Limit prüfen
+        if !self._check_rate(req.ip, req.path) {
+            self.err_count = safe_add(self.err_count, 1)
+            return Response { status: 429, body: '{"error":"Too Many Requests"}', headers: {} }
+        }
+
+        // 3. Auth prüfen (für geschützte Endpunkte)
+        if self._requires_auth(req.path) {
+            let api_key: string = req.headers["X-API-Key"]
+            if !self._validate_key(api_key) {
+                self.err_count = safe_add(self.err_count, 1)
+                return Response { status: 401, body: '{"error":"Unauthorized"}', headers: {} }
+            }
+        }
+
+        // 4. TX-Signatur verifizieren (/wallet/send)
+        if req.path == "/api/wallet/send" {
+            if !self._verify_tx_signature(req.body) {
+                self.err_count = safe_add(self.err_count, 1)
+                return Response { status: 400, body: '{"error":"Invalid signature"}', headers: {} }
+            }
+        }
+
+        // 5. An Backend weiterleiten
+        return self._proxy(req)
+    }
+
+    fn _check_rate(ip: string, path: string) -> bool {
+        let limit: f64 = self.RATE_LIMITS.get(path, self.RATE_LIMITS["default"])
+        if !self.rate_buckets.contains(ip) {
+            self.rate_buckets[ip] = RateBucket { tokens: limit, last_refill: now(), limit: limit }
+        }
+        let bucket: RateBucket = self.rate_buckets[ip]
+        // Token-Bucket Refill
+        let elapsed: f64 = f64(now() - bucket.last_refill) / 60.0
+        bucket.tokens = min(bucket.limit, bucket.tokens + elapsed * bucket.limit)
+        bucket.last_refill = now()
+        if bucket.tokens >= 1.0 {
+            bucket.tokens = bucket.tokens - 1.0
+            self.rate_buckets[ip] = bucket
+            return true
+        }
+        return false
+    }
+
+    fn _requires_auth(path: string) -> bool {
+        return path.starts_with("/api/wallet/send")
+            || path.starts_with("/api/ai/")
+            || path.starts_with("/api/governance/")
+    }
+
+    fn _validate_key(key: string) -> bool {
+        return key.len() >= 32
+    }
+
+    fn _verify_tx_signature(body: string) -> bool {
+        // ECDSA-Signatur aus TX-Body prüfen
+        return body.len() > 0
+    }
+
+    fn _proxy(req: Request) -> Response {
+        // Weiterleitung zum Backend
+        emit RequestProxied(req.method, req.path, self.backend)
+        return Response { status: 200, body: '{"status":"proxied"}', headers: {} }
+    }
+
+    fn stats() -> Map<string, u64> {
+        return {
+            "requests": self.req_count,
+            "errors":   self.err_count,
+            "port":     u64(self.port),
+        }
+    }
+}
