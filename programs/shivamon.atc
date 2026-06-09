@@ -1,0 +1,161 @@
+// ╔══════════════════════════════════════════════════════╗
+// ║  Shivamon NFT — ATC-9000 Standard                  ║
+// ║  ATCLang v0.2.0 | Gaming NFT Ökosystem             ║
+// ╚══════════════════════════════════════════════════════╝
+
+use ATC::Types::Address
+use ATC::Crypto::sha256
+
+enum Element {
+    FIRE, WATER, LIGHTNING, PLANT, DARK, LIGHT, EARTH, ICE
+}
+
+enum Rarity {
+    COMMON, UNCOMMON, RARE, EPIC, LEGENDARY
+}
+
+struct ShivamonStats {
+    hp:  u64,
+    atk: u64,
+    def: u64,
+    spd: u64,
+    sp_atk: u64,
+    sp_def: u64,
+}
+
+struct Shivamon {
+    token_id:  u64,
+    name:      string,
+    element:   Element,
+    rarity:    Rarity,
+    level:     u64,
+    exp:       u64,
+    stats:     ShivamonStats,
+    dna:       bytes32,
+    owner:     Address,
+    for_sale:  bool,
+    price:     u128,
+    wins:      u64,
+    losses:    u64,
+}
+
+contract ShivamonContract {
+    state owner:        Address
+    state tokens:       Map<u64, Shivamon>
+    state owner_tokens: Map<Address, Vec<u64>>
+    state approvals:    Map<u64, Address>
+    state operators:    Map<Address, Map<Address, bool>>
+    state next_id:      u64   = 1
+    state total_minted: u64   = 0
+    state MAX_SUPPLY:   u64   = 10_000_000
+
+    fn init(owner_addr: Address) {
+        self.owner = owner_addr
+        emit ContractInitialized(owner_addr)
+    }
+
+    // Neues Shivamon minten
+    fn mint(
+        to:      Address,
+        name:    string,
+        element: Element,
+        rarity:  Rarity,
+    ) -> u64 {
+        require(caller == self.owner, "Nur Owner kann minten")
+        require(self.total_minted < self.MAX_SUPPLY, "Max Supply erreicht")
+        require(is_valid_address(to_string(to)), "Ungültige Adresse")
+
+        let token_id: u64 = self.next_id
+        self.next_id     = safe_add(self.next_id, 1)
+        self.total_minted = safe_add(self.total_minted, 1)
+
+        // DNA aus Kontext ableiten
+        let dna: bytes32 = sha256(to_string(to) + to_string(token_id) + to_string(now()))
+
+        // Basis-Stats nach Seltenheit
+        let base: u64 = match rarity {
+            Rarity::COMMON    => 50,
+            Rarity::UNCOMMON  => 60,
+            Rarity::RARE      => 75,
+            Rarity::EPIC      => 95,
+            Rarity::LEGENDARY => 130,
+        }
+
+        let shivamon: Shivamon = Shivamon {
+            token_id: token_id,
+            name:     name,
+            element:  element,
+            rarity:   rarity,
+            level:    1,
+            exp:      0,
+            stats: ShivamonStats {
+                hp:     base * 2,
+                atk:    base,
+                def:    base,
+                spd:    base,
+                sp_atk: base,
+                sp_def: base,
+            },
+            dna:      dna,
+            owner:    to,
+            for_sale: false,
+            price:    0,
+            wins:     0,
+            losses:   0,
+        }
+        self.tokens[token_id] = shivamon
+        self.owner_tokens[to].push(token_id)
+        emit ShivamonMinted(to, token_id, name, element, rarity)
+        return token_id
+    }
+
+    // Transfer
+    fn transfer(from_: Address, to: Address, token_id: u64) -> bool {
+        require(self.tokens.contains(token_id), "Token nicht gefunden")
+        let s: Shivamon = self.tokens[token_id]
+        require(s.owner == caller || self.approvals[token_id] == caller, "Nicht berechtigt")
+        require(is_valid_address(to_string(to)), "Ungültige Zieladresse")
+        s.owner      = to
+        s.for_sale   = false
+        s.price      = 0
+        self.tokens[token_id] = s
+        self.owner_tokens[to].push(token_id)
+        emit ShivamonTransferred(from_, to, token_id)
+        return true
+    }
+
+    // Level Up
+    fn level_up(token_id: u64) -> bool {
+        require(self.tokens.contains(token_id), "Token nicht gefunden")
+        let s: Shivamon = self.tokens[token_id]
+        require(s.owner == caller, "Nur Eigentümer")
+        require(s.level < 100, "Max Level 100 erreicht")
+        s.level = safe_add(s.level, 1)
+        // Stats erhöhen
+        s.stats.hp     = safe_add(s.stats.hp, 5)
+        s.stats.atk    = safe_add(s.stats.atk, 3)
+        s.stats.def    = safe_add(s.stats.def, 3)
+        s.stats.spd    = safe_add(s.stats.spd, 2)
+        s.stats.sp_atk = safe_add(s.stats.sp_atk, 3)
+        s.stats.sp_def = safe_add(s.stats.sp_def, 3)
+        self.tokens[token_id] = s
+        emit ShivamonLevelUp(token_id, s.level)
+        return true
+    }
+
+    fn owner_of(token_id: u64) -> Address {
+        require(self.tokens.contains(token_id), "Token nicht gefunden")
+        return self.tokens[token_id].owner
+    }
+
+    fn tokens_of(owner_: Address) -> Vec<u64> {
+        return self.owner_tokens[owner_]
+    }
+
+    fn get_shivamon(token_id: u64) -> Shivamon {
+        require(self.tokens.contains(token_id), "Token nicht gefunden")
+        return self.tokens[token_id]
+    }
+
+    fn total_supply() -> u64 { return self.total_minted }
+}
