@@ -1,0 +1,123 @@
+// ╔══════════════════════════════════════════════════════╗
+// ║  ATC Wallet — ECDSA + KeyGen                       ║
+// ║  ATCLang v0.2.0 | ATC-0002 konform                 ║
+// ╚══════════════════════════════════════════════════════╝
+
+use ATC::Crypto::{ sha256, sha3_256, ecdsa_sign, ecdsa_verify, base58_encode }
+use ATC::Types::Address
+
+struct WalletKeys {
+    address:     Address,
+    private_key: bytes32,
+    public_key:  bytes64,
+    mnemonic:    string,
+}
+
+struct Transaction {
+    from_:     Address,
+    to:        Address,
+    amount:    u128,
+    fee:       u128,
+    nonce:     u64,
+    timestamp: u64,
+    data:      string,
+    signature: string,
+    pub_key:   string,
+}
+
+contract ATCWallet {
+    state ATC_PREFIX:   string = "ATC"
+    state ADDR_LEN:     u64   = 32
+    state DECIMALS:     u8    = 18
+    state MIN_FEE:      u128  = 1000  // in Wei
+
+    // Neue Wallet generieren
+    fn generate() -> WalletKeys {
+        let private_key: bytes32 = random_bytes32()
+        let public_key:  bytes64 = ecdsa_pubkey(private_key)
+        let address:     Address = self._derive_address(public_key)
+        let mnemonic:    string  = self._generate_mnemonic(private_key)
+        emit WalletGenerated(address)
+        return WalletKeys {
+            address:     address,
+            private_key: private_key,
+            public_key:  public_key,
+            mnemonic:    mnemonic,
+        }
+    }
+
+    // Adresse aus Public Key ableiten
+    fn _derive_address(pub_key: bytes64) -> Address {
+        let h1:   bytes32  = sha256(to_string(pub_key))
+        let h2:   bytes32  = sha256(to_string(h1))
+        let raw:  string   = base58_encode(h2[:20])
+        return Address(self.ATC_PREFIX + raw[:self.ADDR_LEN])
+    }
+
+    // Mnemonic aus Private Key
+    fn _generate_mnemonic(priv: bytes32) -> string {
+        // 12-Wort BIP39-kompatible Phrase
+        return "/* 12 Wörter aus proprietärer ATC-Wortliste */"
+    }
+
+    // Wallet aus Mnemonic wiederherstellen
+    fn restore_from_mnemonic(mnemonic: string) -> WalletKeys {
+        let private_key: bytes32 = sha256(mnemonic)
+        let public_key:  bytes64 = ecdsa_pubkey(private_key)
+        let address:     Address = self._derive_address(public_key)
+        return WalletKeys {
+            address:     address,
+            private_key: private_key,
+            public_key:  public_key,
+            mnemonic:    mnemonic,
+        }
+    }
+
+    // Adresse validieren
+    fn validate_address(addr: string) -> bool {
+        if !addr.starts_with(self.ATC_PREFIX) { return false }
+        if addr.len() != safe_add(3, self.ADDR_LEN) { return false }
+        return true
+    }
+
+    // Transaktion erstellen und signieren
+    fn create_tx(
+        from_priv: bytes32,
+        from_pub:  bytes64,
+        to:        Address,
+        amount:    u128,
+        nonce:     u64,
+    ) -> Transaction {
+        let from_addr: Address = self._derive_address(from_pub)
+        require(self.validate_address(to_string(to)), "Ungültige Empfängeradresse")
+        require(amount > 0, "Betrag muss > 0 sein")
+
+        let tx_data: string = to_string(from_addr)
+                            + to_string(to)
+                            + to_string(amount)
+                            + to_string(nonce)
+        let sig: string = ecdsa_sign(tx_data, from_priv)
+
+        emit TransactionCreated(from_addr, to, amount)
+        return Transaction {
+            from_:     from_addr,
+            to:        to,
+            amount:    amount,
+            fee:       self.MIN_FEE,
+            nonce:     nonce,
+            timestamp: now(),
+            data:      "",
+            signature: sig,
+            pub_key:   to_string(from_pub),
+        }
+    }
+
+    // Transaktion verifizieren
+    fn verify_tx(tx: Transaction) -> bool {
+        let tx_data: string = to_string(tx.from_)
+                            + to_string(tx.to)
+                            + to_string(tx.amount)
+                            + to_string(tx.nonce)
+        return ecdsa_verify(tx_data, tx.signature, tx.pub_key)
+    }
+}
