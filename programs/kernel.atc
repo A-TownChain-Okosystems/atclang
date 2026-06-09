@@ -1,0 +1,147 @@
+// ╔══════════════════════════════════════════════════════╗
+// ║  ShivaOS Kernel — ATS-1000 konform                 ║
+// ║  ATCLang v0.2.0 | Proprietär | Kein POSIX-Klon     ║
+// ╚══════════════════════════════════════════════════════╝
+
+use ATC::Core::EventBus
+use ATC::Core::ModuleLoader
+use ATC::Types::{ PID, ProcessState, ProcessType }
+
+// Prozess-Status Enum
+enum ProcessState {
+    CREATED,
+    READY,
+    RUNNING,
+    BLOCKED,
+    TERMINATED,
+}
+
+// Prozess-Typ Enum
+enum ProcessType {
+    AGENT,      // KI-Agent
+    SERVICE,    // Hintergrund-Dienst
+    CONTRACT,   // Smart Contract
+    DAEMON,     // System-Daemon
+    USER,       // User-Prozess
+}
+
+// Prozess-Datenstruktur
+struct Process {
+    pid:      u64,
+    name:     string,
+    ptype:    ProcessType,
+    state:    ProcessState,
+    priority: u8,
+    mem_used: u64,
+    created:  u64,
+}
+
+// Kernel-Hauptklasse
+contract ShivaKernel {
+    state version:  string  = "2.1.0"
+    state running:  bool    = false
+    state processes: Map<u64, Process>
+    state next_pid:  u64    = 1
+    state event_bus: EventBus
+    state start_ts:  u64    = 0
+
+    // Kernel starten
+    fn start() {
+        require(!self.running, "Kernel läuft bereits")
+        self.running  = true
+        self.start_ts = now()
+        self.event_bus.emit("kernel.boot", { "version": self.version })
+        emit KernelStarted(self.version, now())
+    }
+
+    // Kernel stoppen — graceful shutdown
+    fn stop() {
+        require(self.running, "Kernel läuft nicht")
+        // Alle Prozesse in umgekehrter Reihenfolge stoppen
+        let pids: Vec<u64> = self.processes.keys()
+        for pid in pids {
+            self._kill_process(pid)
+        }
+        self.running = false
+        self.event_bus.emit("kernel.stopped", {})
+        emit KernelStopped(now())
+    }
+
+    // Neuen Prozess starten (spawn)
+    fn spawn(name: string, ptype: ProcessType, priority: u8) -> u64 {
+        require(self.running, "Kernel nicht aktiv")
+        require(priority >= 1 && priority <= 10, "Priorität 1-10")
+
+        let pid: u64 = self.next_pid
+        self.next_pid = safe_add(self.next_pid, 1)
+
+        let proc: Process = Process {
+            pid:      pid,
+            name:     name,
+            ptype:    ptype,
+            state:    ProcessState::READY,
+            priority: priority,
+            mem_used: 0,
+            created:  now(),
+        }
+        self.processes[pid] = proc
+        self.event_bus.emit("process.spawned", { "pid": pid, "name": name })
+        emit ProcessSpawned(pid, name, ptype)
+        return pid
+    }
+
+    // Prozess beenden
+    fn kill(pid: u64) -> bool {
+        require(self.processes.contains(pid), "PID nicht gefunden")
+        self._kill_process(pid)
+        return true
+    }
+
+    // Prozess-Status abfragen
+    fn get_process(pid: u64) -> Process {
+        require(self.processes.contains(pid), "PID nicht gefunden")
+        return self.processes[pid]
+    }
+
+    // Alle Prozesse auflisten
+    fn list_processes() -> Vec<Process> {
+        return self.processes.values()
+    }
+
+    // Kernel-Status
+    fn status() -> Map<string, string> {
+        return {
+            "version":  self.version,
+            "running":  to_string(self.running),
+            "uptime_s": to_string(now() - self.start_ts),
+            "processes": to_string(self.processes.len()),
+        }
+    }
+
+    // Speicher allozieren für Prozess
+    fn alloc(pid: u64, size: u64) -> bool {
+        require(self.processes.contains(pid), "PID nicht gefunden")
+        let proc: Process = self.processes[pid]
+        proc.mem_used = safe_add(proc.mem_used, size)
+        self.processes[pid] = proc
+        return true
+    }
+
+    // Uptime in Sekunden
+    fn uptime() -> u64 {
+        if !self.running {
+            return 0
+        }
+        return now() - self.start_ts
+    }
+
+    // Intern: Prozess sicher beenden
+    fn _kill_process(pid: u64) {
+        if self.processes.contains(pid) {
+            let proc: Process = self.processes[pid]
+            proc.state = ProcessState::TERMINATED
+            self.processes[pid] = proc
+            emit ProcessTerminated(pid, proc.name)
+        }
+    }
+}
