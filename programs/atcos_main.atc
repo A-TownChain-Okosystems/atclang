@@ -1,0 +1,1153 @@
+// ╔══════════════════════════════════════════════════════════════╗
+// ║   A-TownChain OS — Unified System                           ║
+// ║   Geschrieben in ATCLang v0.1.0-alpha                       ║
+// ║   Version: 2.1.0 | ShivaCore × Aurora                      ║
+// ║   Eigenentwicklung — Kein Klon. Kein Fork.                  ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+import ATC::OS::Kernel
+import ATC::OS::Filesystem
+import ATC::Net::P2P
+import ATC::Consensus::Shiva
+import ATC::Blockchain::Core
+import ATC::Lang::Runtime
+import ATC::Gateway::API
+import ATC::UI::Dashboard
+
+// ── Globale Konstanten ──────────────────────────────────────────
+const VERSION: String    = "2.1.0-alpha"
+const GATEWAY_PORT: UInt32  = 4000
+const BACKEND_PORT: UInt32  = 5000
+const P2P_PORT: UInt32      = 4001
+const DASH_PORT: UInt32     = 8080
+const DIFFICULTY: UInt32    = 4
+const FS_PATH: String       = "/atcfs/main"
+
+
+// ══════════════════════════════════════════════════════════════
+//  SUBSYSTEM INTERFACES
+// ══════════════════════════════════════════════════════════════
+
+trait Subsystem {
+    fn boot()   -> Bool
+    fn stop()   -> Bool
+    fn status() -> Map<String, String>
+    fn name()   -> String
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  1. SHIVA KERNEL
+// ══════════════════════════════════════════════════════════════
+
+struct ProcessHandle {
+    pid:    UInt32
+    name:   String
+    ptype:  String
+    state:  String
+}
+
+struct IPCChannel {
+    id:       UInt32
+    ctype:    String   // PIPE | QUEUE | STREAM | BROADCAST
+    capacity: UInt32
+}
+
+contract ShivaKernel : Subsystem {
+
+    state version:   String  = "1.0.0-alpha"
+    state processes: List<ProcessHandle>
+    state channels:  List<IPCChannel>
+    state next_pid:  UInt32  = 0
+    state memory:    Map<String, Bytes>
+    state running:   Bool    = false
+
+    // Syscall-Tabelle
+    state SYSCALLS: Map<UInt32, String> = {
+        0: "SYS_SPAWN",   1: "SYS_KILL",    2: "SYS_WAIT",
+        3: "SYS_IPC_OPEN",4: "SYS_IPC_SEND",5: "SYS_IPC_RECV",
+        6: "SYS_MEM_ALLOC",7:"SYS_MEM_FREE",8: "SYS_FS_OPEN",
+        9: "SYS_FS_READ", 10:"SYS_FS_WRITE",11:"SYS_NET_SEND"
+    }
+
+    fn boot() -> Bool {
+        emit KernelBoot("Kernel-Speicher allokieren...")
+        emit KernelBoot("Prozess-Tabelle initialisieren...")
+        emit KernelBoot("IPC-Kanäle einrichten...")
+        emit KernelBoot("Syscall-Tabelle laden (11 Einträge)...")
+
+        // System-Prozesse spawnen
+        self.spawn_process("atc-init",      "SYSTEM")
+        self.spawn_process("atc-scheduler", "SYSTEM")
+        self.spawn_process("atc-ipc",       "SYSTEM")
+
+        self.running = true
+        emit KernelReady("ShivaOS Kernel v" + self.version + " bereit")
+        return true
+    }
+
+    fn spawn_process(name: String, ptype: String) -> UInt32 {
+        let pid: UInt32 = self.next_pid
+        self.next_pid += 1
+        let proc: ProcessHandle = ProcessHandle {
+            pid:   pid,
+            name:  name,
+            ptype: ptype,
+            state: "RUNNING"
+        }
+        self.processes.push(proc)
+        emit ProcessSpawned(pid, name)
+        return pid
+    }
+
+    fn kill_process(pid: UInt32) -> Bool {
+        for proc in self.processes {
+            if proc.pid == pid {
+                proc.state = "DEAD"
+                emit ProcessKilled(pid)
+                return true
+            }
+        }
+        return false
+    }
+
+    fn open_channel(ctype: String, capacity: UInt32) -> IPCChannel {
+        let ch: IPCChannel = IPCChannel {
+            id:       self.channels.length(),
+            ctype:    ctype,
+            capacity: capacity
+        }
+        self.channels.push(ch)
+        emit IPCChannelOpened(ch.id, ctype)
+        return ch
+    }
+
+    fn alloc(owner: String, size: UInt32) -> Bool {
+        self.memory[owner] = ATC::OS::Memory::alloc(size)
+        return true
+    }
+
+    fn syscall(id: UInt32, args: List<String>) -> String {
+        require(id < 12, "Ungültige Syscall-ID")
+        let name: String = self.SYSCALLS[id]
+        emit SyscallExec(id, name, args)
+        return "OK"
+    }
+
+    fn stats() -> Map<String, UInt32> {
+        return {
+            "processes": self.processes.length(),
+            "channels":  self.channels.length(),
+            "memory":    self.memory.keys().length()
+        }
+    }
+
+    fn status() -> Map<String, String> {
+        return {
+            "name":      "ShivaKernel",
+            "version":   self.version,
+            "processes": self.processes.length().to_string(),
+            "running":   self.running.to_string()
+        }
+    }
+
+    fn name() -> String { return "KERNEL" }
+
+    fn stop() -> Bool {
+        self.running = false
+        emit KernelHalt("ShivaOS Kernel gestoppt")
+        return true
+    }
+
+    event KernelBoot(msg: String)
+    event KernelReady(msg: String)
+    event KernelHalt(msg: String)
+    event ProcessSpawned(pid: UInt32, name: String)
+    event ProcessKilled(pid: UInt32)
+    event IPCChannelOpened(id: UInt32, ctype: String)
+    event SyscallExec(id: UInt32, name: String, args: List<String>)
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  2. ATCFS — DEZENTRALES DATEISYSTEM
+// ══════════════════════════════════════════════════════════════
+
+struct INode {
+    ino:     UInt64
+    name:    String
+    ftype:   String   // FILE | DIR
+    size:    UInt64
+    owner:   Address
+    cid:     Hash256  // Content-ID (atc1...)
+    perms:   UInt16   // rwxrwxrwx
+}
+
+contract ATCFS : Subsystem {
+
+    state version:   String  = "1.0.0-alpha"
+    state inodes:    Map<UInt64, INode>
+    state next_ino:  UInt64  = 0
+    state root_cid:  Hash256
+    state owner:     Address
+
+    fn boot() -> Bool {
+        emit FSBoot("Root-Verzeichnis anlegen...")
+        emit FSBoot("INode-Tabelle initialisieren...")
+        emit FSBoot("Standard-Verzeichnisse erstellen...")
+
+        // Verzeichnisbaum
+        self.mkdir("/",          self.owner)
+        self.mkdir("/bin",       self.owner)
+        self.mkdir("/etc",       self.owner)
+        self.mkdir("/home",      self.owner)
+        self.mkdir("/tmp",       self.owner)
+        self.mkdir("/contracts", self.owner)
+        self.mkdir("/chain",     self.owner)
+
+        emit FSReady("ATCFS bereit | 7 Verzeichnisse")
+        return true
+    }
+
+    fn mkdir(path: String, owner: Address) -> INode {
+        let ino: UInt64 = self.next_ino
+        self.next_ino += 1
+        let node: INode = INode {
+            ino:   ino,
+            name:  path,
+            ftype: "DIR",
+            size:  0,
+            owner: owner,
+            cid:   ATC::Hash::sha3(path),
+            perms: 0o755
+        }
+        self.inodes[ino] = node
+        emit DirCreated(path)
+        return node
+    }
+
+    fn write(path: String, data: Bytes, owner: Address) -> INode {
+        let cid: Hash256 = ATC::Hash::sha3_atc(data)
+        let ino: UInt64  = self.next_ino
+        self.next_ino += 1
+        let node: INode = INode {
+            ino:   ino,
+            name:  path,
+            ftype: "FILE",
+            size:  data.length(),
+            owner: owner,
+            cid:   cid,
+            perms: 0o644
+        }
+        self.inodes[ino] = node
+        emit FileWritten(path, cid, data.length())
+        return node
+    }
+
+    fn read(path: String) -> Option<Bytes> {
+        for ino in self.inodes.values() {
+            if ino.name == path {
+                emit FileRead(path)
+                return ATC::Storage::load(ino.cid)
+            }
+        }
+        return null
+    }
+
+    fn stats() -> Map<String, UInt64> {
+        let dirs:  UInt64 = 0
+        let files: UInt64 = 0
+        for node in self.inodes.values() {
+            if node.ftype == "DIR"  { dirs  += 1 }
+            if node.ftype == "FILE" { files += 1 }
+        }
+        return { "dirs": dirs, "files": files, "inodes": self.inodes.keys().length() }
+    }
+
+    fn status() -> Map<String, String> {
+        let s: Map<String, UInt64> = self.stats()
+        return {
+            "name":  "ATCFS",
+            "dirs":  s["dirs"].to_string(),
+            "files": s["files"].to_string()
+        }
+    }
+
+    fn name()   -> String { return "ATCFS" }
+    fn stop()   -> Bool   { return true }
+
+    event FSBoot(msg: String)
+    event FSReady(msg: String)
+    event DirCreated(path: String)
+    event FileWritten(path: String, cid: Hash256, size: UInt64)
+    event FileRead(path: String)
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  3. SHIVA CONSENSUS — PoH + PoS + PoW
+// ══════════════════════════════════════════════════════════════
+
+struct ATCTransaction {
+    tx_id:    Hash256
+    sender:   Address
+    receiver: Address
+    amount:   UInt256
+    nonce:    UInt64
+    sig:      Bytes
+}
+
+struct BlockHeader {
+    height:      UInt64
+    prev_hash:   Hash256
+    block_hash:  Hash256
+    validator:   Address
+    poh_hash:    Hash256
+    timestamp:   UInt64
+    difficulty:  UInt32
+    nonce:       UInt64
+}
+
+struct ATCBlock {
+    header:       BlockHeader
+    transactions: List<ATCTransaction>
+    signatures:   List<Bytes>
+}
+
+struct ValidatorInfo {
+    address:    Address
+    stake:      UInt256
+    reputation: UInt32
+    active:     Bool
+}
+
+contract ShivaConsensus : Subsystem {
+
+    state version:    String   = "1.0.0-alpha"
+    state chain:      List<ATCBlock>
+    state mempool:    List<ATCTransaction>
+    state validators: List<ValidatorInfo>
+    state poh_chain:  List<Hash256>
+    state difficulty: UInt32   = 4
+    state total_stake: UInt256 = 0
+
+    fn boot() -> Bool {
+        emit ConsensusBoot("PoH-Zeitkette initialisieren...")
+        emit ConsensusBoot("PoS Validator-Set laden...")
+        emit ConsensusBoot("PoW Difficulty Target setzen...")
+        emit ConsensusBoot("Genesis Block erzeugen...")
+
+        // Genesis PoH
+        let genesis_poh: Hash256 = ATC::Hash::sha3("GENESIS_ATC_2026")
+        self.poh_chain.push(genesis_poh)
+
+        // Genesis Block
+        let genesis: ATCBlock = self.create_genesis()
+        self.chain.push(genesis)
+
+        emit ConsensusReady("ShivaConsensus v" + self.version + " bereit")
+        return true
+    }
+
+    fn create_genesis() -> ATCBlock {
+        let header: BlockHeader = BlockHeader {
+            height:     0,
+            prev_hash:  Hash256("0000000000000000000000000000000000000000000000000000000000000000"),
+            block_hash: ATC::Hash::sha3("ATCCHAIN_GENESIS_2026"),
+            validator:  Address("ATC_GENESIS_VALIDATOR"),
+            poh_hash:   self.poh_chain[0],
+            timestamp:  block.timestamp,
+            difficulty: self.difficulty,
+            nonce:      0
+        }
+        return ATCBlock {
+            header:       header,
+            transactions: [],
+            signatures:   []
+        }
+    }
+
+    fn add_transaction(tx: ATCTransaction) -> Bool {
+        require(tx.amount > 0,     "Betrag muss > 0 sein")
+        require(tx.sender != tx.receiver, "Selbsttransfer verboten")
+        self.mempool.push(tx)
+        emit TxAdded(tx.tx_id, tx.amount)
+        return true
+    }
+
+    fn register_validator(addr: Address, stake: UInt256) -> Bool {
+        require(stake >= 1000, "Mindest-Stake: 1000 ATC")
+        let v: ValidatorInfo = ValidatorInfo {
+            address:    addr,
+            stake:      stake,
+            reputation: 100,
+            active:     true
+        }
+        self.validators.push(v)
+        self.total_stake += stake
+        emit ValidatorRegistered(addr, stake)
+        return true
+    }
+
+    // Phase 1: PoH — Proof of History
+    fn tick_poh() -> Hash256 {
+        let last: Hash256 = self.poh_chain[self.poh_chain.length() - 1]
+        let tick: Hash256 = ATC::Hash::sha3_atc(last)
+        self.poh_chain.push(tick)
+        return tick
+    }
+
+    // Phase 2: PoS — Proof of Stake
+    fn select_validator() -> Address {
+        require(self.validators.length() > 0, "Keine Validatoren")
+        let rand_stake: UInt256 = ATC::Rand::secure() % self.total_stake
+        let acc: UInt256 = 0
+        for v in self.validators {
+            if v.active {
+                acc += v.stake
+                if acc >= rand_stake {
+                    return v.address
+                }
+            }
+        }
+        return self.validators[0].address
+    }
+
+    // Phase 3: PoW — Proof of Work (finaler Seal)
+    fn mine_seal(data: Bytes, difficulty: UInt32) -> UInt64 {
+        let nonce: UInt64 = 0
+        while true {
+            let candidate: Hash256 = ATC::Hash::sha3_atc(data + nonce.to_bytes())
+            if ATC::Hash::leading_zeros(candidate) >= difficulty {
+                return nonce
+            }
+            nonce += 1
+        }
+        return nonce
+    }
+
+    fn produce_block(validator: Address, max_txs: UInt32) -> ATCBlock {
+        // Phase 1: PoH Tick
+        let poh_hash: Hash256 = self.tick_poh()
+
+        // Phase 2: PoS Validator
+        let selected: Address = self.select_validator()
+
+        // Transaktionen aus Mempool
+        let txs: List<ATCTransaction> = []
+        let count: UInt32 = 0
+        for tx in self.mempool {
+            if count >= max_txs { break }
+            txs.push(tx)
+            count += 1
+        }
+
+        // Block-Header bauen
+        let prev: ATCBlock = self.chain[self.chain.length() - 1]
+        let header_data: Bytes = prev.header.block_hash.to_bytes()
+                               + selected.to_bytes()
+                               + poh_hash.to_bytes()
+
+        // Phase 3: PoW Seal
+        let nonce: UInt64 = self.mine_seal(header_data, self.difficulty)
+
+        let header: BlockHeader = BlockHeader {
+            height:     self.chain.length(),
+            prev_hash:  prev.header.block_hash,
+            block_hash: ATC::Hash::sha3_atc(header_data + nonce.to_bytes()),
+            validator:  selected,
+            poh_hash:   poh_hash,
+            timestamp:  block.timestamp,
+            difficulty: self.difficulty,
+            nonce:      nonce
+        }
+
+        let new_block: ATCBlock = ATCBlock {
+            header:       header,
+            transactions: txs,
+            signatures:   []
+        }
+
+        // Mempool leeren
+        self.mempool = []
+        self.chain.push(new_block)
+        emit BlockProduced(header.height, header.block_hash, txs.length())
+        return new_block
+    }
+
+    fn verify_block(b: ATCBlock) -> Bool {
+        // PoH-Kette prüfen
+        require(self.poh_chain.contains(b.header.poh_hash), "Ungültiger PoH-Hash")
+        // PoW-Schwierigkeit prüfen
+        let zeros: UInt32 = ATC::Hash::leading_zeros(b.header.block_hash)
+        require(zeros >= b.header.difficulty, "PoW-Schwierigkeit nicht erreicht")
+        // Vorgänger prüfen
+        if self.chain.length() > 0 {
+            let prev: ATCBlock = self.chain[self.chain.length() - 1]
+            require(b.header.prev_hash == prev.header.block_hash, "Ungültiger prev_hash")
+        }
+        return true
+    }
+
+    fn chain_height() -> UInt64 {
+        return self.chain.length()
+    }
+
+    fn status() -> Map<String, String> {
+        return {
+            "name":       "ShivaConsensus",
+            "height":     self.chain.length().to_string(),
+            "validators": self.validators.length().to_string(),
+            "mempool":    self.mempool.length().to_string()
+        }
+    }
+
+    fn name() -> String { return "CONSENSUS" }
+    fn stop() -> Bool   { return true }
+
+    event ConsensusBoot(msg: String)
+    event ConsensusReady(msg: String)
+    event TxAdded(tx_id: Hash256, amount: UInt256)
+    event ValidatorRegistered(addr: Address, stake: UInt256)
+    event BlockProduced(height: UInt64, hash: Hash256, tx_count: UInt32)
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  4. ATCNET — P2P NETZWERK
+// ══════════════════════════════════════════════════════════════
+
+struct Peer {
+    node_id:  Hash256
+    address:  String
+    port:     UInt32
+    atc_addr: Address
+    active:   Bool
+    last_seen: UInt64
+}
+
+struct ATCMessage {
+    msg_type: String
+    sender:   Hash256
+    receiver: Hash256
+    payload:  Bytes
+    nonce:    UInt64
+    sig:      Bytes
+}
+
+contract ATCNet : Subsystem {
+
+    state version:    String = "1.0.0-alpha"
+    state node_id:    Hash256
+    state host:       String
+    state port:       UInt32
+    state peers:      List<Peer>
+    state routing:    Map<Hash256, Peer>   // Kademlia DHT
+    state K_BUCKET:   UInt32 = 20
+    state running:    Bool   = false
+
+    fn boot() -> Bool {
+        emit NetBoot("NodeID generieren...")
+        self.node_id = ATC::Hash::sha3(caller.to_string() + block.timestamp.to_string())
+
+        emit NetBoot("Routing-Tabelle (Kademlia k=20) initialisieren...")
+        emit NetBoot("UDP-Socket binden auf Port " + self.port.to_string() + "...")
+        emit NetBoot("Heartbeat-Thread starten...")
+
+        self.running = true
+        emit NetReady("ATCNet v" + self.version + " | NodeID: " + self.node_id.to_short_string())
+        return true
+    }
+
+    fn connect(peer_addr: String, peer_port: UInt32) -> Bool {
+        let peer_id: Hash256 = ATC::Hash::sha3(peer_addr + peer_port.to_string())
+        let peer: Peer = Peer {
+            node_id:   peer_id,
+            address:   peer_addr,
+            port:      peer_port,
+            atc_addr:  Address(""),
+            active:    true,
+            last_seen: block.timestamp
+        }
+        self.peers.push(peer)
+        self.routing[peer_id] = peer
+        emit PeerConnected(peer_id, peer_addr, peer_port)
+        return true
+    }
+
+    fn broadcast(msg_type: String, payload: Bytes) -> UInt32 {
+        let sent: UInt32 = 0
+        for peer in self.peers {
+            if peer.active {
+                let msg: ATCMessage = ATCMessage {
+                    msg_type: msg_type,
+                    sender:   self.node_id,
+                    receiver: peer.node_id,
+                    payload:  payload,
+                    nonce:    ATC::Rand::nonce(),
+                    sig:      ATC::Crypto::sign(payload, caller)
+                }
+                ATC::Net::UDP::send(peer.address, peer.port, msg.encode())
+                sent += 1
+            }
+        }
+        emit Broadcast(msg_type, sent)
+        return sent
+    }
+
+    fn discover(bootstrap_addr: String, bootstrap_port: UInt32) -> List<Peer> {
+        let found: List<Peer> = []
+        let nodes: List<Peer> = ATC::Net::Kademlia::find_node(
+            self.node_id, bootstrap_addr, bootstrap_port, self.K_BUCKET
+        )
+        for n in nodes {
+            self.connect(n.address, n.port)
+            found.push(n)
+        }
+        emit Discovery(found.length())
+        return found
+    }
+
+    fn peer_count() -> UInt32 {
+        let active: UInt32 = 0
+        for p in self.peers {
+            if p.active { active += 1 }
+        }
+        return active
+    }
+
+    fn status() -> Map<String, String> {
+        return {
+            "name":     "ATCNet",
+            "node_id":  self.node_id.to_short_string(),
+            "peers":    self.peer_count().to_string(),
+            "running":  self.running.to_string()
+        }
+    }
+
+    fn name() -> String { return "ATCNET" }
+
+    fn stop() -> Bool {
+        self.running = false
+        emit NetHalt("ATCNet gestoppt")
+        return true
+    }
+
+    event NetBoot(msg: String)
+    event NetReady(msg: String)
+    event NetHalt(msg: String)
+    event PeerConnected(id: Hash256, addr: String, port: UInt32)
+    event Broadcast(msg_type: String, count: UInt32)
+    event Discovery(found: UInt32)
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  5. ATC WALLET
+// ══════════════════════════════════════════════════════════════
+
+struct WalletKeys {
+    address:    Address
+    pub_key:    Bytes
+    seed_words: List<String>   // BIP39 24-Wort Phrase
+}
+
+contract ATCWalletManager : Subsystem {
+
+    state wallets:   Map<Address, WalletKeys>
+    state balances:  Map<Address, UInt256>
+
+    fn new_wallet(owner_name: String) -> WalletKeys {
+        // BIP39 Seed → ECDSA secp256k1 → ATC-Adresse
+        let seed:  Bytes   = ATC::Crypto::random_bytes(32)
+        let words: List<String> = ATC::Crypto::BIP39::to_mnemonic(seed, 24)
+        let priv:  Bytes   = ATC::Crypto::sha256(seed)
+        let pub_:  Bytes   = ATC::Crypto::ECDSA::privkey_to_pubkey(priv)
+        let hash:  Hash256 = ATC::Hash::sha256(pub_)
+        let addr:  Address = Address("ATC" + hash.to_hex()[0:32])
+
+        let keys: WalletKeys = WalletKeys {
+            address:    addr,
+            pub_key:    pub_,
+            seed_words: words
+        }
+        self.wallets[addr]  = keys
+        self.balances[addr] = 0
+        emit WalletCreated(addr, owner_name)
+        return keys
+    }
+
+    fn sign_tx(tx: ATCTransaction, priv_key: Bytes) -> Bytes {
+        let data: Bytes = tx.tx_id.to_bytes()
+                        + tx.sender.to_bytes()
+                        + tx.receiver.to_bytes()
+                        + tx.amount.to_bytes()
+        return ATC::Crypto::ECDSA::sign(data, priv_key)
+    }
+
+    fn verify_sig(tx: ATCTransaction) -> Bool {
+        let keys: WalletKeys = self.wallets[tx.sender]
+        let data: Bytes = tx.tx_id.to_bytes()
+                        + tx.sender.to_bytes()
+                        + tx.receiver.to_bytes()
+                        + tx.amount.to_bytes()
+        return ATC::Crypto::ECDSA::verify(data, tx.sig, keys.pub_key)
+    }
+
+    fn balance(addr: Address) -> UInt256 {
+        return self.balances.get(addr, 0)
+    }
+
+    fn boot() -> Bool {
+        emit WalletReady("ATCWallet bereit")
+        return true
+    }
+
+    fn status() -> Map<String, String> {
+        return { "name": "WALLET", "wallets": self.wallets.keys().length().to_string() }
+    }
+
+    fn name() -> String { return "WALLET" }
+    fn stop() -> Bool   { return true }
+
+    event WalletCreated(addr: Address, owner: String)
+    event WalletReady(msg: String)
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  6. ATC-8300 TOKEN CONTRACT
+// ══════════════════════════════════════════════════════════════
+
+contract ATCToken : ATC-8300 {
+
+    state name_:     String  = "ATCoin"
+    state symbol:    String  = "ATC"
+    state decimals:  UInt8   = 18
+    state supply:    UInt256 = 0
+    state balances:  Map<Address, UInt256>
+    state allowances: Map<Address, Map<Address, UInt256>>
+    state owner:     Address
+
+    fn boot() -> Bool {
+        self.owner = caller
+        // Genesis-Verteilung
+        let genesis_supply: UInt256 = 1_000_000_000 * (10 ** 18)
+        self.mint(self.owner, genesis_supply)
+        emit TokenReady(self.name_, self.symbol, genesis_supply)
+        return true
+    }
+
+    fn mint(to: Address, amount: UInt256) -> Bool {
+        require(caller == self.owner, "Nur Owner darf minten")
+        require(amount > 0,           "Betrag muss > 0 sein")
+        self.balances[to] = self.balances.get(to, 0) + amount
+        self.supply += amount
+        emit Transfer(Address("0x0"), to, amount)
+        return true
+    }
+
+    fn burn(from: Address, amount: UInt256) -> Bool {
+        require(self.balances.get(from, 0) >= amount, "Guthaben zu gering")
+        self.balances[from] -= amount
+        self.supply -= amount
+        emit Transfer(from, Address("0x0"), amount)
+        return true
+    }
+
+    fn transfer(to: Address, amount: UInt256) -> Bool {
+        require(self.balances.get(caller, 0) >= amount, "Guthaben zu gering")
+        require(to != Address("0x0"),                   "Ungültige Adresse")
+        self.balances[caller] -= amount
+        self.balances[to] = self.balances.get(to, 0) + amount
+        emit Transfer(caller, to, amount)
+        return true
+    }
+
+    fn approve(spender: Address, amount: UInt256) -> Bool {
+        self.allowances[caller][spender] = amount
+        emit Approval(caller, spender, amount)
+        return true
+    }
+
+    fn transfer_from(from: Address, to: Address, amount: UInt256) -> Bool {
+        let allowed: UInt256 = self.allowances[from].get(caller, 0)
+        require(allowed >= amount,                              "Nicht genehmigt")
+        require(self.balances.get(from, 0) >= amount,          "Guthaben zu gering")
+        self.allowances[from][caller] -= amount
+        self.balances[from] -= amount
+        self.balances[to] = self.balances.get(to, 0) + amount
+        emit Transfer(from, to, amount)
+        return true
+    }
+
+    fn balance_of(addr: Address) -> UInt256 {
+        return self.balances.get(addr, 0)
+    }
+
+    fn total_supply() -> UInt256 { return self.supply }
+
+    fn status() -> Map<String, String> {
+        return {
+            "name":   "ATC8300Token",
+            "supply": self.supply.to_string(),
+            "symbol": self.symbol
+        }
+    }
+
+    fn name() -> String { return "ATC8300" }
+    fn stop() -> Bool   { return true }
+
+    event Transfer(from: Address, to: Address, amount: UInt256)
+    event Approval(owner: Address, spender: Address, amount: UInt256)
+    event TokenReady(name: String, symbol: String, supply: UInt256)
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  7. SMART CONTRACT REGISTRY
+// ══════════════════════════════════════════════════════════════
+
+struct ContractEntry {
+    address:   Address
+    name:      String
+    standard:  String
+    deployed:  UInt64
+    active:    Bool
+}
+
+contract SmartContractRegistry : Subsystem {
+
+    state contracts:  Map<Address, ContractEntry>
+    state by_standard: Map<String, List<Address>>
+
+    fn deploy(addr: Address, name: String, standard: String) -> Bool {
+        require(!self.contracts.has(addr), "Contract bereits deployed")
+        let entry: ContractEntry = ContractEntry {
+            address:  addr,
+            name:     name,
+            standard: standard,
+            deployed: block.timestamp,
+            active:   true
+        }
+        self.contracts[addr] = entry
+        if !self.by_standard.has(standard) {
+            self.by_standard[standard] = []
+        }
+        self.by_standard[standard].push(addr)
+        emit ContractDeployed(addr, name, standard)
+        return true
+    }
+
+    fn list_by_standard(standard: String) -> List<Address> {
+        return self.by_standard.get(standard, [])
+    }
+
+    fn boot() -> Bool {
+        emit RegistryReady("Smart Contract Registry bereit")
+        return true
+    }
+
+    fn status() -> Map<String, String> {
+        return { "name": "REGISTRY", "contracts": self.contracts.keys().length().to_string() }
+    }
+
+    fn name() -> String { return "REGISTRY" }
+    fn stop() -> Bool   { return true }
+
+    event ContractDeployed(addr: Address, name: String, standard: String)
+    event RegistryReady(msg: String)
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  8. API GATEWAY
+// ══════════════════════════════════════════════════════════════
+
+struct HTTPRequest {
+    method:  String
+    path:    String
+    body:    Bytes
+    headers: Map<String, String>
+}
+
+struct HTTPResponse {
+    status:  UInt32
+    body:    Bytes
+    headers: Map<String, String>
+}
+
+contract APIGateway : Subsystem {
+
+    state version: String  = "2.1.0"
+    state port:    UInt32  = 4000
+    state running: Bool    = false
+    state routes:  Map<String, String>
+
+    fn boot() -> Bool {
+        emit GatewayBoot("Middleware laden (Auth, Logger, RateLimit)...")
+        emit GatewayBoot("Routing-Tabelle aufbauen...")
+        emit GatewayBoot("Gateway-Server starten auf Port " + self.port.to_string() + "...")
+
+        self.routes = {
+            "GET /health":             "backend:health",
+            "GET /api/status":         "backend:status",
+            "POST /api/wallet/new":    "backend:wallet_new",
+            "POST /api/block/produce": "backend:block_produce",
+            "POST /api/atclang/run":   "backend:atclang_run",
+            "POST /api/tx/send":       "backend:tx_send",
+            "GET /api/chain":          "backend:chain_info",
+            "GET /api/peers":          "backend:peers",
+        }
+
+        self.running = true
+        emit GatewayReady("API Gateway bereit | Port " + self.port.to_string())
+        return true
+    }
+
+    fn route(req: HTTPRequest) -> HTTPResponse {
+        let key: String = req.method + " " + req.path
+        if self.routes.has(key) {
+            let handler: String = self.routes[key]
+            emit RequestRouted(req.method, req.path, handler)
+            return self.forward(req, handler)
+        }
+        return HTTPResponse {
+            status:  404,
+            body:    "{\"error\": \"Not Found\"}".to_bytes(),
+            headers: { "Content-Type": "application/json" }
+        }
+    }
+
+    fn forward(req: HTTPRequest, handler: String) -> HTTPResponse {
+        // Middleware-Chain: Auth → RateLimit → Logger → Handler
+        let auth_ok: Bool = self.check_auth(req)
+        if !auth_ok {
+            return HTTPResponse { status: 401, body: "{\"error\":\"Unauthorized\"}".to_bytes(), headers: {} }
+        }
+        let response: HTTPResponse = ATC::RPC::call(handler, req)
+        emit RequestCompleted(req.path, response.status)
+        return response
+    }
+
+    fn check_auth(req: HTTPRequest) -> Bool {
+        let token: String = req.headers.get("X-ATC-Token", "")
+        if token == "" { return true }   // Public routes
+        return ATC::Crypto::verify_jwt(token)
+    }
+
+    fn status() -> Map<String, String> {
+        return {
+            "name":    "APIGateway",
+            "port":    self.port.to_string(),
+            "routes":  self.routes.keys().length().to_string(),
+            "running": self.running.to_string()
+        }
+    }
+
+    fn name() -> String { return "GATEWAY" }
+    fn stop() -> Bool   { self.running = false; return true }
+
+    event GatewayBoot(msg: String)
+    event GatewayReady(msg: String)
+    event RequestRouted(method: String, path: String, handler: String)
+    event RequestCompleted(path: String, status: UInt32)
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  9. SYSTEM MANAGER — ZENTRALE STEUERUNG
+// ══════════════════════════════════════════════════════════════
+
+contract ATCSystem {
+
+    state version:    String  = VERSION
+    state running:    Bool    = false
+    state start_time: UInt64  = 0
+    state subsystems: Map<String, Subsystem>
+    state errors:     List<String>
+
+    state kernel:    ShivaKernel
+    state fs:        ATCFS
+    state consensus: ShivaConsensus
+    state network:   ATCNet
+    state wallet:    ATCWalletManager
+    state token:     ATCToken
+    state registry:  SmartContractRegistry
+    state gateway:   APIGateway
+
+    fn boot_all() -> Bool {
+        self.start_time = block.timestamp
+        self.running    = true
+
+        emit SystemBoot("╔══════════════════════════════════════════╗")
+        emit SystemBoot("║   A-TownChain OS v" + VERSION + "              ║")
+        emit SystemBoot("║   ShivaCore × Aurora                    ║")
+        emit SystemBoot("║   Kein Klon. Kein Fork. Eigenentwicklung║")
+        emit SystemBoot("╚══════════════════════════════════════════╝")
+        emit SystemBoot("Starte alle Subsysteme...")
+
+        let steps: List<String> = [
+            "kernel", "fs", "consensus", "network",
+            "wallet", "token", "registry", "gateway"
+        ]
+
+        for step in steps {
+            let ok: Bool = self.boot_subsystem(step)
+            if !ok {
+                self.errors.push(step + " konnte nicht gestartet werden")
+            }
+        }
+
+        let elapsed: UInt64 = block.timestamp - self.start_time
+        emit SystemReady(
+            "A-TownChain OS v" + VERSION + " BEREIT in " + elapsed.to_string() + "ms",
+            self.subsystems.keys().length()
+        )
+        return self.errors.length() == 0
+    }
+
+    fn boot_subsystem(name: String) -> Bool {
+        emit SubsystemBooting(name)
+        let ok: Bool = false
+
+        if name == "kernel"   { ok = self.kernel.boot()    ; self.subsystems["kernel"]   = self.kernel    }
+        if name == "fs"       { ok = self.fs.boot()        ; self.subsystems["fs"]       = self.fs        }
+        if name == "consensus"{ ok = self.consensus.boot() ; self.subsystems["consensus"]= self.consensus }
+        if name == "network"  { ok = self.network.boot()   ; self.subsystems["network"]  = self.network   }
+        if name == "wallet"   { ok = self.wallet.boot()    ; self.subsystems["wallet"]   = self.wallet    }
+        if name == "token"    { ok = self.token.boot()     ; self.subsystems["token"]    = self.token     }
+        if name == "registry" { ok = self.registry.boot()  ; self.subsystems["registry"] = self.registry  }
+        if name == "gateway"  { ok = self.gateway.boot()   ; self.subsystems["gateway"]  = self.gateway   }
+
+        if ok { emit SubsystemReady(name) }
+        else  { emit SubsystemError(name) }
+        return ok
+    }
+
+    fn status() -> Map<String, String> {
+        return {
+            "version":    self.version,
+            "running":    self.running.to_string(),
+            "subsystems": self.subsystems.keys().length().to_string(),
+            "errors":     self.errors.length().to_string(),
+            "chain":      self.consensus.chain_height().to_string(),
+            "peers":      self.network.peer_count().to_string(),
+        }
+    }
+
+    fn produce_block(validator_addr: Address) -> ATCBlock {
+        require(self.running, "System nicht aktiv")
+        let block: ATCBlock = self.consensus.produce_block(validator_addr, 100)
+        // Block ins ATCFS schreiben
+        self.fs.write(
+            "/chain/block_" + block.header.height.to_string() + ".atcb",
+            block.encode(),
+            validator_addr
+        )
+        // Peers benachrichtigen
+        self.network.broadcast("NEW_BLOCK", block.encode())
+        return block
+    }
+
+    fn send_transaction(from: Address, to: Address, amount: UInt256, priv_key: Bytes) -> Bool {
+        require(self.running, "System nicht aktiv")
+        let tx: ATCTransaction = ATCTransaction {
+            tx_id:    ATC::Hash::sha3(from.to_string() + to.to_string() + amount.to_string()),
+            sender:   from,
+            receiver: to,
+            amount:   amount,
+            nonce:    block.number,
+            sig:      ATC::Crypto::ECDSA::sign(amount.to_bytes(), priv_key)
+        }
+        let verified: Bool = self.wallet.verify_sig(tx)
+        require(verified, "Ungültige Signatur")
+        return self.consensus.add_transaction(tx)
+    }
+
+    fn run_atclang(source: String) -> String {
+        let bytecode: Bytes  = ATC::Lang::Compiler::compile(source)
+        let result:   String = ATC::Lang::VM::run(bytecode)
+        return result
+    }
+
+    fn shutdown() -> Bool {
+        emit SystemShutdown("A-TownChain OS wird beendet...")
+        for name in self.subsystems.keys() {
+            self.subsystems[name].stop()
+            emit SubsystemStopped(name)
+        }
+        self.running = false
+        emit SystemShutdown("Auf Wiedersehen, ShivaCore.")
+        return true
+    }
+
+    event SystemBoot(msg: String)
+    event SystemReady(msg: String, subsystems: UInt32)
+    event SystemShutdown(msg: String)
+    event SubsystemBooting(name: String)
+    event SubsystemReady(name: String)
+    event SubsystemError(name: String)
+    event SubsystemStopped(name: String)
+}
+
+
+// ══════════════════════════════════════════════════════════════
+//  MAIN — EINSTIEGSPUNKT
+// ══════════════════════════════════════════════════════════════
+
+fn main() -> Bool {
+    // System initialisieren
+    let sys: ATCSystem = ATCSystem {
+        kernel:    ShivaKernel {},
+        fs:        ATCFS       { owner: caller, root_cid: Hash256("") },
+        consensus: ShivaConsensus {},
+        network:   ATCNet      { host: "0.0.0.0", port: P2P_PORT },
+        wallet:    ATCWalletManager {},
+        token:     ATCToken    {},
+        registry:  SmartContractRegistry {},
+        gateway:   APIGateway  { port: GATEWAY_PORT }
+    }
+
+    // Alles hochfahren
+    let ok: Bool = sys.boot_all()
+    require(ok, "System-Boot fehlgeschlagen — prüfe Logs")
+
+    // Erstes Wallet für Operator
+    let operator: WalletKeys = sys.wallet.new_wallet("ShivaCore_Operator")
+    emit WalletInfo("Operator-Wallet: " + operator.address.to_string())
+
+    // Token deployen
+    sys.registry.deploy(
+        Address("ATC_TOKEN_8300"),
+        "ATCoin",
+        "ATC-8300"
+    )
+
+    // Genesis-Validator registrieren
+    sys.token.transfer(operator.address, 100_000 * (10 ** 18))
+    sys.consensus.register_validator(operator.address, 50_000)
+
+    // Ersten Block produzieren
+    let genesis_block: ATCBlock = sys.produce_block(operator.address)
+    emit BlockInfo("Genesis-Block #" + genesis_block.header.height.to_string()
+                   + " | Hash: " + genesis_block.header.block_hash.to_short_string())
+
+    // Status ausgeben
+    let status: Map<String, String> = sys.status()
+    emit SystemInfo("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    emit SystemInfo("  Subsysteme:  " + status["subsystems"])
+    emit SystemInfo("  Chain-Höhe:  " + status["chain"])
+    emit SystemInfo("  P2P-Peers:   " + status["peers"])
+    emit SystemInfo("  Fehler:      " + status["errors"])
+    emit SystemInfo("  Gateway:     http://0.0.0.0:" + GATEWAY_PORT.to_string())
+    emit SystemInfo("  Dashboard:   http://0.0.0.0:" + DASH_PORT.to_string())
+    emit SystemInfo("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+    return true
+}
+
+// Globale Events für main()
+event WalletInfo(msg: String)
+event BlockInfo(msg: String)
+event SystemInfo(msg: String)
