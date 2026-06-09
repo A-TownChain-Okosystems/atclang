@@ -1,0 +1,143 @@
+// ╔══════════════════════════════════════════════════════╗
+// ║  ShivaConsensus — Hybrid PoH + PoS + PoW           ║
+// ║  ATCLang v0.2.0 | ATC-0006 konform                 ║
+// ╚══════════════════════════════════════════════════════╝
+
+use ATC::Crypto::{ sha3_256, sha256 }
+use ATC::Types::{ Address, BlockHash }
+
+// Block-Struktur
+struct Block {
+    height:     u64,
+    hash:       bytes32,
+    prev_hash:  bytes32,
+    timestamp:  u64,
+    poh_hash:   bytes32,
+    pow_nonce:  u64,
+    validator:  Address,
+    tx_count:   u64,
+    merkle_root: bytes32,
+}
+
+// Konsens-Zustand
+enum ConsensusState {
+    IDLE,
+    MINING,
+    VALIDATING,
+    FINALIZING,
+}
+
+contract ShivaConsensus {
+    state chain:      Vec<Block>
+    state state_:     ConsensusState = ConsensusState::IDLE
+    state difficulty: u8  = 4
+    state poh_chain:  Vec<bytes32>
+    state validators: Map<Address, u64>   // addr → stake
+    state total_stake: u64 = 0
+    state block_reward: u64 = 1_000_000_000_000_000_000  // 1 ATC in Wei
+
+    // ── Phase 1: Proof of History ─────────────────────
+    fn generate_poh(prev_hash: bytes32, data: string) -> bytes32 {
+        let combined: string = to_string(prev_hash) + data + to_string(now())
+        let new_hash: bytes32 = sha256(combined)
+        self.poh_chain.push(new_hash)
+        emit PoHGenerated(new_hash, now())
+        return new_hash
+    }
+
+    fn verify_poh(hash: bytes32, prev_hash: bytes32, data: string, ts: u64) -> bool {
+        let combined: string = to_string(prev_hash) + data + to_string(ts)
+        let expected: bytes32 = sha256(combined)
+        return hash == expected
+    }
+
+    // ── Phase 2: Proof of Stake ───────────────────────
+    fn register_validator(addr: Address, stake: u64) {
+        require(stake >= 1_000_000_000_000_000_000_000, "Min. 1000 ATC Stake")
+        require(is_valid_address(to_string(addr)), "Ungültige Adresse")
+        self.validators[addr] = safe_add(self.validators[addr], stake)
+        self.total_stake      = safe_add(self.total_stake, stake)
+        emit ValidatorRegistered(addr, stake)
+    }
+
+    fn select_validator() -> Address {
+        require(self.total_stake > 0, "Keine Validatoren")
+        // Weighted-Random-Selection basierend auf Stake
+        let target: u64 = block_timestamp() % self.total_stake
+        let cumulative: u64 = 0
+        for addr in self.validators.keys() {
+            cumulative = safe_add(cumulative, self.validators[addr])
+            if cumulative >= target {
+                return addr
+            }
+        }
+        return self.validators.keys()[0]
+    }
+
+    // ── Phase 3: Proof of Work ────────────────────────
+    fn mine_block(data: string, prev_hash: bytes32) -> Map<string, string> {
+        let target: string = "0000"  // difficulty 4
+        let nonce: u64 = 0
+        let found_hash: bytes32 = zero_address()
+        let MAX_ITER: u64 = 10_000_000
+
+        while nonce < MAX_ITER {
+            let candidate: string = data + to_string(nonce)
+            let h: bytes32        = sha3_256(candidate)
+            if to_string(h).starts_with(target) {
+                found_hash = h
+                break
+            }
+            nonce = safe_add(nonce, 1)
+        }
+        require(nonce < MAX_ITER, "Mining fehlgeschlagen")
+        emit BlockMined(found_hash, nonce)
+        return { "hash": to_string(found_hash), "nonce": to_string(nonce) }
+    }
+
+    // ── Block erstellen (alle 3 Phasen) ──────────────
+    fn create_block(txs: Vec<string>, prev_hash: bytes32) -> Block {
+        self.state_ = ConsensusState::MINING
+        // Phase 1: PoH
+        let poh_hash: bytes32 = self.generate_poh(prev_hash, to_string(txs))
+        // Phase 2: PoW
+        let pow_result = self.mine_block(to_string(txs) + to_string(poh_hash), prev_hash)
+        // Phase 3: PoS Validator
+        let validator: Address = self.select_validator()
+
+        let block: Block = Block {
+            height:      u64(self.chain.len()),
+            hash:        bytes32(pow_result["hash"]),
+            prev_hash:   prev_hash,
+            timestamp:   now(),
+            poh_hash:    poh_hash,
+            pow_nonce:   u64(pow_result["nonce"]),
+            validator:   validator,
+            tx_count:    u64(txs.len()),
+            merkle_root: sha256(to_string(txs)),
+        }
+        self.chain.push(block)
+        self.state_ = ConsensusState::IDLE
+        emit BlockFinalized(block.height, block.hash, validator)
+        return block
+    }
+
+    // Kette validieren
+    fn validate_chain() -> bool {
+        for i in 1..self.chain.len() {
+            let curr: Block = self.chain[i]
+            let prev: Block = self.chain[i-1]
+            if curr.prev_hash != prev.hash {
+                return false
+            }
+            if !self.verify_poh(curr.poh_hash, curr.prev_hash, "", curr.timestamp) {
+                return false
+            }
+        }
+        return true
+    }
+
+    fn get_height() -> u64 { return u64(self.chain.len()) }
+    fn get_block(h: u64) -> Block { return self.chain[h] }
+    fn get_state() -> ConsensusState { return self.state_ }
+}
