@@ -1,0 +1,141 @@
+// ╔══════════════════════════════════════════════════════╗
+// ║  ATCFS — A-TownChain File System                   ║
+// ║  ATCLang v0.2.0 | ATS-1003 konform                 ║
+// ╚══════════════════════════════════════════════════════╝
+
+use ATC::Crypto::{ sha256, aes256_encrypt, aes256_decrypt }
+
+enum FileMode { READ, WRITE, APPEND, READ_BINARY, WRITE_BINARY }
+
+struct FileStat {
+    path:        string,
+    size:        u64,
+    created:     u64,
+    modified:    u64,
+    is_dir:      bool,
+    hash:        bytes32,
+    permissions: u8,
+}
+
+struct FileHandle {
+    id:       u64,
+    path:     string,
+    mode:     FileMode,
+    position: u64,
+    open:     bool,
+}
+
+contract ATCFS {
+    state files:       Map<string, bytes>
+    state dirs:        Map<string, Vec<string>>
+    state stats_:      Map<string, FileStat>
+    state handles:     Map<u64, FileHandle>
+    state next_handle: u64 = 1
+    state root:        string = "/"
+
+    fn init() {
+        self.dirs["/"]          = Vec::new()
+        self.dirs["/system"]    = Vec::new()
+        self.dirs["/contracts"] = Vec::new()
+        self.dirs["/data"]      = Vec::new()
+        self.dirs["/wallet"]    = Vec::new()
+        self.dirs["/logs"]      = Vec::new()
+        self.dirs["/home"]      = Vec::new()
+        emit FSInitialized("/")
+    }
+
+    // Datei öffnen
+    fn open(path: string, mode: FileMode) -> u64 {
+        let handle_id: u64 = self.next_handle
+        self.next_handle   = safe_add(self.next_handle, 1)
+        let handle: FileHandle = FileHandle {
+            id:       handle_id,
+            path:     path,
+            mode:     mode,
+            position: 0,
+            open:     true,
+        }
+        self.handles[handle_id] = handle
+        return handle_id
+    }
+
+    // Datei schreiben
+    fn write(handle_id: u64, data: bytes) -> u64 {
+        require(self.handles.contains(handle_id), "Ungültiger Handle")
+        let handle: FileHandle = self.handles[handle_id]
+        require(handle.open, "Handle geschlossen")
+        self.files[handle.path] = data
+        let stat: FileStat = FileStat {
+            path:        handle.path,
+            size:        u64(data.len()),
+            created:     now(),
+            modified:    now(),
+            is_dir:      false,
+            hash:        sha256(to_string(data)),
+            permissions: 0o644,
+        }
+        self.stats_[handle.path] = stat
+        emit FileWritten(handle.path, u64(data.len()))
+        return u64(data.len())
+    }
+
+    // Datei lesen
+    fn read(handle_id: u64) -> bytes {
+        require(self.handles.contains(handle_id), "Ungültiger Handle")
+        let handle: FileHandle = self.handles[handle_id]
+        require(self.files.contains(handle.path), "Datei nicht gefunden")
+        return self.files[handle.path]
+    }
+
+    // Handle schließen
+    fn close(handle_id: u64) {
+        if self.handles.contains(handle_id) {
+            let handle: FileHandle = self.handles[handle_id]
+            handle.open = false
+            self.handles[handle_id] = handle
+        }
+    }
+
+    // Metadaten
+    fn stat(path: string) -> FileStat {
+        require(self.stats_.contains(path), "Datei/Verzeichnis nicht gefunden")
+        return self.stats_[path]
+    }
+
+    // Datei löschen
+    fn rm(path: string) -> bool {
+        if self.files.contains(path) {
+            self.files.remove(path)
+            self.stats_.remove(path)
+            emit FileDeleted(path)
+            return true
+        }
+        return false
+    }
+
+    // Hash einer Datei
+    fn hash_file(path: string) -> bytes32 {
+        require(self.files.contains(path), "Datei nicht gefunden")
+        return sha256(to_string(self.files[path]))
+    }
+
+    // Verschlüsselt schreiben
+    fn write_encrypted(handle_id: u64, data: bytes, key: bytes32) -> u64 {
+        let encrypted: bytes = aes256_encrypt(data, key)
+        return self.write(handle_id, encrypted)
+    }
+
+    fn mkdir(path: string) -> bool {
+        if !self.dirs.contains(path) {
+            self.dirs[path] = Vec::new()
+            emit DirCreated(path)
+            return true
+        }
+        return false
+    }
+
+    fn ls(path: string) -> Vec<string> {
+        require(self.dirs.contains(path), "Verzeichnis nicht gefunden")
+        return self.dirs[path]
+    }
+}
