@@ -1,0 +1,112 @@
+// ╔══════════════════════════════════════════════════════╗
+// ║  ATC-9900 Governance DAO                           ║
+// ║  ATCLang v0.2.0 | Issue #9                        ║
+// ╚══════════════════════════════════════════════════════╝
+
+use ATC::Types::Address
+
+enum ProposalState {
+    ACTIVE,
+    PASSED,
+    FAILED,
+    EXECUTED,
+    CANCELLED,
+}
+
+struct Proposal {
+    id:          u64,
+    proposer:    Address,
+    description: string,
+    for_votes:   u128,
+    against_votes: u128,
+    start_time:  u64,
+    end_time:    u64,
+    state_:      ProposalState,
+    executed:    bool,
+}
+
+contract GovernanceDAO {
+    state owner:        Address
+    state atc_token:    Address
+    state proposals:    Map<u64, Proposal>
+    state votes:        Map<u64, Map<Address, bool>>  // proposal → voter → hasVoted
+    state next_id:      u64   = 1
+    state MIN_STAKE:    u128  = 10_000_000_000_000_000_000_000  // 10.000 ATC
+    state VOTING_DAYS:  u64   = 7
+    state QUORUM:       u64   = 10    // 10%
+    state THRESHOLD:    u64   = 51    // 51%
+
+    fn init(owner_addr: Address, token_addr: Address) {
+        self.owner     = owner_addr
+        self.atc_token = token_addr
+        emit DAOInitialized(owner_addr)
+    }
+
+    // Vorschlag einreichen
+    fn propose(description: string) -> u64 {
+        require(description.len() > 10, "Beschreibung zu kurz")
+        let proposal_id: u64 = self.next_id
+        self.next_id = safe_add(self.next_id, 1)
+
+        let proposal: Proposal = Proposal {
+            id:            proposal_id,
+            proposer:      caller,
+            description:   description,
+            for_votes:     0,
+            against_votes: 0,
+            start_time:    now(),
+            end_time:      safe_add(now(), self.VOTING_DAYS * 86400),
+            state_:        ProposalState::ACTIVE,
+            executed:      false,
+        }
+        self.proposals[proposal_id] = proposal
+        emit ProposalCreated(proposal_id, caller, description)
+        return proposal_id
+    }
+
+    // Abstimmen
+    fn vote(proposal_id: u64, support: bool, weight: u128) {
+        require(self.proposals.contains(proposal_id), "Vorschlag nicht gefunden")
+        let p: Proposal = self.proposals[proposal_id]
+        require(p.state_ == ProposalState::ACTIVE, "Abstimmung nicht aktiv")
+        require(now() < p.end_time, "Abstimmungszeitraum abgelaufen")
+        require(!self.votes[proposal_id].contains(caller), "Bereits abgestimmt")
+        require(weight > 0, "Gewicht muss > 0 sein")
+
+        self.votes[proposal_id][caller] = true
+        if support {
+            p.for_votes = safe_add(p.for_votes, weight)
+        } else {
+            p.against_votes = safe_add(p.against_votes, weight)
+        }
+        self.proposals[proposal_id] = p
+        emit VoteCast(proposal_id, caller, support, weight)
+    }
+
+    // Abstimmung abschließen
+    fn finalize(proposal_id: u64) {
+        require(self.proposals.contains(proposal_id), "Vorschlag nicht gefunden")
+        let p: Proposal = self.proposals[proposal_id]
+        require(now() >= p.end_time, "Abstimmungszeitraum läuft noch")
+        require(p.state_ == ProposalState::ACTIVE, "Bereits abgeschlossen")
+
+        let total: u128  = safe_add(p.for_votes, p.against_votes)
+        if total == 0 {
+            p.state_ = ProposalState::FAILED
+        } else {
+            let for_pct: u64 = u64(p.for_votes * 100 / total)
+            if for_pct >= self.THRESHOLD {
+                p.state_ = ProposalState::PASSED
+            } else {
+                p.state_ = ProposalState::FAILED
+            }
+        }
+        self.proposals[proposal_id] = p
+        emit ProposalFinalized(proposal_id, p.state_)
+    }
+
+    fn get_proposal(id: u64) -> Proposal {
+        require(self.proposals.contains(id), "Nicht gefunden")
+        return self.proposals[id]
+    }
+}
