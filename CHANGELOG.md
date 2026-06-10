@@ -1,8 +1,13 @@
-# Changelog — ATCLang Compiler Stack
+# Changelog — atclang
 
-## Letzte Versionen
+## v3.0.0 — 10.06.2026
+Vollständiger Changelog: https://github.com/A-TownChain-Okosystems/a-townchain-os/blob/main/CHANGELOG.md
 
-- v0.2.0: Label-Cache, Input-Validation, Security Analyzer
-- v0.1.0: Lexer/Parser/Compiler/VM/REPL initial
+### Relevante Fixes
 
-Vollständiger Changelog: [a-townchain-os/docs/CHANGELOG.md](https://github.com/A-TownChain-Okosystems/a-townchain-os/blob/main/docs/CHANGELOG.md)
+
+
+- Fix #29 Federated Learning
+
+
+- Fix #26 Integration Tests 9/9
