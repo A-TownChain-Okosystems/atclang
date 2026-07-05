@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
 """
 ATCLang Lexer — Tokenizer v0.2.0
 Eigene Programmiersprache für das A-TownChain Ökosystem

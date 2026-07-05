@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
 """
 ATCLang Parser — Recursive Descent Parser
 Wandelt Token-Liste in einen AST um

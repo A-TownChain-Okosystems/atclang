@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
 """
 ATCLang Compiler — AST → ATC-Bytecode
 Version: 0.1.0-alpha | Komplett selbst geschrieben

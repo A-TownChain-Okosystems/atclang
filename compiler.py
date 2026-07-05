@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
 # ATCLang Compiler v0.2.0
 # Vollständige Implementierung → atclang/compiler/compiler.py
 
