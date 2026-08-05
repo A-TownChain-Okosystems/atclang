@@ -1,22 +1,24 @@
 # 📋 File Register — atclang
 
-> **Zweck:** Vollständige Liste aller existierenden Dateien.
-> **Auto-generiert:** 2026-08-05 · **Dateien:** 29
+> **Zweck:** Vollständige Liste aller existierenden Dateien im Repository.
+> **Auto-generiert:** 2026-08-05 · **Dateien:** 32
 
 | Datei | Zeilen | Typ |
 |------|--------|-----|
 | `./.gitignore` | 23 | gitignore |
 | `./ATCLANG_SPEC.md` | 31 | md |
-| `./CHANGELOG.md` | 12 | md |
+| `./CHANGELOG.md` | 13 | md |
 | `./CONTRIBUTING.md` | 19 | md |
-| `./FILE_REGISTER.md` | 11 | md |
-| `./LICENSE` | 22 | /LICENSE |
-| `./README.md` | 69 | md |
-| `./compiler.py` | 101 | py |
+| `./FILE_REGISTER.md` | 37 | md |
+| `./LICENSE` | 22 | LICENSE |
+| `./README.md` | 117 | md |
+| `./ROADMAP.md` | 21 | md |
+| `./STATUS.md` | 19 | md |
+| `./compiler.py` | 102 | py |
 | `./compiler/compiler.py` | 471 | py |
-| `./lexer.py` | 114 | py |
+| `./lexer.py` | 115 | py |
 | `./lexer/lexer.py` | 563 | py |
-| `./parser.py` | 94 | py |
+| `./parser.py` | 95 | py |
 | `./parser/ast_nodes.py` | 265 | py |
 | `./parser/parser.py` | 399 | py |
 | `./programs/atc8300.atc` | 96 | atc |
@@ -33,5 +35,5 @@
 | `./repl/repl.py` | 185 | py |
 | `./requirements.txt` | 4 | txt |
 | `./stdlib/atc_stdlib.py` | 69 | py |
-| `./vm.py` | 97 | py |
+| `./vm.py` | 98 | py |
 | `./vm/atcvm.py` | 887 | py |

@@ -1,4 +1,4 @@
-# atclang
+# ⚡ ATCLang Compiler & Runtime Engine
 
 > ## 🤖 Fuer KI-Agenten — Pflichtlektuere vor jeder Aenderung
 > Governance liegt zentral im Wiki-Repo `a-townchain-os-docs`:
@@ -6,64 +6,112 @@
 > 2. [`AGENT_COORDINATION.md`](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs/blob/main/docs/AGENT_COORDINATION.md) — wer arbeitet gerade woran, Todos, Agent-IDs
 > 3. [`DECISIONS_REGISTER.md`](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs/blob/main/docs/DECISIONS_REGISTER.md) — verbindliche Architektur-Entscheidungen
 
+**ATCLang Compiler & Execution Stack (v0.3.0)** — Proprietäre, performante Programmiersprache für das A-TownChain Ökosystem mit nativer Unterstützung für Smart Contracts, Kernel-Services und P2P-Netzwerke. Durchsetzung der **ATC-99 First Policy**.
 
-> **ATCLang v0.3.0, proprietäre Sprache (Lexer, Parser, VM)**
-
-[![Layer](https://img.shields.io/badge/Layer-L2–L4-purple)](https://github.com/A-TownChain-Okosystems)
-[![KAI-OS](https://img.shields.io/badge/KAI--OS-v2.0.0-blue)](https://github.com/A-TownChain-Okosystems/a-townchain-os/blob/main/docs/kai-os-wiki.md)
+[![Layer](https://img.shields.io/badge/Layer-L2--L4-purple)](https://github.com/A-TownChain-Okosystems)
+[![KAI-OS](https://img.shields.io/badge/KAI--OS-v2.0.0-blue)](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs)
 [![Org](https://img.shields.io/badge/Org-A--TownChain--Okosystems-green)](https://github.com/A-TownChain-Okosystems)
-[![Wiki](https://img.shields.io/badge/Wiki-📖-blue)](https://github.com/A-TownChain-Okosystems/atclang-wiki)
+[![Wiki](https://img.shields.io/badge/Wiki-📖_atclang--wiki-blue)](https://github.com/A-TownChain-Okosystems/atclang-wiki)
 
 ---
 
-## 📦 Teil des A-TownChain Ökosystems
+## 🏛️ Architektur & Pipeline
 
-**Org:** [A-TownChain-Okosystems](https://github.com/A-TownChain-Okosystems)
-**Haupt-Repo:** [a-townchain-os](https://github.com/A-TownChain-Okosystems/a-townchain-os)
-**KAI-OS Wiki (69 Kapitel):** [→ docs/kai-os-wiki.md](https://github.com/A-TownChain-Okosystems/a-townchain-os/blob/main/docs/kai-os-wiki.md)
-**Alle Repos:** [→ ECOSYSTEM.md](https://github.com/A-TownChain-Okosystems/a-townchain-os/blob/main/ECOSYSTEM.md)  |  [Repo-Wiki](https://github.com/A-TownChain-Okosystems/atclang-wiki)
+ATCLang transformiert Quellcode in ATVM-Bytecode und führt diesen in einer isolierten Register/Stack-basierten Virtual Machine aus:
 
----
-
-## 🔗 Abhängigkeiten
-
-**Nutzt:** — (Basis-Modul)
-
-**Wird genutzt von:**
-- [atc-contracts](https://github.com/A-TownChain-Okosystems/atc-contracts)
-
----
-
-## 🗺️ Alle Repos
-
-| Repo | Layer | Beschreibung |
-|------|-------|-------------|
-| [a-townchain-os](https://github.com/A-TownChain-Okosystems/a-townchain-os) | `L2–L4` | Einziges Haupt-Repo — KAI-OS Core, AI, Blockchain |
-| [atc-kernel](https://github.com/A-TownChain-Okosystems/atc-kernel) | `L2` | ShivaOS Microkernel, IPC, ATCFS, Consensus |
-| [atcnet](https://github.com/A-TownChain-Okosystems/atcnet) | `L5` | P2P Netzwerk-Stack, Kademlia DHT, Bootstrap Node |
-| [atc-gateway](https://github.com/A-TownChain-Okosystems/atc-gateway) | `L7` | API Gateway :4000, Circuit-Breaker, Rate-Limit |
-| [atclang](https://github.com/A-TownChain-Okosystems/atclang) | `L2–L4` | ATCLang v0.3.0, proprietäre Sprache (Lexer, Parser, VM) |
-| [atc-contracts](https://github.com/A-TownChain-Okosystems/atc-contracts) | `L4/L11` | Smart Contracts: ATC-8300, ATC-9000, ATC-9900, Bridge |
-| [atc-shivamon](https://github.com/A-TownChain-Okosystems/atc-shivamon) | `L12` | NFT Gaming: Battle Engine, Breeding, Marketplace |
-| [atc-franchise](https://github.com/A-TownChain-Okosystems/atc-franchise) | `L10/L8` | Business DAO: Vault, Revenue-Share, Royalty (ATC-9900) |
-| [atc-ui](https://github.com/A-TownChain-Okosystems/atc-ui) | `L10` | Neon Dashboard: Wallet, Explorer, Shivamon, AI Chat |
-| [atc-standards](https://github.com/A-TownChain-Okosystems/atc-standards) | `L0` | Protokoll-Standards: ATC-0001–0009 + ATS-1000–1007 |
-| [atc-whitepaper](https://github.com/A-TownChain-Okosystems/atc-whitepaper) | `L0` | Offizielles Whitepaper v2.1.0 |
+```
++------------------+     +------------------+     +------------------+
+| Quellcode (.atc) | --> |   Lexer Engine   | --> | Tokens Stream    |
++------------------+     +------------------+     +------------------+
+                                                           |
+                                                           v
++------------------+     +------------------+     +------------------+
+| ATVM Bytecode    | <-- | AST Compiler     | <-- | Parser & AST     |
++------------------+     +------------------+     +------------------+
+         |
+         v
++------------------+
+|  ATVM Runtime    | (Execution & State Engine)
++------------------+
+```
 
 ---
 
-*[A-TownChain-Okosystems](https://github.com/A-TownChain-Okosystems) · v2.0.0 · Stand: 2026-08-05*
+## 🧩 Komponenten Übersicht
+
+| Komponente | Verzeichnis / Datei | Beschreibung |
+|------------|---------------------|--------------|
+| **Lexer Engine** | `lexer/lexer.py`, `lexer.py` | Tokenisierung, Schlüsselwörter (`fn`, `let`, `if`, `contract`, `policy`), Operatoren |
+| **Parser & AST** | `parser/parser.py`, `ast_nodes.py` | Rekursiver Abstiegs-Parser, Erzeugung des Abstract Syntax Tree (AST) |
+| **Compiler** | `compiler/compiler.py`, `compiler.py` | AST-zu-Bytecode Übersetzung, Opcode-Generierung, Symboltabellen |
+| **Virtual Machine** | `vm/atcvm.py`, `vm.py` | Stack-basierte Ausführungsumgebung, Call Stack, Frame Pointer, Memory Management |
+| **Standard Library** | `stdlib/atc_stdlib.py` | Basis-Builtins für String, Math, I/O und Datenstrukturen |
+| **REPL Engine** | `repl/repl.py` | Interaktive Shell zur direkten Evaluierung von ATCLang Befehlen |
+| **Programme** | `programs/` | ATC-Systemprogramme (`atcos_main.atc`, `kernel.atc`, `gateway.atc`, `atc8300.atc`, etc.) |
 
 ---
 
-## Lizenz
+## 💻 Usage Example
+
+### 1. ATCLang Programm kompilieren und ausführen
+```bash
+# REPL starten
+python3 repl/repl.py
+
+# Quellcode direkt kompilieren und in ATVM ausführen
+python3 compiler.py programs/atcos_main.atc
+
+# Oder die VM direkt mit Opcodes starten
+python3 vm.py
+```
+
+### 2. Quellcode Beispiel (`example.atc`)
+```atc
+fn main() {
+    let system_id = "ATC-99";
+    let status = check_compliance(system_id);
+    print("ATCLang System Status:", status);
+}
+```
+
+---
+
+## 🛠️ Build & Installation
+
+```bash
+# Repository klonen
+git clone https://github.com/A-TownChain-Okosystems/atclang.git
+cd atclang
+
+# Abhängigkeiten installieren
+pip install -r requirements.txt
+
+# Tests & Module ausführen
+python3 -m unittest discover -s .
+```
+
+---
+
+## 🌐 Verwandte Repos & Ökosystem
+
+| Repo | Rolle | Beschreibung |
+|------|-------|--------------|
+| [a-townchain-os-docs](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs) | `Governance` | Zentrale Spezifikationen & Governance |
+| [atc-atclang](https://github.com/A-TownChain-Okosystems/atc-atclang) | `Modules` | Erweiterte Module, TypeChecker & Optimizer |
+| [atc-vm](https://github.com/A-TownChain-Okosystems/atc-vm) | `Runtime` | Standalone ATVM Execution Engine |
+| [atc-stdlib](https://github.com/A-TownChain-Okosystems/atc-stdlib) | `Library` | Standard-Bibliothek Module |
+| [atc-atcpkg](https://github.com/A-TownChain-Okosystems/atc-atcpkg) | `PackageManager` | ATCLang Paketverwaltung |
+
+---
+
+## 📖 Wiki & Dokumentation
+
+Vollständige Sprachspezifikation, Opcode-Referenzen und Beispiele:
+👉 **[atclang-wiki Documentation Repository](https://github.com/A-TownChain-Okosystems/atclang-wiki)**
+
+---
+
+## ⚖️ Lizenz
 
 Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. **All Rights Reserved.**
-
-Dieses Projekt nutzt das **ATC-LIC Lizenzmodell** — ein monetarisiertes, autonomes
-Open-Source-Oekosystem. Unlizenzierter Code wird von der ATVM physisch nicht ausgefuehrt.
-
-- [ATC-LIC — Smart Contract Licenses](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs/blob/main/docs/standards/ATC-LIC-SMART_CONTRACT_LICENSE.md)
-- [ATS-LIC — System & Hardware Licenses](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs/blob/main/docs/standards/ATS-LIC-SYSTEM_HARDWARE_LICENSE.md)
-- [Compliance-Handbuch (BaFin)](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs/blob/main/docs/compliance/COMPLIANCE_HANDBUCH.md)
-- [Lizenz-Uebersicht](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs/blob/main/docs/LICENSING_OVERVIEW.md)
+Dieses Projekt nutzt das **ATC-LIC Lizenzmodell**.
