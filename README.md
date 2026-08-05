@@ -10,7 +10,7 @@
 > **ATCLang v0.3.0, proprietäre Sprache (Lexer, Parser, VM)**
 
 [![Layer](https://img.shields.io/badge/Layer-L2–L4-purple)](https://github.com/A-TownChain-Okosystems)
-[![KAI-OS](https://img.shields.io/badge/KAI--OS-v1.0.0-blue)](https://github.com/A-TownChain-Okosystems/a-townchain-os/blob/main/docs/kai-os-wiki.md)
+[![KAI-OS](https://img.shields.io/badge/KAI--OS-v2.0.0-blue)](https://github.com/A-TownChain-Okosystems/a-townchain-os/blob/main/docs/kai-os-wiki.md)
 [![Org](https://img.shields.io/badge/Org-A--TownChain--Okosystems-green)](https://github.com/A-TownChain-Okosystems)
 [![Wiki](https://img.shields.io/badge/Wiki-📖-blue)](https://github.com/A-TownChain-Okosystems/atclang-wiki)
 
@@ -52,7 +52,7 @@
 
 ---
 
-*[A-TownChain-Okosystems](https://github.com/A-TownChain-Okosystems) · v1.0.0 · Stand: 2026-08-05*
+*[A-TownChain-Okosystems](https://github.com/A-TownChain-Okosystems) · v2.0.0 · Stand: 2026-08-05*
 
 ---
 
