@@ -9,7 +9,7 @@
 **ATCLang Compiler & Execution Stack (v0.3.0)** — Proprietäre, performante Programmiersprache für das A-TownChain Ökosystem mit nativer Unterstützung für Smart Contracts, Kernel-Services und P2P-Netzwerke. Durchsetzung der **ATC-99 First Policy**.
 
 [![Layer](https://img.shields.io/badge/Layer-L2--L4-purple)](https://github.com/A-TownChain-Okosystems)
-[![KAI-OS](https://img.shields.io/badge/KAI--OS-v2.0.0-blue)](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs)
+[![KAI-OS](https://img.shields.io/badge/KAI--OS-v1.0.0-blue)](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs)
 [![Org](https://img.shields.io/badge/Org-A--TownChain--Okosystems-green)](https://github.com/A-TownChain-Okosystems)
 [![Wiki](https://img.shields.io/badge/Wiki-📖_atclang--wiki-blue)](https://github.com/A-TownChain-Okosystems/atclang-wiki)
 
