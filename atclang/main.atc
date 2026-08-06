@@ -1,0 +1,180 @@
+// Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+// ─────────────────────────────────────────────────────────────
+// ATC-24 — API Gateway
+// Sprint 3.0 | Gateway Layer | Chain-ID 9000
+// Migrated from: modules/gateway/main.py (95 lines)
+// Request routing, middleware chain, circuit breaker
+// ─────────────────────────────────────────────────────────────
+
+const GATEWAY_PORT: u16 = 4000
+const BACKEND_PORT: u16 = 5000
+const MAX_RETRIES: u8 = 3
+const CIRCUIT_RESET_TIME: u64 = 60
+const RATE_LIMIT_WINDOW: u64 = 60
+const RATE_LIMIT_MAX: u32 = 100
+
+struct Route {
+    path: String,
+    backend: String,
+    methods: List<String>,
+    auth_required: bool,
+    rate_limit: u32,
+}
+
+struct CircuitState {
+    backend: String,
+    failure_count: u8,
+    last_failure: u64,
+    is_open: bool,
+}
+
+contract Gateway {
+    state routes: Map<String, Route>
+    state circuits: Map<String, CircuitState>
+    state request_count: u64
+    state error_count: u64
+    state rate_limiter: Map<Address, u32>
+    state rate_timestamps: Map<Address, u64>
+    state middleware_chain: List<String>
+    state owner: Address
+
+    event RequestRouted(path: String, backend: String)
+    event CircuitTripped(backend: String)
+    event CircuitReset(backend: String)
+    event RateLimited(addr: Address)
+
+    fn init() {
+        self.routes = {}
+        self.circuits = {}
+        self.request_count = 0
+        self.error_count = 0
+        self.rate_limiter = {}
+        self.rate_timestamps = {}
+        self.middleware_chain = ["auth", "rate_limit", "signature_verify", "logger"]
+        self.owner = msg_sender()
+        self.register_default_routes()
+    }
+
+    fn register_default_routes() {
+        self.register_route("/api/wallet", "backend:5000", ["GET", "POST"], true, 60)
+        self.register_route("/api/blockchain", "backend:5000", ["GET", "POST"], false, 100)
+        self.register_route("/api/governance", "backend:5000", ["GET", "POST"], true, 30)
+        self.register_route("/api/game", "backend:5000", ["GET", "POST"], true, 60)
+        self.register_route("/api/marketplace", "backend:5000", ["GET", "POST"], true, 60)
+        self.register_route("/api/explorer", "backend:5000", ["GET"], false, 200)
+        self.register_route("/api/nodes", "backend:5000", ["GET", "POST"], false, 50)
+        self.register_route("/api/ai", "backend:5000", ["POST"], true, 20)
+        self.register_route("/api/atcpkg", "backend:5000", ["GET", "POST"], true, 30)
+    }
+
+    fn register_route(path: String, backend: String, methods: List<String>, auth: bool, rl: u32) -> bool {
+        let route = Route {
+            path: path,
+            backend: backend,
+            methods: methods,
+            auth_required: auth,
+            rate_limit: rl,
+        }
+        self.routes[path] = route
+        return true
+    }
+
+    fn route_request(path: String, addr: Address) -> (String, bool) {
+        self.request_count += 1
+        let route = self.routes.get(path)
+        if route == null {
+            self.error_count += 1
+            return ("404 Not Found", false)
+        }
+        // Check rate limit
+        if !self.check_rate_limit(addr, route.rate_limit) {
+            emit RateLimited(addr)
+            return ("429 Too Many Requests", false)
+        }
+        // Check circuit breaker
+        if self.is_circuit_open(route.backend) {
+            return ("503 Service Unavailable", false)
+        }
+        emit RequestRouted(path, route.backend)
+        return (route.backend, true)
+    }
+
+    fn check_rate_limit(addr: Address, max_requests: u32) -> bool {
+        let now = Time::now()
+        let last_ts = self.rate_timestamps.get(addr)
+        if last_ts == null {
+            self.rate_timestamps[addr] = now
+            self.rate_limiter[addr] = 1
+            return true
+        }
+        if now - last_ts > RATE_LIMIT_WINDOW {
+            self.rate_timestamps[addr] = now
+            self.rate_limiter[addr] = 1
+            return true
+        }
+        let count = self.rate_limiter.get(addr)
+        if count == null {
+            self.rate_limiter[addr] = 1
+            return true
+        }
+        if count >= max_requests {
+            return false
+        }
+        self.rate_limiter[addr] = count + 1
+        return true
+    }
+
+    fn is_circuit_open(backend: String) -> bool {
+        let circuit = self.circuits.get(backend)
+        if circuit == null {
+            return false
+        }
+        if circuit.is_open {
+            if Time::now() - circuit.last_failure > CIRCUIT_RESET_TIME {
+                circuit.is_open = false
+                circuit.failure_count = 0
+                emit CircuitReset(backend)
+                return false
+            }
+            return true
+        }
+        return false
+    }
+
+    fn record_failure(backend: String) -> bool {
+        let circuit = self.circuits.get(backend)
+        if circuit == null {
+            self.circuits[backend] = CircuitState {
+                backend: backend,
+                failure_count: 1,
+                last_failure: Time::now(),
+                is_open: false,
+            }
+            return false
+        }
+        circuit.failure_count += 1
+        circuit.last_failure = Time::now()
+        if circuit.failure_count >= MAX_RETRIES {
+            circuit.is_open = true
+            emit CircuitTripped(backend)
+            return true
+        }
+        return false
+    }
+
+    fn record_success(backend: String) {
+        let circuit = self.circuits.get(backend)
+        if circuit != null {
+            circuit.failure_count = 0
+            circuit.is_open = false
+        }
+    }
+
+    fn get_stats() -> (u64, u64, u16, u16) {
+        return (self.request_count, self.error_count, self.routes.len(), self.circuits.len())
+    }
+
+    fn get_middleware() -> List<String> {
+        return self.middleware_chain
+    }
+}
