@@ -1,57 +1,48 @@
-# 🌳 Architektur — atclang
+# ARCHITECTURE.md — atclang
+> Copyright © Michael Wroblewski / A-TownChain-Okosystems. All Rights Reserved.
 
-> **Stand:** 2026-08-06 | **Commit:** ceed038
-> **Teil von:** [A-TownChain Ökosystem](https://github.com/A-TownChain-Okosystems)
-
-## Statistik
-
-| Metrik | Wert |
-|--------|------|
-| Dateien | 27 |
-| Zeilen | 5,417 |
-| .atc | 6 |
-| .py | 11 |
-| .rs | 0 |
-| .ts/.tsx | 0 |
-| .md | 7 |
-
-## Verzeichnisstruktur
-
-```
-├── atclang/ (1 files, 180 lines)
-│   └── main.atc (180 lines)
-├── compiler/ (3 files, 1,691 lines)
-│   ├── compiler.py (626 lines)
-│   ├── optimizer.py (558 lines)
-│   └── type_checker.py (507 lines)
-├── lexer/ (1 files, 563 lines)
-│   └── lexer.py (563 lines)
-├── parser/ (2 files, 791 lines)
-│   ├── ast_nodes.py (392 lines)
-│   └── parser.py (399 lines)
-├── programs/ (5 files, 490 lines)
-│   ├── atc8300.atc (96 lines)
-│   ├── atcos_main.atc (9 lines)
-│   ├── event_bus.atc (75 lines)
-│   ├── kernel.atc (148 lines)
-│   └── shivamon.atc (162 lines)
-├── runtime/ (2 files, 1,131 lines)
-│   ├── driver_framework.py (506 lines)
-│   └── kernel_runtime.py (625 lines)
-├── .gitignore
-├── ATCLANG_SPEC.md (31 lines)
-├── CHANGELOG.md (13 lines)
-├── CONTRIBUTING.md (19 lines)
-├── FILE_REGISTER.md (39 lines)
-├── LICENSE
-├── README.md (117 lines)
-├── ROADMAP.md (21 lines)
-├── STATUS.md (19 lines)
-├── compiler.py (102 lines)
-├── lexer.py (115 lines)
-├── parser.py (95 lines)
-└── requirements.txt
+## File Tree
+```tree
+atclang/
+├── README.md                 # ATCLang specification overview
+├── ATCLANG_SPEC.md           # Formal language specification
+├── compiler.py               # Top-level compiler CLI executable
+├── lexer.py                  # Tokenizer entry point
+├── parser.py                 # AST generator entry point
+├── atclang/                  # ATCLang main standard library scripts
+│   └── main.atc              # ATCLang runtime entry point
+├── compiler/                 # Compiler backend (type checker, optimizer, code generator)
+│   ├── compiler.py
+│   ├── optimizer.py
+│   └── type_checker.py
+├── lexer/                    # Lexical scanner implementation
+│   └── lexer.py
+├── parser/                   # Grammar rules and AST node definitions
+│   ├── ast_nodes.py
+│   └── parser.py
+└── programs/                 # Standard ATCLang program examples
+    ├── atc8300.atc
+    ├── atcos_main.atc
+    ├── event_bus.atc
+    └── kernel.atc
 ```
 
----
-*Auto-generiert 2026-08-06 · Aurora (MasterBrain · Base44)*
+## Module Descriptions
+- README.md — Guide to the ATCLang domain-specific smart contract language
+- ATCLANG_SPEC.md — Formal EBNF syntax grammar and type rules specification
+- compiler.py — Entry point CLI for compiling .atc code into bytecode
+- lexer.py — Lexical analysis module converting source text into token streams
+- parser.py — Parser module transforming tokens into Abstract Syntax Trees
+- compiler/ — Type checking, optimization passes, and code emission pipeline
+- lexer/ — Modular tokenizer engine
+- parser/ — AST node declarations and recursive descent parsing logic
+- programs/ — Reference .atc programs demonstrating language features
+
+## Build System
+- Python setuptools / pytest
+
+## Dependencies
+- Python 3.10+
+
+## Status (Active/Migrated/Legacy)
+Migrated to a-townchain-os / Legacy repo
