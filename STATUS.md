@@ -11,7 +11,7 @@
 | Metrik | Wert |
 |--------|------|
 | Dateien | 32 |
-| Letzter Commit | d6aecbb fix: unified naming conventions — ShivaCoreDev→A |
+| Letzter Commit | d6aecbb fix: unified naming conventions — A-TownChain-Okosystems→A |
 | Status | Aktiv |
 
 ---
