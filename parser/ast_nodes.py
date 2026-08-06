@@ -41,6 +41,18 @@ class BoolLiteral(ASTNode):
     col:   int = 0
 
 @dataclass
+class ListLiteral(ASTNode):
+    elements: List[ASTNode] = field(default_factory=list)
+    line:     int = 0
+    col:      int = 0
+
+@dataclass
+class MapLiteral(ASTNode):
+    pairs:    List[tuple] = field(default_factory=list)
+    line:     int = 0
+    col:      int = 0
+
+@dataclass
 class NullLiteral(ASTNode):
     line:  int = 0
     col:   int = 0
@@ -106,6 +118,15 @@ class TypeAnnotation(ASTNode):
     params: List[Any] = field(default_factory=list)
     line:   int = 0
     col:    int = 0
+
+
+
+@dataclass
+class StructLiteral(ASTNode):
+    struct_name: str = ""
+    fields: list = field(default_factory=list)
+    line: int = 0
+    col: int = 0
 
 
 # ── Statements ───────────────────────────────────────────
@@ -261,5 +282,111 @@ class EnumDef(ASTNode):
 @dataclass
 class Program(ASTNode):
     statements: List[Any] = field(default_factory=list)
+    line:       int = 0
+    col:        int = 0
+
+class MatchStatement(ASTNode):
+    def __init__(self, subject, arms, line=0, col=0):
+        self.subject = subject
+        self.arms = arms  # list of (pattern, body)
+        self.line = line
+        self.col = col
+
+    def __repr__(self):
+        return f"MatchStatement(arms={len(self.arms)})"
+
+    def children(self):
+        return [self.subject] + [stmt for _, body in self.arms for stmt in body]
+
+class SliceExpr(ASTNode):
+    def __init__(self, start, end, line=0, col=0):
+        self.start = start
+        self.end = end
+        self.line = line
+        self.col = col
+    def __repr__(self):
+        return f'SliceExpr({self.start}:{self.end})'
+    def children(self):
+        return [x for x in [self.start, self.end] if x is not None]
+
+class RangeExpr(ASTNode):
+    def __init__(self, start, end, step=None, line=0, col=0):
+        self.start = start
+        self.end = end
+        self.step = step
+        self.line = line
+        self.col = col
+    def __repr__(self):
+        return f'RangeExpr({self.start}..{self.end})'
+    def children(self):
+        return [self.start, self.end] + ([self.step] if self.step else [])
+
+class LambdaExpr(ASTNode):
+    def __init__(self, params, body, line=0, col=0):
+        self.params = params  # List[str]
+        self.body = body      # ASTNode (Ausdruck)
+        self.line = line
+        self.col = col
+    def __repr__(self):
+        return f'LambdaExpr({self.params})'
+    def children(self):
+        return [self.body]
+
+class CastExpr(ASTNode):
+    def __init__(self, expr, target_type, line=0, col=0):
+        self.expr = expr
+        self.target_type = target_type
+        self.line = line
+        self.col = col
+    def __repr__(self):
+        return f'CastExpr(-> {self.target_type})'
+    def children(self):
+        return [self.expr]
+
+class TernaryExpr(ASTNode):
+    def __init__(self, cond, then_expr, else_expr, line=0, col=0):
+        self.cond = cond
+        self.then_expr = then_expr
+        self.else_expr = else_expr
+        self.line = line
+        self.col = col
+    def __repr__(self):
+        return 'TernaryExpr()'
+    def children(self):
+        return [self.cond, self.then_expr, self.else_expr]
+
+class TupleExpr(ASTNode):
+    def __init__(self, elements, line=0, col=0):
+        self.elements = elements
+        self.line = line
+        self.col = col
+    def __repr__(self):
+        return f'TupleExpr({len(self.elements)})'
+    def children(self):
+        return self.elements
+
+@dataclass
+class ClassDef(ASTNode):
+    """class X implements Y { ... } — wird wie ContractDef behandelt."""
+    name:      str
+    implements: str = ""
+    fields:    List[Any] = field(default_factory=list)
+    functions: List[Any] = field(default_factory=list)
+    line:      int = 0
+    col:       int = 0
+
+@dataclass
+class StorageBlock(ASTNode):
+    """storage { field: Type, ... } — Storage-Deklaration."""
+    fields: List[Any] = field(default_factory=list)
+    line:   int = 0
+    col:    int = 0
+
+@dataclass
+class TypeAliasDef(ASTNode):
+    """type Set<T> = Any — Type-Alias."""
+    name:       str
+    type_params: List[str] = field(default_factory=list)
+    target:     Any = None
     line:       int = 0
     col:        int = 0

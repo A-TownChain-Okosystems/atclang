@@ -1,12 +1,12 @@
 # Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+# STUB: Temporärer Python-Stub — wird in Sprint 2.1 durch ATCLang ersetzt (ATCLang First Policy, AD-006)
 """
 ATCLang Compiler — AST → ATC-Bytecode
 Version: 0.1.0-alpha | Komplett selbst geschrieben
 Kein LLVM-Klon, kein GCC-Port — eigener Code-Generator
 """
 
-import sys, os
-sys.path.insert(0, '/app')
+import os
 
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple
@@ -23,12 +23,13 @@ VERSION   = b"\x01\x00"  # v1.0
 
 @dataclass
 class CompiledModule:
-    name:         str
-    instructions: List[Instruction]
-    constants:    List[object]
-    functions:    Dict[str, List[Instruction]]
-    exports:      List[str]
-    source_map:   List[Tuple[int, int, int]]   # (instr_idx, line, col)
+    name:            str
+    instructions:    List[Instruction]
+    constants:       List[object]
+    functions:       Dict[str, List[Instruction]]
+    exports:         List[str] = field(default_factory=list)
+    function_params: Dict[str, List[str]] = field(default_factory=dict)
+    source_map:      List[Tuple[int, int, int]] = field(default_factory=list)
 
     def summary(self) -> str:
         return (
@@ -87,6 +88,7 @@ class ATCCompiler:
         self.instructions: List[Instruction] = []
         self.constants:    List[object]       = []
         self.functions:    Dict[str, List[Instruction]] = {}
+        self.function_params: Dict[str, List[str]] = {}
         self.exports:      List[str]          = []
         self.source_map:   List[Tuple]        = []
         self.globals       = SymbolTable()
@@ -156,9 +158,14 @@ class ATCCompiler:
             self.compile_expr(node.right, scope)
             op_map = {
                 '+': OP.ADD, '-': OP.SUB, '*': OP.MUL, '/': OP.DIV,
+                '%': OP.MOD, '**': OP.POW,
                 '==': OP.EQ, '!=': OP.NEQ,
                 '<': OP.LT,  '>': OP.GT,
                 '<=': OP.LTE, '>=': OP.GTE,
+                '&&': OP.AND, 'and': OP.AND,
+                '||': OP.OR,  'or': OP.OR,
+                '&': OP.BITAND, '|': OP.BITOR, '^': OP.BITXOR,
+                '<<': OP.SHL, '>>': OP.SHR,
             }
             op = op_map.get(node.op)
             if op:
@@ -217,6 +224,50 @@ class ATCCompiler:
             elif isinstance(node.target, DotAccess):
                 self.compile_expr(node.target.target, scope)
                 self.emit(OP.SET_FIELD, node.target.field_name, line=node.line)
+
+        elif isinstance(node, ListLiteral):
+            for elem in node.elements:
+                self.compile_expr(elem, scope)
+            self.emit(OP.NEW_LIST, len(node.elements), line=node.line)
+
+        elif isinstance(node, MapLiteral):
+            for pair in node.pairs:
+                if isinstance(pair, tuple) and len(pair) >= 2:
+                    key, val = pair[0], pair[1]
+                elif isinstance(pair, dict):
+                    key, val = pair.get('key'), pair.get('value')
+                else:
+                    key, val = pair, None
+                self.compile_expr(val, scope)
+                self.compile_expr(key, scope)
+            self.emit(OP.NEW_MAP, len(node.pairs), line=node.line)
+
+        elif isinstance(node, StructLiteral):
+            for fname, fval in node.fields:
+                self.compile_expr(fval, scope)
+            self.emit(OP.NEW_OBJ, node.struct_name or "struct",
+                     len(node.fields), line=node.line)
+
+        elif isinstance(node, TernaryExpr):
+            # cond ? then : else → compile as if-else with result
+            self.compile_expr(node.cond, scope)
+            jump_else = len(self.instructions)
+            self.emit(OP.JUMP_NOT, 0, line=node.line)  # placeholder
+            self.compile_expr(node.then_expr, scope)
+            jump_end = len(self.instructions)
+            self.emit(OP.JUMP, 0, line=node.line)  # placeholder
+            self.instructions[jump_else] = Instruction(OP.JUMP_NOT, [len(self.instructions)])
+            self.compile_expr(node.else_expr, scope)
+            self.instructions[jump_end] = Instruction(OP.JUMP, [len(self.instructions)])
+
+        elif isinstance(node, CastExpr):
+            self.compile_expr(node.value if hasattr(node, 'value') else node.operand, scope)
+            self.emit(OP.CAST, node.target_type if hasattr(node, 'target_type') else "Any", line=node.line)
+
+        elif isinstance(node, TupleExpr):
+            for elem in node.elements:
+                self.compile_expr(elem, scope)
+            self.emit(OP.NEW_LIST, len(node.elements), line=node.line)
 
         else:
             self.error(f"Unbekannter Ausdruck-Typ: {type(node).__name__}", node)
@@ -353,8 +404,78 @@ class ATCCompiler:
             # Ergebnis vom Stack räumen
             self.emit(OP.POP)
 
+        elif isinstance(node, Assignment):
+            # Assignment as statement — STORE already consumes the value, no POP needed
+            self.compile_expr(node, scope)
+
+        elif isinstance(node, ExprStatement):
+            self.compile_expr(node.expr, scope)
+            self.emit(OP.POP)
+
+        elif isinstance(node, BreakStatement):
+            if self._break_stack:
+                jmp = self.emit(OP.JUMP, 0)
+                self._break_stack.append(jmp)
+            else:
+                self.error("break außerhalb einer Schleife", node)
+
+        elif isinstance(node, ContinueStatement):
+            if self._loop_stack:
+                self.emit(OP.JUMP, self._loop_stack[-1], line=node.line)
+            else:
+                self.error("continue außerhalb einer Schleife", node)
+
+        elif isinstance(node, StateField):
+            # State field declarations are metadata — no bytecode
+            pass
+
         else:
             self.error(f"Unbekanntes Statement: {type(node).__name__}", node)
+
+
+    def compile_if_toplevel(self, node: IfStatement, scope: SymbolTable):
+        """Compile if/else at top level — keeps branch result on stack."""
+        self.compile_expr(node.condition, scope)
+        jump_if_false = self.emit(OP.JUMP_NOT, 0, line=node.line)
+
+        child_scope = scope.child()
+        for s in node.then_block:
+            if isinstance(s, ExprStatement):
+                self.compile_expr(s.expr, scope)
+            else:
+                self.compile_stmt(s, child_scope)
+
+        elif_jumps = []
+        if node.else_block or node.elif_blocks:
+            jump_over = self.emit(OP.JUMP, 0)
+            elif_jumps.append(jump_over)
+
+        self.patch(jump_if_false, self.current_pos())
+
+        for elif_cond, elif_body in node.elif_blocks:
+            self.compile_expr(elif_cond, scope)
+            jf = self.emit(OP.JUMP_NOT, 0)
+            cs = scope.child()
+            for s in elif_body:
+                if isinstance(s, ExprStatement):
+                    self.compile_expr(s.expr, scope)
+                else:
+                    self.compile_stmt(s, cs)
+            jo = self.emit(OP.JUMP, 0)
+            elif_jumps.append(jo)
+            self.patch(jf, self.current_pos())
+
+        if node.else_block:
+            cs = scope.child()
+            for s in node.else_block:
+                if isinstance(s, ExprStatement):
+                    self.compile_expr(s.expr, scope)
+                else:
+                    self.compile_stmt(s, cs)
+
+        end_pos = self.current_pos()
+        for j in elif_jumps:
+            self.patch(j, end_pos)
 
     # ── Top-Level Compiler ────────────────────────────────
 
@@ -400,13 +521,19 @@ class ATCCompiler:
         """Vollständiges Programm kompilieren."""
         scope = self.globals
 
-        for node in program.statements:
+        statements = program.statements
+        last_idx = len(statements) - 1
+
+        for idx, node in enumerate(statements):
+            is_last = (idx == last_idx)
+
             if isinstance(node, ContractDef):
                 self.compile_contract(node)
 
             elif isinstance(node, FunctionDef):
                 fn_instrs = self.compile_function(node)
                 self.functions[node.name] = fn_instrs
+                self.function_params[node.name] = [p.name for p in node.params]
                 if node.is_pub:
                     self.exports.append(node.name)
 
@@ -424,17 +551,45 @@ class ATCCompiler:
                 if node.alias:
                     self.emit(OP.STORE, node.alias)
 
+            elif isinstance(node, EnumDef):
+                # Enum: Register variants as constants, skip in bytecode
+                for i, variant in enumerate(node.variants):
+                    self.emit(OP.PUSH, i)
+                    self.emit(OP.STORE, f"{node.name}::{variant}")
+                self.emit(OP.PUSH, {v: i for i, v in enumerate(node.variants)})
+                self.emit(OP.STORE, node.name)
+
+            elif isinstance(node, StructDef):
+                # Struct: Register as factory function
+                pass  # Handled at runtime level
+
+            elif isinstance(node, (ClassDef, StorageBlock, TypeAliasDef)):
+                # Class/Storage/TypeAlias: Skip in bytecode, handled at runtime
+                pass
+
+            elif is_last and isinstance(node, ExprStatement):
+                # Last top-level expression: keep result on stack (no POP)
+                self.compile_expr(node.expr, scope)
+                self.emit(OP.RETURN, line=node.line)
+
+            elif is_last and isinstance(node, IfStatement):
+                # Last top-level if: keep branch result on stack (no POP in branches)
+                self.compile_if_toplevel(node, scope)
+
             else:
                 self.compile_stmt(node, scope)
 
-        self.emit(OP.HALT)
+        # Only emit HALT if last statement didn't emit RETURN
+        if not self.instructions or self.instructions[-1].op != OP.RETURN:
+            self.emit(OP.HALT)
 
         return CompiledModule(
-            name         = "main",
-            instructions = self.instructions,
-            constants    = self.constants,
-            functions    = self.functions,
-            exports      = self.exports,
+            name            = "main",
+            instructions    = self.instructions,
+            constants       = self.constants,
+            functions       = self.functions,
+            function_params = self.function_params,
+            exports         = self.exports,
             source_map   = self.source_map,
         )
 
