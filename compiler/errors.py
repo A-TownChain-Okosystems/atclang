@@ -10,42 +10,35 @@ Zentrales, unabhängiges Error- und Diagnostic-System des Compilers.
 Dependency Rule
 ---------------
 
+errors.py ist Layer 0 des Compiler-Subsystems.
+
+    errors.py
+        ↑
+        ├── source_map.py
+        ├── constants.py
+        ├── symbols.py
+        ├── context.py
+        ├── bytecode.py
+        ├── expressions.py
+        ├── statements.py
+        ├── control_flow.py
+        ├── functions.py
+        ├── contracts.py
+        ├── optimizer.py
+        └── compiler.py
+
 errors.py darf KEINE Abhängigkeit auf andere Compiler-Module besitzen.
 
-Erlaubt:
+Ziele
+-----
 
-    source_map.py
-        ↓
-    errors.py
-
-    constants.py
-        ↓
-    errors.py
-
-    symbols.py
-        ↓
-    errors.py
-
-    context.py
-        ↓
-    errors.py
-
-    ...
-
-Nicht erlaubt:
-
-    errors.py
-        ↓
-    source_map.py
-
-oder:
-
-    errors.py
-        ↓
-    compiler.py
-
-Dadurch bleibt errors.py die unterste Compiler-Schicht
-und verhindert zyklische Imports.
+- zentrale Compiler-Fehler
+- strukturierte Diagnostics
+- deterministische Fehlermeldungen
+- Source-Location-Unterstützung
+- stabile Error-Codes
+- CLI/IDE/LSP/CI-Unterstützung
+- keine zyklischen Compiler-Imports
 """
 
 from __future__ import annotations
@@ -82,11 +75,6 @@ class SourceLocation:
 
     0 bedeutet:
         Position unbekannt.
-
-    Beispiel:
-
-        line=12
-        column=7
     """
 
     line: int = 0
@@ -105,12 +93,12 @@ class SourceLocation:
 
     @property
     def is_known(self) -> bool:
-        """Gibt an, ob eine gültige Source-Position vorhanden ist."""
+        """Gibt an, ob die Position bekannt ist."""
 
         return self.line > 0
 
     def format(self) -> str:
-        """Formatiert die Position für Diagnostics."""
+        """Formatiert die Position für eine Diagnostic."""
 
         if self.line <= 0:
             return ""
@@ -157,12 +145,22 @@ class SourceSpan:
         if node is None:
             return cls(SourceLocation())
 
-        line = int(getattr(node, "line", 0) or 0)
+        line = int(
+            getattr(node, "line", 0) or 0
+        )
 
-        column = getattr(node, "column", None)
+        column = getattr(
+            node,
+            "column",
+            None,
+        )
 
         if column is None:
-            column = getattr(node, "col", 0)
+            column = getattr(
+                node,
+                "col",
+                0,
+            )
 
         column = int(column or 0)
 
@@ -171,18 +169,34 @@ class SourceSpan:
             column=column,
         )
 
-        end_line = getattr(node, "end_line", None)
+        end_line = getattr(
+            node,
+            "end_line",
+            None,
+        )
 
-        end_column = getattr(node, "end_column", None)
+        end_column = getattr(
+            node,
+            "end_column",
+            None,
+        )
 
         if end_column is None:
-            end_column = getattr(node, "end_col", None)
+            end_column = getattr(
+                node,
+                "end_col",
+                None,
+            )
 
         if end_line is None and end_column is None:
             return cls(start=start)
 
         end = SourceLocation(
-            line=int(end_line if end_line is not None else line),
+            line=int(
+                end_line
+                if end_line is not None
+                else line
+            ),
             column=int(end_column or 0),
         )
 
@@ -232,15 +246,15 @@ class CompilerDiagnostic:
     """
     Strukturierte Compiler-Diagnose.
 
-    Diese Struktur kann direkt von folgenden Systemen
-    verwendet werden:
+    Verwendbar durch:
 
         - CLI
         - IDE
         - LSP
         - CI
         - JSON Diagnostics
-        - Testsystem
+        - Testsysteme
+        - Build-Systeme
     """
 
     code: str
@@ -290,15 +304,17 @@ class CompilerDiagnostic:
 
 class CompileErrorCode:
     """
-    Zentrale ATCLang Compiler Error Codes.
+    Zentrale ATCLang Compiler Error-Codes.
 
-    ATC-Cxxx
+    Schema:
+
+        ATC-Cxxx
 
     Kategorien:
 
         C0xx  General
         C1xx  Syntax / AST
-        C2xx  Symbols
+        C2xx  Symbols / Scope
         C3xx  Types
         C4xx  Control Flow
         C5xx  Functions
@@ -309,55 +325,99 @@ class CompileErrorCode:
         C999  Internal
     """
 
+    # ───────────────────────────────────────────────────────────────────
     # General
+    # ───────────────────────────────────────────────────────────────────
+
     GENERAL = "ATC-C000"
 
+    # ───────────────────────────────────────────────────────────────────
     # Syntax / AST
+    # ───────────────────────────────────────────────────────────────────
+
     SYNTAX = "ATC-C100"
     INVALID_AST = "ATC-C101"
 
-    # Symbols
+    # ───────────────────────────────────────────────────────────────────
+    # Symbols / Scope
+    # ───────────────────────────────────────────────────────────────────
+
     NAME = "ATC-C200"
     UNDEFINED_SYMBOL = "ATC-C201"
     DUPLICATE_SYMBOL = "ATC-C202"
+    INVALID_SCOPE = "ATC-C203"
 
+    # ───────────────────────────────────────────────────────────────────
     # Types
+    # ───────────────────────────────────────────────────────────────────
+
     TYPE = "ATC-C300"
     TYPE_MISMATCH = "ATC-C301"
     INVALID_CAST = "ATC-C302"
     INVALID_OPERATION = "ATC-C303"
+    UNKNOWN_TYPE = "ATC-C304"
+    INVALID_GENERIC = "ATC-C305"
 
+    # ───────────────────────────────────────────────────────────────────
     # Control Flow
+    # ───────────────────────────────────────────────────────────────────
+
     CONTROL_FLOW = "ATC-C400"
     BREAK_OUTSIDE_LOOP = "ATC-C401"
     CONTINUE_OUTSIDE_LOOP = "ATC-C402"
     INVALID_RETURN = "ATC-C403"
+    UNREACHABLE_CODE = "ATC-C404"
 
+    # ───────────────────────────────────────────────────────────────────
     # Functions
+    # ───────────────────────────────────────────────────────────────────
+
     FUNCTION = "ATC-C500"
     INVALID_CALL = "ATC-C501"
     ARGUMENT_COUNT = "ATC-C502"
     DUPLICATE_PARAMETER = "ATC-C503"
+    INVALID_FUNCTION = "ATC-C504"
 
+    # ───────────────────────────────────────────────────────────────────
     # Contracts
+    # ───────────────────────────────────────────────────────────────────
+
     CONTRACT = "ATC-C600"
     INVALID_CONTRACT = "ATC-C601"
     INVALID_STATE = "ATC-C602"
+    INVALID_EVENT = "ATC-C603"
+    INVALID_ERROR = "ATC-C604"
+    INVALID_STORAGE = "ATC-C605"
 
+    # ───────────────────────────────────────────────────────────────────
     # Bytecode
+    # ───────────────────────────────────────────────────────────────────
+
     BYTECODE = "ATC-C700"
     INVALID_OPCODE = "ATC-C701"
     INVALID_OPERAND = "ATC-C702"
     INVALID_JUMP = "ATC-C703"
+    INVALID_BYTECODE = "ATC-C704"
 
+    # ───────────────────────────────────────────────────────────────────
     # Constant Pool
+    # ───────────────────────────────────────────────────────────────────
+
     CONSTANT = "ATC-C800"
     CONSTANT_POOL_OVERFLOW = "ATC-C801"
+    INVALID_CONSTANT = "ATC-C802"
 
+    # ───────────────────────────────────────────────────────────────────
     # Optimizer
-    OPTIMIZATION = "ATC-C900"
+    # ───────────────────────────────────────────────────────────────────
 
+    OPTIMIZATION = "ATC-C900"
+    INVALID_OPTIMIZATION = "ATC-C901"
+
+    # ───────────────────────────────────────────────────────────────────
     # Internal
+    # ───────────────────────────────────────────────────────────────────
+
     INTERNAL = "ATC-C999"
 
 
@@ -369,9 +429,6 @@ class CompileErrorCode:
 class CompileError(Exception):
     """
     Basisklasse aller ATCLang Compiler-Fehler.
-
-    Compiler-Module sollten bevorzugt strukturierte
-    Subklassen verwenden.
     """
 
     code = CompileErrorCode.GENERAL
@@ -387,6 +444,7 @@ class CompileError(Exception):
         hint: Optional[str] = None,
         note: Optional[str] = None,
     ) -> None:
+
         self.message = message
 
         if code is not None:
@@ -423,28 +481,36 @@ class CompileError(Exception):
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# SYNTAX / AST
+# SYNTAX / AST ERRORS
 # ═══════════════════════════════════════════════════════════════════════
 
 
 class CompileSyntaxError(CompileError):
+    """Compiler-Syntax-/AST-Fehler."""
+
     code = CompileErrorCode.SYNTAX
 
 
 class InvalidASTError(CompileError):
+    """AST entspricht nicht den Compiler-Anforderungen."""
+
     code = CompileErrorCode.INVALID_AST
 
 
 # ═══════════════════════════════════════════════════════════════════════
-# SYMBOL ERRORS
+# SYMBOL / SCOPE ERRORS
 # ═══════════════════════════════════════════════════════════════════════
 
 
 class CompileNameError(CompileError):
+    """Fehler bei Symbolauflösung."""
+
     code = CompileErrorCode.NAME
 
 
 class UndefinedSymbolError(CompileNameError):
+    """Symbol wurde nicht gefunden."""
+
     code = CompileErrorCode.UNDEFINED_SYMBOL
 
     def __init__(
@@ -454,6 +520,7 @@ class UndefinedSymbolError(CompileNameError):
         node: Any = None,
         hint: Optional[str] = None,
     ) -> None:
+
         self.name = name
 
         super().__init__(
@@ -464,6 +531,8 @@ class UndefinedSymbolError(CompileNameError):
 
 
 class DuplicateSymbolError(CompileNameError):
+    """Symbol wurde mehrfach definiert."""
+
     code = CompileErrorCode.DUPLICATE_SYMBOL
 
     def __init__(
@@ -472,6 +541,7 @@ class DuplicateSymbolError(CompileNameError):
         *,
         node: Any = None,
     ) -> None:
+
         self.name = name
 
         super().__init__(
@@ -480,16 +550,26 @@ class DuplicateSymbolError(CompileNameError):
         )
 
 
+class InvalidScopeError(CompileNameError):
+    """Ungültiger Scope-Kontext."""
+
+    code = CompileErrorCode.INVALID_SCOPE
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # TYPE ERRORS
 # ═══════════════════════════════════════════════════════════════════════
 
 
 class CompileTypeError(CompileError):
+    """Statischer Typfehler."""
+
     code = CompileErrorCode.TYPE
 
 
 class TypeMismatchError(CompileTypeError):
+    """Inkompatible Typen."""
+
     code = CompileErrorCode.TYPE_MISMATCH
 
     def __init__(
@@ -500,6 +580,7 @@ class TypeMismatchError(CompileTypeError):
         node: Any = None,
         hint: Optional[str] = None,
     ) -> None:
+
         self.expected = expected
         self.actual = actual
 
@@ -514,32 +595,62 @@ class TypeMismatchError(CompileTypeError):
 
 
 class InvalidCastError(CompileTypeError):
+    """Nicht erlaubter Cast."""
+
     code = CompileErrorCode.INVALID_CAST
 
 
 class InvalidOperationError(CompileTypeError):
+    """Nicht erlaubte Operation für einen Typ."""
+
     code = CompileErrorCode.INVALID_OPERATION
 
 
+class UnknownTypeError(CompileTypeError):
+    """Unbekannter Typ."""
+
+    code = CompileErrorCode.UNKNOWN_TYPE
+
+
+class InvalidGenericError(CompileTypeError):
+    """Ungültige generische Typdefinition."""
+
+    code = CompileErrorCode.INVALID_GENERIC
+
+
 # ═══════════════════════════════════════════════════════════════════════
-# CONTROL FLOW
+# CONTROL FLOW ERRORS
 # ═══════════════════════════════════════════════════════════════════════
 
 
 class CompileControlFlowError(CompileError):
+    """Fehler in der Kontrollflussanalyse."""
+
     code = CompileErrorCode.CONTROL_FLOW
 
 
 class BreakOutsideLoopError(CompileControlFlowError):
+    """break außerhalb einer Schleife."""
+
     code = CompileErrorCode.BREAK_OUTSIDE_LOOP
 
 
 class ContinueOutsideLoopError(CompileControlFlowError):
+    """continue außerhalb einer Schleife."""
+
     code = CompileErrorCode.CONTINUE_OUTSIDE_LOOP
 
 
 class InvalidReturnError(CompileControlFlowError):
+    """Ungültiges return."""
+
     code = CompileErrorCode.INVALID_RETURN
+
+
+class UnreachableCodeError(CompileControlFlowError):
+    """Nicht erreichbarer Code."""
+
+    code = CompileErrorCode.UNREACHABLE_CODE
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -548,14 +659,20 @@ class InvalidReturnError(CompileControlFlowError):
 
 
 class CompileFunctionError(CompileError):
+    """Fehler beim Kompilieren einer Funktion."""
+
     code = CompileErrorCode.FUNCTION
 
 
 class InvalidCallError(CompileFunctionError):
+    """Ungültiger Funktionsaufruf."""
+
     code = CompileErrorCode.INVALID_CALL
 
 
 class ArgumentCountError(CompileFunctionError):
+    """Falsche Anzahl von Argumenten."""
+
     code = CompileErrorCode.ARGUMENT_COUNT
 
     def __init__(
@@ -566,6 +683,7 @@ class ArgumentCountError(CompileFunctionError):
         *,
         node: Any = None,
     ) -> None:
+
         self.function_name = function_name
         self.expected = expected
         self.actual = actual
@@ -580,7 +698,15 @@ class ArgumentCountError(CompileFunctionError):
 
 
 class DuplicateParameterError(CompileFunctionError):
+    """Doppelter Funktionsparameter."""
+
     code = CompileErrorCode.DUPLICATE_PARAMETER
+
+
+class InvalidFunctionError(CompileFunctionError):
+    """Ungültige Funktionsdefinition."""
+
+    code = CompileErrorCode.INVALID_FUNCTION
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -589,15 +715,39 @@ class DuplicateParameterError(CompileFunctionError):
 
 
 class CompileContractError(CompileError):
+    """Fehler beim Kompilieren eines Contracts."""
+
     code = CompileErrorCode.CONTRACT
 
 
 class InvalidContractError(CompileContractError):
+    """Ungültige Contract-Struktur."""
+
     code = CompileErrorCode.INVALID_CONTRACT
 
 
 class InvalidStateError(CompileContractError):
+    """Ungültiger Contract-State."""
+
     code = CompileErrorCode.INVALID_STATE
+
+
+class InvalidEventError(CompileContractError):
+    """Ungültige Event-Definition."""
+
+    code = CompileErrorCode.INVALID_EVENT
+
+
+class InvalidErrorDefinitionError(CompileContractError):
+    """Ungültige Contract-Error-Definition."""
+
+    code = CompileErrorCode.INVALID_ERROR
+
+
+class InvalidStorageError(CompileContractError):
+    """Ungültige Storage-Definition."""
+
+    code = CompileErrorCode.INVALID_STORAGE
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -606,19 +756,33 @@ class InvalidStateError(CompileContractError):
 
 
 class CompileBytecodeError(CompileError):
+    """Fehler beim Erzeugen von ATC-Bytecode."""
+
     code = CompileErrorCode.BYTECODE
 
 
 class InvalidOpcodeError(CompileBytecodeError):
+    """Ungültiger Opcode."""
+
     code = CompileErrorCode.INVALID_OPCODE
 
 
 class InvalidOperandError(CompileBytecodeError):
+    """Ungültiger Bytecode-Operand."""
+
     code = CompileErrorCode.INVALID_OPERAND
 
 
 class InvalidJumpError(CompileBytecodeError):
+    """Ungültiges Sprungziel."""
+
     code = CompileErrorCode.INVALID_JUMP
+
+
+class InvalidBytecodeError(CompileBytecodeError):
+    """Strukturell ungültiger Bytecode."""
+
+    code = CompileErrorCode.INVALID_BYTECODE
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -627,11 +791,21 @@ class InvalidJumpError(CompileBytecodeError):
 
 
 class ConstantPoolError(CompileError):
+    """Fehler im Constant Pool."""
+
     code = CompileErrorCode.CONSTANT
 
 
 class ConstantPoolOverflowError(ConstantPoolError):
+    """Constant Pool hat die maximale Größe überschritten."""
+
     code = CompileErrorCode.CONSTANT_POOL_OVERFLOW
+
+
+class InvalidConstantError(ConstantPoolError):
+    """Ungültiger Constant-Pool-Eintrag."""
+
+    code = CompileErrorCode.INVALID_CONSTANT
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -640,7 +814,15 @@ class ConstantPoolOverflowError(ConstantPoolError):
 
 
 class OptimizationError(CompileError):
+    """Fehler während einer Optimierung."""
+
     code = CompileErrorCode.OPTIMIZATION
+
+
+class InvalidOptimizationError(OptimizationError):
+    """Optimierung erzeugt einen ungültigen Zustand."""
+
+    code = CompileErrorCode.INVALID_OPTIMIZATION
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -667,7 +849,7 @@ def location_from_node(
     node: Any,
 ) -> Optional[SourceSpan]:
     """
-    Konvertiert sicher einen AST-Node in einen SourceSpan.
+    Konvertiert einen AST-Node sicher in einen SourceSpan.
     """
 
     if node is None:
@@ -686,7 +868,7 @@ def raise_compile_error(
     note: Optional[str] = None,
 ) -> None:
     """
-    Convenience Helper zum Werfen eines CompileError.
+    Convenience-Helper zum Werfen eines CompileError.
     """
 
     raise CompileError(
@@ -725,46 +907,57 @@ __all__ = [
     "CompileSyntaxError",
     "InvalidASTError",
 
-    # Symbols
+    # Symbols / Scope
     "CompileNameError",
     "UndefinedSymbolError",
     "DuplicateSymbolError",
+    "InvalidScopeError",
 
     # Types
     "CompileTypeError",
     "TypeMismatchError",
     "InvalidCastError",
     "InvalidOperationError",
+    "UnknownTypeError",
+    "InvalidGenericError",
 
     # Control Flow
     "CompileControlFlowError",
     "BreakOutsideLoopError",
     "ContinueOutsideLoopError",
     "InvalidReturnError",
+    "UnreachableCodeError",
 
     # Functions
     "CompileFunctionError",
     "InvalidCallError",
     "ArgumentCountError",
     "DuplicateParameterError",
+    "InvalidFunctionError",
 
     # Contracts
     "CompileContractError",
     "InvalidContractError",
     "InvalidStateError",
+    "InvalidEventError",
+    "InvalidErrorDefinitionError",
+    "InvalidStorageError",
 
     # Bytecode
     "CompileBytecodeError",
     "InvalidOpcodeError",
     "InvalidOperandError",
     "InvalidJumpError",
+    "InvalidBytecodeError",
 
-    # Constants
+    # Constant Pool
     "ConstantPoolError",
     "ConstantPoolOverflowError",
+    "InvalidConstantError",
 
     # Optimizer
     "OptimizationError",
+    "InvalidOptimizationError",
 
     # Internal
     "CompileInternalError",
