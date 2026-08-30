@@ -1,597 +1,630 @@
-atclang/compiler/source_map.py
-
 Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems.
 
 All Rights Reserved.
 
 """
-ATCLang Source Map
+ATCLang Compiler Source Map
 
-Mapping zwischen ATCLang-Quellcode und generiertem ATC-Bytecode.
+Source-Mapping-System des ATCLang Compilers.
 
-Verantwortlichkeiten:
-- Bytecode-IP → Source Location
-- Source Location → Bytecode-IP
-- effiziente Lookup-Operationen
-- Fehler-/Runtime-Diagnostik
-- Serialisierung für Debugger und Tooling
+Verantwortung
 
-Das Modul enthält bewusst keine Compilerlogik.
+source_map.py verbindet erzeugten Compiler-/Bytecode-Code mit
+Positionen im ursprünglichen ATCLang-Quelltext.
 
-Format einer Source Location:
-file_id
-line
-column
-optional end_line / end_column
+Dependency Rule
 
-ATC-92 / ATCLang Compiler
-"""
+source_map.py
+    ↓
+errors.py
+
+source_map.py darf keine Abhängigkeit auf Compiler-Orchestrator,
+Parser, VM oder Optimizer besitzen.
+
+Kanonische Source-Typen
+
+SourceLocation
+SourceSpan
+CompilerDiagnostic
+
+werden ausschließlich aus errors.py importiert.
+
+Ziele
+
+- Bytecode → Source Mapping
+- Instruction → Source Mapping
+- Source → Bytecode Lookup
+- Debugger-Unterstützung
+- Stacktrace-Unterstützung
+- LSP/IDE-Unterstützung
+- deterministische Serialisierung
+- Optimizer-kompatibles Mapping
+  """
 
 from future import annotations
 
-from bisect import bisect_right
-from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence, Tuple
+from dataclasses import dataclass
+from typing import Dict, Iterable, List, Optional, Tuple
 
-══════════════════════════════════════════════════════════════════════════════
+from .errors import (
+CompilerDiagnostic,
+ErrorSeverity,
+SourceLocation,
+SourceSpan,
+)
 
-SOURCE LOCATION
-
-══════════════════════════════════════════════════════════════════════════════
-
-@dataclass(frozen=True, slots=True)
-class SourceLocation:
-"""Position eines AST-/Bytecode-Elements im Quelltext."""
-
-file_id: str = "<memory>"
-line: int = 0
-column: int = 0
-end_line: Optional[int] = None
-end_column: Optional[int] = None
-
-def __post_init__(self) -> None:
-    if self.line < 0:
-        raise ValueError("line must be >= 0")
-    if self.column < 0:
-        raise ValueError("column must be >= 0")
-
-    if self.end_line is not None and self.end_line < self.line:
-        raise ValueError("end_line must be >= line")
-
-    if (
-        self.end_line is not None
-        and self.end_line == self.line
-        and self.end_column is not None
-        and self.end_column < self.column
-    ):
-        raise ValueError("end_column must be >= column")
-
-def as_tuple(self) -> Tuple[str, int, int]:
-    """Legacy-kompatible Darstellung."""
-    return self.file_id, self.line, self.column
-
-def to_dict(self) -> Dict[str, Any]:
-    return {
-        "file_id": self.file_id,
-        "line": self.line,
-        "column": self.column,
-        "end_line": self.end_line,
-        "end_column": self.end_column,
-    }
-
-@classmethod
-def from_dict(cls, data: Mapping[str, Any]) -> "SourceLocation":
-    return cls(
-        file_id=str(data.get("file_id", "<memory>")),
-        line=int(data.get("line", 0)),
-        column=int(data.get("column", 0)),
-        end_line=(
-            None
-            if data.get("end_line") is None
-            else int(data["end_line"])
-        ),
-        end_column=(
-            None
-            if data.get("end_column") is None
-            else int(data["end_column"])
-        ),
-    )
-
-def __str__(self) -> str:
-    return f"{self.file_id}:{self.line}:{self.column}"
-
-══════════════════════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════
 
 SOURCE MAP ENTRY
 
-══════════════════════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class SourceMapEntry:
-"""Eine Zuordnung von Bytecode-IP zu Source Location."""
-
-ip: int
-location: SourceLocation
-
-# Optionaler semantischer Kontext.
-# Beispiele:
-#   expression
-#   statement
-#   function
-#   contract
-#   call
-kind: str = ""
-
-# Optionales Symbol, z. B. Funktionsname.
-symbol: Optional[str] = None
-
-def __post_init__(self) -> None:
-    if self.ip < 0:
-        raise ValueError("instruction pointer must be >= 0")
-
-def to_dict(self) -> Dict[str, Any]:
-    return {
-        "ip": self.ip,
-        "location": self.location.to_dict(),
-        "kind": self.kind,
-        "symbol": self.symbol,
-    }
-
-@classmethod
-def from_dict(cls, data: Mapping[str, Any]) -> "SourceMapEntry":
-    return cls(
-        ip=int(data["ip"]),
-        location=SourceLocation.from_dict(data["location"]),
-        kind=str(data.get("kind", "")),
-        symbol=data.get("symbol"),
-    )
-
-══════════════════════════════════════════════════════════════════════════════
-
-SOURCE MAP
-
-══════════════════════════════════════════════════════════════════════════════
-
-class SourceMap:
 """
-Bidirektionale Source-Map für ATC-Bytecode.
+Mapping eines Bytecode-Bereichs auf einen Source-Bereich.
+
+bytecode_start
+    Erste Instruction, die diesem Mapping zugeordnet ist.
+
+bytecode_end
+    Exklusives Ende des Bytecode-Bereichs.
+
+span
+    Zugehöriger Bereich im ATCLang-Quelltext.
 
 Beispiel:
 
-    source_map.add(0, line=1, column=1)
-    source_map.add(1, line=1, column=7)
-    source_map.add(2, line=2, column=5)
-
-    loc = source_map.lookup_ip(1)
-
-Die Implementierung hält die Einträge nach IP sortiert und verwendet
-binäre Suche für schnelle Runtime-/Debugger-Lookups.
+    Bytecode [10, 14)
+        ↓
+    source line 8, columns 5-17
 """
 
-def __init__(
-    self,
-    entries: Optional[Iterable[SourceMapEntry]] = None,
-    *,
-    file_id: str = "<memory>",
-) -> None:
-    self.file_id = file_id
-    self._entries: List[SourceMapEntry] = []
-    self._ips: List[int] = []
+bytecode_start: int
+bytecode_end: int
+span: SourceSpan
 
-    if entries:
-        self.extend(entries)
+def __post_init__(self) -> None:
+    if self.bytecode_start < 0:
+        raise ValueError("bytecode_start darf nicht negativ sein")
 
-# ──────────────────────────────────────────────────────────────────────
-# Properties
-# ──────────────────────────────────────────────────────────────────────
+    if self.bytecode_end < self.bytecode_start:
+        raise ValueError(
+            "bytecode_end darf nicht kleiner als bytecode_start sein"
+        )
 
 @property
-def entries(self) -> Sequence[SourceMapEntry]:
-    """Read-only Sicht auf die Source-Map."""
-    return tuple(self._entries)
+def length(self) -> int:
+    """Anzahl der gemappten Bytecode-Instructions."""
+
+    return self.bytecode_end - self.bytecode_start
+
+def contains_bytecode(self, offset: int) -> bool:
+    """Prüft, ob ein Bytecode-Offset innerhalb des Eintrags liegt."""
+
+    return self.bytecode_start <= offset < self.bytecode_end
+
+═══════════════════════════════════════════════════════════════════════
+
+SOURCE MAP
+
+═══════════════════════════════════════════════════════════════════════
+
+class SourceMap:
+"""
+Zentrale Source-Map eines kompilierten Moduls.
+
+Die Map unterstützt zwei Richtungen:
+
+    Bytecode → Source
+
+und:
+
+    Source → Bytecode
+
+Die Einträge werden intern deterministisch nach
+Bytecode-Offset sortiert.
+"""
+
+def __init__(self) -> None:
+    self._entries: List[SourceMapEntry] = []
+
+# ────────────────────────────────────────────────────────────────
+# INSERT
+# ────────────────────────────────────────────────────────────────
+
+def add(
+    self,
+    bytecode_start: int,
+    bytecode_end: int,
+    span: SourceSpan,
+) -> SourceMapEntry:
+    """
+    Fügt einen Source-Map-Eintrag hinzu.
+    """
+
+    entry = SourceMapEntry(
+        bytecode_start=bytecode_start,
+        bytecode_end=bytecode_end,
+        span=span,
+    )
+
+    self._entries.append(entry)
+
+    return entry
+
+def add_instruction(
+    self,
+    instruction_offset: int,
+    span: SourceSpan,
+) -> SourceMapEntry:
+    """
+    Fügt ein Mapping für genau eine Instruction hinzu.
+    """
+
+    return self.add(
+        instruction_offset,
+        instruction_offset + 1,
+        span,
+    )
+
+# ────────────────────────────────────────────────────────────────
+# LOOKUP: BYTECODE → SOURCE
+# ────────────────────────────────────────────────────────────────
+
+def lookup(
+    self,
+    bytecode_offset: int,
+) -> Optional[SourceMapEntry]:
+    """
+    Liefert den Source-Map-Eintrag für einen Bytecode-Offset.
+    """
+
+    if bytecode_offset < 0:
+        return None
+
+    for entry in reversed(self._entries):
+        if entry.contains_bytecode(bytecode_offset):
+            return entry
+
+    return None
+
+def lookup_span(
+    self,
+    bytecode_offset: int,
+) -> Optional[SourceSpan]:
+    """
+    Liefert direkt den SourceSpan eines Bytecode-Offsets.
+    """
+
+    entry = self.lookup(bytecode_offset)
+
+    if entry is None:
+        return None
+
+    return entry.span
+
+def lookup_location(
+    self,
+    bytecode_offset: int,
+) -> Optional[SourceLocation]:
+    """
+    Liefert die Startposition des zugehörigen Source-Bereichs.
+    """
+
+    span = self.lookup_span(bytecode_offset)
+
+    if span is None:
+        return None
+
+    return span.start
+
+# ────────────────────────────────────────────────────────────────
+# LOOKUP: SOURCE → BYTECODE
+# ────────────────────────────────────────────────────────────────
+
+def lookup_source(
+    self,
+    line: int,
+    column: int = 0,
+) -> List[SourceMapEntry]:
+    """
+    Liefert alle Bytecode-Einträge, die zu einer Source-Position
+    gehören.
+
+    Die Suche ist bewusst tolerant gegenüber unvollständigen
+    Endpositionen.
+    """
+
+    if line < 0 or column < 0:
+        return []
+
+    result: List[SourceMapEntry] = []
+
+    for entry in self._entries:
+        start = entry.span.start
+        end = entry.span.end
+
+        if start.line == 0:
+            continue
+
+        if end is None:
+            if start.line == line:
+                result.append(entry)
+            continue
+
+        if self._position_in_span(
+            line,
+            column,
+            entry.span,
+        ):
+            result.append(entry)
+
+    return result
+
+def lookup_line(self, line: int) -> List[SourceMapEntry]:
+    """
+    Liefert alle Mappings für eine Source-Zeile.
+    """
+
+    return self.lookup_source(line)
+
+# ────────────────────────────────────────────────────────────────
+# POSITION TEST
+# ────────────────────────────────────────────────────────────────
+
+@staticmethod
+def _position_in_span(
+    line: int,
+    column: int,
+    span: SourceSpan,
+) -> bool:
+    """
+    Prüft, ob eine Source-Position innerhalb eines SourceSpans liegt.
+    """
+
+    start = span.start
+    end = span.end
+
+    if end is None:
+        return line == start.line
+
+    if line < start.line:
+        return False
+
+    if line > end.line:
+        return False
+
+    if line == start.line and column > 0:
+        if start.column > 0 and column < start.column:
+            return False
+
+    if line == end.line and end.column > 0:
+        if column > end.column:
+            return False
+
+    return True
+
+# ═══════════════════════════════════════════════════════════════
+# NORMALIZATION
+# ═══════════════════════════════════════════════════════════════
+
+def normalize(self) -> None:
+    """
+    Sortiert und konsolidiert die Source Map.
+
+    Identische oder direkt angrenzende Einträge mit identischem
+    SourceSpan werden zusammengeführt.
+    """
+
+    if not self._entries:
+        return
+
+    entries = sorted(
+        self._entries,
+        key=lambda entry: (
+            entry.bytecode_start,
+            entry.bytecode_end,
+        ),
+    )
+
+    merged: List[SourceMapEntry] = []
+
+    for entry in entries:
+        if not merged:
+            merged.append(entry)
+            continue
+
+        previous = merged[-1]
+
+        if (
+            previous.bytecode_end == entry.bytecode_start
+            and previous.span == entry.span
+        ):
+            merged[-1] = SourceMapEntry(
+                bytecode_start=previous.bytecode_start,
+                bytecode_end=entry.bytecode_end,
+                span=previous.span,
+            )
+        else:
+            merged.append(entry)
+
+    self._entries = merged
+
+# ═══════════════════════════════════════════════════════════════
+# BYTECODE REINDEXING
+# ═══════════════════════════════════════════════════════════════
+
+def remap_offsets(
+    self,
+    old_to_new: Dict[int, int],
+) -> None:
+    """
+    Aktualisiert Bytecode-Offsets nach einer Bytecode-Transformation.
+
+    old_to_new:
+
+        alter Offset → neuer Offset
+
+    Einträge, deren Startposition nicht mehr existiert,
+    werden verworfen.
+    """
+
+    new_entries: List[SourceMapEntry] = []
+
+    for entry in self._entries:
+        if entry.bytecode_start not in old_to_new:
+            continue
+
+        new_start = old_to_new[entry.bytecode_start]
+
+        if entry.bytecode_end > entry.bytecode_start:
+            last_old = entry.bytecode_end - 1
+
+            if last_old in old_to_new:
+                new_end = old_to_new[last_old] + 1
+            else:
+                new_end = new_start + 1
+        else:
+            new_end = new_start
+
+        if new_end < new_start:
+            new_end = new_start
+
+        new_entries.append(
+            SourceMapEntry(
+                bytecode_start=new_start,
+                bytecode_end=new_end,
+                span=entry.span,
+            )
+        )
+
+    self._entries = new_entries
+    self.normalize()
+
+# ═══════════════════════════════════════════════════════════════
+# ITERATION
+# ═══════════════════════════════════════════════════════════════
+
+@property
+def entries(self) -> Tuple[SourceMapEntry, ...]:
+    """
+    Read-only Sicht auf die Source-Map-Einträge.
+    """
+
+    return tuple(
+        sorted(
+            self._entries,
+            key=lambda entry: entry.bytecode_start,
+        )
+    )
+
+def __iter__(self) -> Iterable[SourceMapEntry]:
+    return iter(self.entries)
 
 def __len__(self) -> int:
     return len(self._entries)
 
-def __bool__(self) -> bool:
-    return bool(self._entries)
+def clear(self) -> None:
+    """Entfernt alle Source-Map-Einträge."""
 
-def __iter__(self) -> Iterator[SourceMapEntry]:
-    return iter(self._entries)
+    self._entries.clear()
 
-# ──────────────────────────────────────────────────────────────────────
-# Add / Build
-# ──────────────────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════
+# DIAGNOSTICS
+# ═══════════════════════════════════════════════════════════════
 
-def add(
+def diagnostic(
     self,
-    ip: int,
-    line: int,
-    column: int = 0,
+    code: str,
+    message: str,
     *,
-    file_id: Optional[str] = None,
-    end_line: Optional[int] = None,
-    end_column: Optional[int] = None,
-    kind: str = "",
-    symbol: Optional[str] = None,
-) -> SourceMapEntry:
+    bytecode_offset: Optional[int] = None,
+    severity: ErrorSeverity = ErrorSeverity.ERROR,
+    hint: Optional[str] = None,
+    note: Optional[str] = None,
+) -> CompilerDiagnostic:
     """
-    Fügt eine Source-Map-Zuordnung hinzu.
+    Erstellt eine CompilerDiagnostic mit Source-Mapping.
 
-    Existiert bereits ein Eintrag für dieselbe IP, wird dieser ersetzt.
+    Wenn bytecode_offset angegeben ist, wird automatisch der
+    zugehörige SourceSpan verwendet.
     """
 
-    location = SourceLocation(
-        file_id=file_id if file_id is not None else self.file_id,
-        line=line,
-        column=column,
-        end_line=end_line,
-        end_column=end_column,
+    span = None
+
+    if bytecode_offset is not None:
+        span = self.lookup_span(bytecode_offset)
+
+    return CompilerDiagnostic(
+        code=code,
+        message=message,
+        severity=severity,
+        span=span,
+        hint=hint,
+        note=note,
     )
 
-    entry = SourceMapEntry(
-        ip=ip,
-        location=location,
-        kind=kind,
-        symbol=symbol,
-    )
+# ═══════════════════════════════════════════════════════════════
+# SERIALIZATION
+# ═══════════════════════════════════════════════════════════════
 
-    self._insert_or_replace(entry)
-    return entry
-
-def add_location(
-    self,
-    ip: int,
-    location: SourceLocation,
-    *,
-    kind: str = "",
-    symbol: Optional[str] = None,
-) -> SourceMapEntry:
-    """Fügt eine vorhandene SourceLocation hinzu."""
-
-    entry = SourceMapEntry(
-        ip=ip,
-        location=location,
-        kind=kind,
-        symbol=symbol,
-    )
-
-    self._insert_or_replace(entry)
-    return entry
-
-def extend(self, entries: Iterable[SourceMapEntry]) -> None:
-    """Fügt mehrere Entries hinzu und sortiert sie anschließend."""
-
-    for entry in entries:
-        if not isinstance(entry, SourceMapEntry):
-            raise TypeError(
-                "SourceMap entries must be SourceMapEntry instances"
-            )
-
-        self._insert_or_replace(entry)
-
-def _insert_or_replace(self, entry: SourceMapEntry) -> None:
-    pos = bisect_right(self._ips, entry.ip)
-
-    # Existing IP.
-    if pos > 0 and self._ips[pos - 1] == entry.ip:
-        self._entries[pos - 1] = entry
-        return
-
-    self._ips.insert(pos, entry.ip)
-    self._entries.insert(pos, entry)
-
-# ──────────────────────────────────────────────────────────────────────
-# Lookup
-# ──────────────────────────────────────────────────────────────────────
-
-def lookup_ip(
-    self,
-    ip: int,
-    *,
-    exact: bool = False,
-) -> Optional[SourceMapEntry]:
+def to_dict(self) -> List[dict]:
     """
-    Ermittelt die Source-Position für eine Bytecode-IP.
-
-    exact=False:
-        Liefert den letzten bekannten Mapping-Eintrag <= IP.
-
-    exact=True:
-        Liefert nur einen exakten Treffer.
+    Serialisiert die Source Map in eine einfache JSON-kompatible
+    Struktur.
     """
 
-    if not self._entries:
-        return None
+    result: List[dict] = []
 
-    pos = bisect_right(self._ips, ip)
+    for entry in self.entries:
+        start = entry.span.start
+        end = entry.span.end
 
-    if pos == 0:
-        return None
+        item = {
+            "bytecode_start": entry.bytecode_start,
+            "bytecode_end": entry.bytecode_end,
+            "start": {
+                "line": start.line,
+                "column": start.column,
+            },
+        }
 
-    entry = self._entries[pos - 1]
+        if end is not None:
+            item["end"] = {
+                "line": end.line,
+                "column": end.column,
+            }
 
-    if exact and entry.ip != ip:
-        return None
-
-    return entry
-
-def location_for_ip(
-    self,
-    ip: int,
-    *,
-    exact: bool = False,
-) -> Optional[SourceLocation]:
-    """Convenience-Lookup: IP → SourceLocation."""
-
-    entry = self.lookup_ip(ip, exact=exact)
-    return entry.location if entry else None
-
-def ips_for_location(
-    self,
-    line: int,
-    column: Optional[int] = None,
-    *,
-    file_id: Optional[str] = None,
-) -> List[int]:
-    """
-    Source → Bytecode.
-
-    Liefert alle Bytecode-IPs, die zur angegebenen Source-Position
-    gehören.
-    """
-
-    result: List[int] = []
-
-    for entry in self._entries:
-        loc = entry.location
-
-        if file_id is not None and loc.file_id != file_id:
-            continue
-
-        if loc.line != line:
-            continue
-
-        if column is not None and loc.column != column:
-            continue
-
-        result.append(entry.ip)
+        result.append(item)
 
     return result
-
-def entries_for_line(
-    self,
-    line: int,
-    *,
-    file_id: Optional[str] = None,
-) -> List[SourceMapEntry]:
-    """Alle Mapping-Einträge einer Source-Zeile."""
-
-    return [
-        entry
-        for entry in self._entries
-        if entry.location.line == line
-        and (
-            file_id is None
-            or entry.location.file_id == file_id
-        )
-    ]
-
-# ──────────────────────────────────────────────────────────────────────
-# Compiler compatibility
-# ──────────────────────────────────────────────────────────────────────
-
-def append_legacy(
-    self,
-    ip: int,
-    line: int,
-    column: int = 0,
-) -> None:
-    """
-    Kompatibilität für das bisherige Compilerformat:
-
-        List[Tuple[int, int, int]]
-
-    entspricht:
-
-        (instruction_index, line, column)
-    """
-
-    self.add(ip, line, column)
-
-def to_legacy(self) -> List[Tuple[int, int, int]]:
-    """Konvertiert die Source-Map in das bisherige Tuple-Format."""
-
-    return [
-        (
-            entry.ip,
-            entry.location.line,
-            entry.location.column,
-        )
-        for entry in self._entries
-    ]
-
-# ──────────────────────────────────────────────────────────────────────
-# Transformations
-# ──────────────────────────────────────────────────────────────────────
-
-def remap(
-    self,
-    old_to_new: Mapping[int, int],
-) -> "SourceMap":
-    """
-    Erzeugt eine neue Source-Map nach Bytecode-Reindexierung.
-
-    Wichtig für Optimizer-Pässe, die Instructions entfernen oder
-    verschieben.
-    """
-
-    result = SourceMap(file_id=self.file_id)
-
-    for entry in self._entries:
-        new_ip = old_to_new.get(entry.ip)
-
-        if new_ip is None:
-            continue
-
-        result.add_location(
-            new_ip,
-            entry.location,
-            kind=entry.kind,
-            symbol=entry.symbol,
-        )
-
-    return result
-
-def merge(
-    self,
-    other: "SourceMap",
-    *,
-    ip_offset: int = 0,
-) -> "SourceMap":
-    """
-    Kombiniert zwei Source Maps.
-
-    Wird insbesondere für Function-/Module-Code hilfreich.
-    """
-
-    result = SourceMap(file_id=self.file_id)
-
-    result.extend(self._entries)
-
-    for entry in other:
-        result.add_location(
-            entry.ip + ip_offset,
-            entry.location,
-            kind=entry.kind,
-            symbol=entry.symbol,
-        )
-
-    return result
-
-# ──────────────────────────────────────────────────────────────────────
-# Serialization
-# ──────────────────────────────────────────────────────────────────────
-
-def to_list(self) -> List[Dict[str, Any]]:
-    """JSON-kompatible Darstellung."""
-
-    return [entry.to_dict() for entry in self._entries]
-
-def to_dict(self) -> Dict[str, Any]:
-    return {
-        "version": 1,
-        "file_id": self.file_id,
-        "entries": self.to_list(),
-    }
 
 @classmethod
-def from_list(
-    cls,
-    data: Iterable[Mapping[str, Any]],
-    *,
-    file_id: str = "<memory>",
-) -> "SourceMap":
-    result = cls(file_id=file_id)
+def from_dict(cls, data: Iterable[dict]) -> "SourceMap":
+    """
+    Erstellt eine SourceMap aus einer JSON-kompatiblen Struktur.
+    """
+
+    source_map = cls()
 
     for item in data:
-        result.add_location(
-            int(item["ip"]),
-            SourceLocation.from_dict(item["location"]),
-            kind=str(item.get("kind", "")),
-            symbol=item.get("symbol"),
+        start_data = item.get("start", {})
+
+        start = SourceLocation(
+            line=int(start_data.get("line", 0)),
+            column=int(start_data.get("column", 0)),
         )
 
-    return result
+        end_data = item.get("end")
 
-@classmethod
-def from_dict(cls, data: Mapping[str, Any]) -> "SourceMap":
-    return cls.from_list(
-        data.get("entries", []),
-        file_id=str(data.get("file_id", "<memory>")),
-    )
+        end = None
 
-# ──────────────────────────────────────────────────────────────────────
-# Debugging
-# ──────────────────────────────────────────────────────────────────────
+        if end_data is not None:
+            end = SourceLocation(
+                line=int(end_data.get("line", start.line)),
+                column=int(end_data.get("column", 0)),
+            )
 
-def format_ip(self, ip: int) -> str:
-    """Menschenlesbare Darstellung einer Bytecode-IP."""
-
-    entry = self.lookup_ip(ip)
-
-    if entry is None:
-        return f"<unknown>@ip={ip}"
-
-    suffix = ""
-
-    if entry.symbol:
-        suffix = f" [{entry.symbol}]"
-
-    if entry.kind:
-        suffix += f" <{entry.kind}>"
-
-    return f"{entry.location}{suffix}"
-
-def dump(self) -> str:
-    """Debug-Ausgabe der vollständigen Source-Map."""
-
-    lines = ["=== ATC Source Map ==="]
-
-    for entry in self._entries:
-        symbol = f" [{entry.symbol}]" if entry.symbol else ""
-        kind = f" <{entry.kind}>" if entry.kind else ""
-
-        lines.append(
-            f"  {entry.ip:04d} → "
-            f"{entry.location}{kind}{symbol}"
+        span = SourceSpan(
+            start=start,
+            end=end,
         )
 
-    return "\n".join(lines)
+        source_map.add(
+            int(item.get("bytecode_start", 0)),
+            int(item.get("bytecode_end", 0)),
+            span,
+        )
 
-══════════════════════════════════════════════════════════════════════════════
+    source_map.normalize()
 
-COMPILER HELPER
+    return source_map
 
-══════════════════════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════
 
-def build_source_map(
-entries: Iterable[Tuple[int, int, int]],
-*,
-file_id: str = "<memory>",
-) -> SourceMap:
+SOURCE MAP BUILDER
+
+═══════════════════════════════════════════════════════════════════════
+
+class SourceMapBuilder:
 """
-Erstellt eine SourceMap aus dem bisherigen Compilerformat.
+Convenience-Builder für den Compiler.
 
-Beispiel:
-
-    [
-        (0, 1, 0),
-        (1, 1, 5),
-        (2, 2, 0),
-    ]
+Der Builder ermöglicht es Compiler-Komponenten, während des
+Lowerings Source-Mappings aufzubauen.
 """
 
-source_map = SourceMap(file_id=file_id)
+def __init__(self) -> None:
+    self._map = SourceMap()
 
-for ip, line, column in entries:
-    source_map.add(
-        ip,
-        line,
-        column,
+def mark(
+    self,
+    bytecode_offset: int,
+    span: SourceSpan,
+) -> None:
+    """
+    Markiert eine einzelne Instruction.
+    """
+
+    self._map.add_instruction(
+        bytecode_offset,
+        span,
     )
 
-return source_map
+def mark_range(
+    self,
+    bytecode_start: int,
+    bytecode_end: int,
+    span: SourceSpan,
+) -> None:
+    """
+    Markiert einen Bytecode-Bereich.
+    """
 
-══════════════════════════════════════════════════════════════════════════════
+    self._map.add(
+        bytecode_start,
+        bytecode_end,
+        span,
+    )
+
+def mark_node(
+    self,
+    bytecode_offset: int,
+    node: object,
+) -> None:
+    """
+    Markiert eine Instruction anhand eines AST-Nodes.
+
+    Der Node muss lediglich line/column bzw. line/col besitzen.
+    """
+
+    span = SourceSpan.from_node(node)
+
+    self.mark(
+        bytecode_offset,
+        span,
+    )
+
+def build(self) -> SourceMap:
+    """
+    Erstellt die finale SourceMap.
+    """
+
+    self._map.normalize()
+
+    return self._map
+
+═══════════════════════════════════════════════════════════════════════
 
 PUBLIC API
 
-══════════════════════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════════════════════════════
 
 all = [
-"SourceLocation",
 "SourceMapEntry",
 "SourceMap",
-"build_source_map",
+"SourceMapBuilder",
 ]
+
+version = "0.3.0"
