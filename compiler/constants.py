@@ -2,636 +2,712 @@
 # All Rights Reserved.
 
 """
-ATCLang Compiler — Constants
-============================
+ATCLang Compiler Constant Pool
+==============================
 
-Zentrale Konstanten und Compiler-Konfiguration für ATCLang.
+Zentrales Constant-Pool-System des ATCLang Compilers.
 
-Verantwortlichkeiten:
-    - Compiler-Version
-    - Bytecode-Format
-    - Magic Bytes
-    - Sprach-/ABI-Version
-    - Compiler Limits
-    - Reserved Names
-    - interne Symbolpräfixe
-    - Optimierungslevel
-    - Source-Map-Konstanten
+Verantwortung
+-------------
 
-Diese Datei enthält keine Compilerlogik.
+constants.py verwaltet alle Konstanten, die während der Compilation
+in den erzeugten ATC-Bytecode übernommen werden.
+
+Beispiele:
+
+    - Integer
+    - Float
+    - Boolean
+    - String
+    - Bytes
+    - None / Null
+    - weitere immutable Literale
+
+Architektur
+-----------
+
+    AST
+     │
+     ▼
+    Expression Lowering
+     │
+     ▼
+    ConstantPool
+     │
+     ▼
+    Bytecode
+
+Dependency Rule
+---------------
+
+constants.py darf keine Abhängigkeit auf andere Compiler-Module
+besitzen.
+
+Erlaubt:
+
+    constants.py
+        ↓
+    errors.py
+
+Nicht erlaubt:
+
+    constants.py
+        ↓
+    bytecode.py
+        ↓
+    compiler.py
+
+Ziele
+-----
+
+- deterministische Constant-Pool-Indizes
+- Deduplication identischer Konstanten
+- stabile Serialisierung
+- definierte maximale Pool-Größe
+- sichere Typvalidierung
+- Optimizer-kompatible Indizes
+- JSON-kompatible Darstellung
 """
 
 from __future__ import annotations
 
-from enum import IntEnum
-from typing import Final
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-# VERSIONING
-# ══════════════════════════════════════════════════════════════════════════════
-
-ATCLANG_VERSION: Final[str] = "0.3.0"
-ATCLANG_VERSION_MAJOR: Final[int] = 0
-ATCLANG_VERSION_MINOR: Final[int] = 3
-ATCLANG_VERSION_PATCH: Final[int] = 0
-
-# Compiler/Language compatibility identifier.
-LANGUAGE_VERSION: Final[str] = "0.3"
-
-# ATC-92 compiler/VM bytecode family.
-BYTECODE_VERSION_MAJOR: Final[int] = 1
-BYTECODE_VERSION_MINOR: Final[int] = 0
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# BYTECODE FORMAT
-# ══════════════════════════════════════════════════════════════════════════════
-
-BYTECODE_MAGIC: Final[bytes] = b"ATCB"
-
-# Compatibility aliases for older compiler code.
-MAGIC: Final[bytes] = BYTECODE_MAGIC
-VERSION: Final[bytes] = bytes(
-    (BYTECODE_VERSION_MAJOR, BYTECODE_VERSION_MINOR)
+from .errors import (
+    CompileErrorCode,
+    ConstantPoolError,
+    ConstantPoolOverflowError,
 )
 
-BYTECODE_EXTENSION: Final[str] = ".atcb"
-SOURCE_EXTENSION: Final[str] = ".atc"
+
+# ═══════════════════════════════════════════════════════════════════════
+# CONSTANT TYPE
+# ═══════════════════════════════════════════════════════════════════════
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# COMPILER IDENTIFICATION
-# ══════════════════════════════════════════════════════════════════════════════
+class ConstantType(str, Enum):
+    """Kanonische Typen des ATCLang Constant Pools."""
 
-COMPILER_NAME: Final[str] = "ATCLang Compiler"
-COMPILER_ID: Final[str] = "atclang"
-COMPILER_VENDOR: Final[str] = "ShivaCore / A-TownChain-Okosystems"
+    NULL = "null"
+    BOOL = "bool"
+    INT = "int"
+    FLOAT = "float"
+    STRING = "string"
+    BYTES = "bytes"
 
-# Standards reference.
-COMPILER_STANDARD: Final[str] = "ATC-92"
+
+# ═══════════════════════════════════════════════════════════════════════
+# CONSTANT VALUE
+# ═══════════════════════════════════════════════════════════════════════
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# OPTIMIZATION
-# ══════════════════════════════════════════════════════════════════════════════
-
-class OptimizationLevel(IntEnum):
+@dataclass(frozen=True)
+class Constant:
     """
-    Compiler optimization levels.
+    Ein einzelner Eintrag im Constant Pool.
 
-    O0:
-        Keine Optimierung.
+    index
+        Deterministischer Pool-Index.
 
-    O1:
-        Sichere lokale Optimierungen:
-            - Constant Folding
-            - Dead Code Elimination
-            - Jump Threading
-            - einfache Peephole-Regeln
+    type
+        Kanonischer ATCLang-Konstantentyp.
 
-    O2:
-        Erweiterte Optimierungen:
-            - Constant Propagation
-            - Algebraic Simplification
-            - zusätzliche lokale Optimierungen
+    value
+        Tatsächlicher Konstantenwert.
     """
 
-    O0 = 0
-    O1 = 1
-    O2 = 2
-
-
-DEFAULT_OPTIMIZATION_LEVEL: Final[int] = OptimizationLevel.O1
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# COMPILER LIMITS
-# ══════════════════════════════════════════════════════════════════════════════
-
-# Defensive limits. These prevent malformed programs from creating
-# unbounded compiler state.
-
-MAX_CONSTANTS: Final[int] = 1_000_000
-MAX_FUNCTIONS: Final[int] = 100_000
-MAX_GLOBAL_SYMBOLS: Final[int] = 1_000_000
-MAX_LOCAL_SYMBOLS: Final[int] = 65_535
-
-MAX_PARAMETERS: Final[int] = 255
-MAX_NESTING_DEPTH: Final[int] = 1_024
-MAX_BASIC_BLOCKS: Final[int] = 1_000_000
-MAX_INSTRUCTIONS: Final[int] = 10_000_000
-
-MAX_IDENTIFIER_LENGTH: Final[int] = 256
-MAX_STRING_LITERAL_LENGTH: Final[int] = 16 * 1024 * 1024
-
-MAX_MODULE_NAME_LENGTH: Final[int] = 256
-MAX_EXPORTS: Final[int] = 65_535
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# SYMBOL KINDS
-# ══════════════════════════════════════════════════════════════════════════════
-
-SYMBOL_LOCAL: Final[str] = "local"
-SYMBOL_GLOBAL: Final[str] = "global"
-SYMBOL_FUNCTION: Final[str] = "function"
-SYMBOL_CONTRACT: Final[str] = "contract"
-SYMBOL_STATE: Final[str] = "state"
-SYMBOL_PARAMETER: Final[str] = "parameter"
-SYMBOL_TYPE: Final[str] = "type"
-SYMBOL_ENUM: Final[str] = "enum"
-SYMBOL_CONSTANT: Final[str] = "constant"
-SYMBOL_IMPORT: Final[str] = "import"
-
-
-SYMBOL_KINDS: Final[frozenset[str]] = frozenset(
-    {
-        SYMBOL_LOCAL,
-        SYMBOL_GLOBAL,
-        SYMBOL_FUNCTION,
-        SYMBOL_CONTRACT,
-        SYMBOL_STATE,
-        SYMBOL_PARAMETER,
-        SYMBOL_TYPE,
-        SYMBOL_ENUM,
-        SYMBOL_CONSTANT,
-        SYMBOL_IMPORT,
-    }
-)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# INTERNAL SYMBOL PREFIXES
-# ══════════════════════════════════════════════════════════════════════════════
-
-INTERNAL_PREFIX: Final[str] = "__atc_"
-
-ITERATOR_PREFIX: Final[str] = "__atc_iter_"
-LOOP_INDEX_PREFIX: Final[str] = "__atc_i_"
-TEMP_PREFIX: Final[str] = "__atc_tmp_"
-RETURN_PREFIX: Final[str] = "__atc_return_"
-PARAM_PREFIX: Final[str] = "__atc_param_"
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# NAMESPACE
-# ══════════════════════════════════════════════════════════════════════════════
-
-NAMESPACE_SEPARATOR: Final[str] = "::"
-
-ATC_NAMESPACE: Final[str] = "ATC"
-
-STANDARD_NAMESPACE: Final[str] = "ATC::Std"
-
-IMPORT_NAMESPACE: Final[str] = "ATC::Import"
-
-SYSTEM_NAMESPACE: Final[str] = "ATC::System"
-
-VM_NAMESPACE: Final[str] = "ATC::VM"
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# BUILTIN FUNCTIONS
-# ══════════════════════════════════════════════════════════════════════════════
-
-BUILTIN_PRINT: Final[str] = "print"
-BUILTIN_LEN: Final[str] = "len"
-
-BUILTIN_FUNCTIONS: Final[frozenset[str]] = frozenset(
-    {
-        BUILTIN_PRINT,
-        BUILTIN_LEN,
-    }
-)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# SPECIAL COMPILER FUNCTIONS
-# ══════════════════════════════════════════════════════════════════════════════
-
-DYNAMIC_CALL_NAME: Final[str] = "__dynamic__"
-
-STD_LEN_FUNCTION: Final[str] = "ATC::Std::len"
-
-IMPORT_FUNCTION_PREFIX: Final[str] = "ATC::Import::"
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# RESERVED IDENTIFIERS
-# ══════════════════════════════════════════════════════════════════════════════
-
-RESERVED_IDENTIFIERS: Final[frozenset[str]] = frozenset(
-    {
-        # Language/runtime
-        "self",
-        "super",
-        "this",
-
-        # Compiler/runtime internals
-        "__dynamic__",
-        "__atc_return__",
-        "__atc_tmp__",
-
-        # Builtins
-        "print",
-        "len",
-
-        # ATC namespaces
-        "ATC",
-        "Std",
-        "System",
-        "VM",
-    }
-)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# CONTROL FLOW
-# ══════════════════════════════════════════════════════════════════════════════
-
-# Maximum number of nested loops/branches tracked by compiler context.
-MAX_CONTROL_FLOW_DEPTH: Final[int] = 1_024
-
-# Sentinel used by control-flow analysis.
-NO_TARGET: Final[int] = -1
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# SOURCE MAP
-# ══════════════════════════════════════════════════════════════════════════════
-
-# Source map entry:
-#
-#     instruction_index, source_line, source_column
-#
-SOURCE_MAP_ENTRY_SIZE: Final[int] = 3
-
-UNKNOWN_SOURCE_LINE: Final[int] = 0
-UNKNOWN_SOURCE_COLUMN: Final[int] = 0
-
-SOURCE_MAP_VERSION: Final[int] = 1
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# CONSTANT POOL
-# ══════════════════════════════════════════════════════════════════════════════
-
-class ConstantKind(IntEnum):
-    """Canonical constant-pool categories."""
-
-    NULL = 0
-    BOOL = 1
-    INT = 2
-    FLOAT = 3
-    STRING = 4
-    BYTES = 5
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# TYPE SYSTEM
-# ══════════════════════════════════════════════════════════════════════════════
-
-TYPE_ANY: Final[str] = "Any"
-TYPE_NULL: Final[str] = "Null"
-TYPE_BOOL: Final[str] = "Bool"
-TYPE_INT: Final[str] = "Int"
-TYPE_FLOAT: Final[str] = "Float"
-TYPE_STRING: Final[str] = "String"
-TYPE_BYTES: Final[str] = "Bytes"
-
-TYPE_LIST: Final[str] = "List"
-TYPE_MAP: Final[str] = "Map"
-TYPE_TUPLE: Final[str] = "Tuple"
-
-TYPE_ADDRESS: Final[str] = "Address"
-TYPE_ATC_WALLET: Final[str] = "ATCWallet"
-
-PRIMITIVE_TYPES: Final[frozenset[str]] = frozenset(
-    {
-        TYPE_NULL,
-        TYPE_BOOL,
-        TYPE_INT,
-        TYPE_FLOAT,
-        TYPE_STRING,
-        TYPE_BYTES,
-    }
-)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# OPERATOR SET
-# ══════════════════════════════════════════════════════════════════════════════
-
-ARITHMETIC_OPERATORS: Final[frozenset[str]] = frozenset(
-    {
-        "+",
-        "-",
-        "*",
-        "/",
-        "%",
-        "**",
-    }
-)
-
-COMPARISON_OPERATORS: Final[frozenset[str]] = frozenset(
-    {
-        "==",
-        "!=",
-        "<",
-        ">",
-        "<=",
-        ">=",
-    }
-)
-
-LOGICAL_OPERATORS: Final[frozenset[str]] = frozenset(
-    {
-        "&&",
-        "||",
-        "and",
-        "or",
-    }
-)
-
-BITWISE_OPERATORS: Final[frozenset[str]] = frozenset(
-    {
-        "&",
-        "|",
-        "^",
-        "<<",
-        ">>",
-    }
-)
-
-UNARY_OPERATORS: Final[frozenset[str]] = frozenset(
-    {
-        "-",
-        "!",
-        "~",
-    }
-)
-
-ALL_BINARY_OPERATORS: Final[frozenset[str]] = (
-    ARITHMETIC_OPERATORS
-    | COMPARISON_OPERATORS
-    | LOGICAL_OPERATORS
-    | BITWISE_OPERATORS
-)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# FUNCTION CALL CONVENTION
-# ══════════════════════════════════════════════════════════════════════════════
-
-MAX_CALL_ARGUMENTS: Final[int] = 255
-
-# Arguments are evaluated left-to-right.
-ARGUMENT_EVALUATION_ORDER: Final[str] = "left-to-right"
-
-# Current compiler ABI convention.
-CALL_ABI_VERSION: Final[int] = 1
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# CONTRACT / SMART-CONTRACT CONSTANTS
-# ══════════════════════════════════════════════════════════════════════════════
-
-STATE_NAMESPACE_SEPARATOR: Final[str] = "."
-
-CONTRACT_FUNCTION_SEPARATOR: Final[str] = "."
-
-MAX_CONTRACT_STATES: Final[int] = 65_535
-MAX_CONTRACT_FUNCTIONS: Final[int] = 65_535
-MAX_CONTRACT_EVENTS: Final[int] = 65_535
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# EXPORTS
-# ══════════════════════════════════════════════════════════════════════════════
-
-# Public API names that can be emitted by compiler modules.
-EXPORT_NAME_SEPARATOR: Final[str] = "::"
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# ERROR CODES
-# ══════════════════════════════════════════════════════════════════════════════
-
-ERROR_PREFIX: Final[str] = "ATC"
-
-ERR_INVALID_AST: Final[str] = "ATC-C001"
-ERR_UNKNOWN_NODE: Final[str] = "ATC-C002"
-ERR_UNKNOWN_OPERATOR: Final[str] = "ATC-C003"
-ERR_UNDEFINED_SYMBOL: Final[str] = "ATC-C004"
-ERR_DUPLICATE_SYMBOL: Final[str] = "ATC-C005"
-ERR_INVALID_CONTROL_FLOW: Final[str] = "ATC-C006"
-ERR_INVALID_FUNCTION: Final[str] = "ATC-C007"
-ERR_INVALID_CONTRACT: Final[str] = "ATC-C008"
-ERR_BYTECODE_LIMIT: Final[str] = "ATC-C009"
-ERR_CONSTANT_LIMIT: Final[str] = "ATC-C010"
-ERR_INVALID_TARGET: Final[str] = "ATC-C011"
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# VALIDATION HELPERS
-# ══════════════════════════════════════════════════════════════════════════════
-
-def is_reserved_identifier(name: str) -> bool:
-    """Return True if ``name`` is reserved by the language/compiler."""
-    return name in RESERVED_IDENTIFIERS or name.startswith(INTERNAL_PREFIX)
-
-
-def is_valid_identifier_length(name: str) -> bool:
-    """Validate identifier length against compiler limits."""
-    return 0 < len(name) <= MAX_IDENTIFIER_LENGTH
-
-
-def is_valid_module_name(name: str) -> bool:
-    """Validate module name length."""
-    return 0 < len(name) <= MAX_MODULE_NAME_LENGTH
-
-
-def validate_optimization_level(level: int) -> int:
-    """
-    Validate and normalize an optimization level.
-
-    Raises:
-        ValueError: if the level is outside O0..O2.
-    """
-    try:
-        value = int(level)
-    except (TypeError, ValueError) as exc:
-        raise ValueError(
-            f"Invalid optimization level: {level!r}"
-        ) from exc
-
-    if value not in (
-        OptimizationLevel.O0,
-        OptimizationLevel.O1,
-        OptimizationLevel.O2,
-    ):
-        raise ValueError(
-            f"Invalid optimization level {value}; "
-            f"expected 0, 1 or 2."
+    index: int
+    type: ConstantType
+    value: Any
+
+    def __post_init__(self) -> None:
+        if self.index < 0:
+            raise ValueError("Constant.index darf nicht negativ sein")
+
+        _validate_constant_value(self.type, self.value)
+
+    def to_dict(self) -> dict:
+        """
+        JSON-kompatible Repräsentation.
+
+        Bytes werden als Hex-String serialisiert.
+        """
+
+        if self.type is ConstantType.BYTES:
+            value = self.value.hex()
+        else:
+            value = self.value
+
+        return {
+            "index": self.index,
+            "type": self.type.value,
+            "value": value,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Constant":
+        """Erzeugt eine Constant aus einer serialisierten Struktur."""
+
+        if not isinstance(data, dict):
+            raise ConstantPoolError(
+                "Constant entry must be a dictionary",
+                code=CompileErrorCode.INVALID_CONSTANT,
+            )
+
+        try:
+            index = int(data["index"])
+            constant_type = ConstantType(data["type"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ConstantPoolError(
+                "Invalid serialized constant entry",
+                code=CompileErrorCode.INVALID_CONSTANT,
+            ) from exc
+
+        value = data.get("value")
+
+        if constant_type is ConstantType.BYTES:
+            if not isinstance(value, str):
+                raise ConstantPoolError(
+                    "Serialized bytes constant must be a hex string",
+                    code=CompileErrorCode.INVALID_CONSTANT,
+                )
+
+            try:
+                value = bytes.fromhex(value)
+            except ValueError as exc:
+                raise ConstantPoolError(
+                    "Invalid hexadecimal bytes constant",
+                    code=CompileErrorCode.INVALID_CONSTANT,
+                ) from exc
+
+        return cls(
+            index=index,
+            type=constant_type,
+            value=value,
         )
 
-    return value
+
+# ═══════════════════════════════════════════════════════════════════════
+# CONSTANT KEY
+# ═══════════════════════════════════════════════════════════════════════
 
 
-# ══════════════════════════════════════════════════════════════════════════════
+def _constant_key(
+    constant_type: ConstantType,
+    value: Any,
+) -> Tuple[ConstantType, Any]:
+    """
+    Erzeugt einen stabilen Schlüssel für Deduplication.
+
+    Der Typ ist Bestandteil des Schlüssels.
+
+    Dadurch werden beispielsweise:
+
+        bool(True)
+
+und:
+
+        int(1)
+
+nicht als dieselbe Konstante behandelt.
+    """
+
+    if constant_type is ConstantType.BYTES:
+        value = bytes(value)
+
+    return constant_type, value
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# VALIDATION
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def _validate_constant_value(
+    constant_type: ConstantType,
+    value: Any,
+) -> None:
+    """Validiert einen Konstantenwert gegen seinen ConstantType."""
+
+    if constant_type is ConstantType.NULL:
+        if value is not None:
+            raise ConstantPoolError(
+                "NULL constant must contain None",
+                code=CompileErrorCode.INVALID_CONSTANT,
+            )
+        return
+
+    if constant_type is ConstantType.BOOL:
+        if type(value) is not bool:
+            raise ConstantPoolError(
+                "BOOL constant must contain a bool",
+                code=CompileErrorCode.INVALID_CONSTANT,
+            )
+        return
+
+    if constant_type is ConstantType.INT:
+        if type(value) is not int:
+            raise ConstantPoolError(
+                "INT constant must contain an int",
+                code=CompileErrorCode.INVALID_CONSTANT,
+            )
+        return
+
+    if constant_type is ConstantType.FLOAT:
+        if type(value) is not float:
+            raise ConstantPoolError(
+                "FLOAT constant must contain a float",
+                code=CompileErrorCode.INVALID_CONSTANT,
+            )
+        return
+
+    if constant_type is ConstantType.STRING:
+        if not isinstance(value, str):
+            raise ConstantPoolError(
+                "STRING constant must contain a str",
+                code=CompileErrorCode.INVALID_CONSTANT,
+            )
+        return
+
+    if constant_type is ConstantType.BYTES:
+        if not isinstance(value, bytes):
+            raise ConstantPoolError(
+                "BYTES constant must contain bytes",
+                code=CompileErrorCode.INVALID_CONSTANT,
+            )
+        return
+
+    raise ConstantPoolError(
+        f"Unsupported constant type: {constant_type!r}",
+        code=CompileErrorCode.INVALID_CONSTANT,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# TYPE INFERENCE
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def infer_constant_type(value: Any) -> ConstantType:
+    """
+    Ermittelt den kanonischen ConstantType eines Python-Wertes.
+
+    Die Prüfung erfolgt bewusst mit type(...) statt isinstance(...),
+    damit bool nicht versehentlich als int behandelt wird.
+    """
+
+    if value is None:
+        return ConstantType.NULL
+
+    if type(value) is bool:
+        return ConstantType.BOOL
+
+    if type(value) is int:
+        return ConstantType.INT
+
+    if type(value) is float:
+        return ConstantType.FLOAT
+
+    if type(value) is str:
+        return ConstantType.STRING
+
+    if type(value) is bytes:
+        return ConstantType.BYTES
+
+    raise ConstantPoolError(
+        f"Unsupported constant value type: {type(value).__name__}",
+        code=CompileErrorCode.INVALID_CONSTANT,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# CONSTANT POOL
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class ConstantPool:
+    """
+    Deterministischer Constant Pool.
+
+    Eigenschaften
+    -------------
+
+    - insertion-order stabil
+    - identische Konstanten werden dedupliziert
+    - Index bleibt nach Einfügung stabil
+    - optionales Größenlimit
+    """
+
+    DEFAULT_MAX_SIZE = 65535
+
+    def __init__(
+        self,
+        *,
+        max_size: int = DEFAULT_MAX_SIZE,
+    ) -> None:
+        if max_size <= 0:
+            raise ValueError(
+                "max_size muss größer als 0 sein"
+            )
+
+        self.max_size = max_size
+
+        self._constants: List[Constant] = []
+        self._index: Dict[
+            Tuple[ConstantType, Any],
+            int,
+        ] = {}
+
+    # ────────────────────────────────────────────────────────────────
+    # INSERT
+    # ────────────────────────────────────────────────────────────────
+
+    def add(
+        self,
+        value: Any,
+        *,
+        constant_type: Optional[ConstantType] = None,
+    ) -> int:
+        """
+        Fügt eine Konstante hinzu und liefert deren Index.
+
+        Existiert die Konstante bereits, wird ihr bestehender Index
+        zurückgegeben.
+        """
+
+        if constant_type is None:
+            constant_type = infer_constant_type(value)
+
+        _validate_constant_value(
+            constant_type,
+            value,
+        )
+
+        key = _constant_key(
+            constant_type,
+            value,
+        )
+
+        existing = self._index.get(key)
+
+        if existing is not None:
+            return existing
+
+        if len(self._constants) >= self.max_size:
+            raise ConstantPoolOverflowError(
+                (
+                    "Constant pool overflow: "
+                    f"maximum size is {self.max_size}"
+                )
+            )
+
+        index = len(self._constants)
+
+        constant = Constant(
+            index=index,
+            type=constant_type,
+            value=value,
+        )
+
+        self._constants.append(constant)
+        self._index[key] = index
+
+        return index
+
+    def add_null(self) -> int:
+        """Fügt eine NULL-Konstante hinzu."""
+
+        return self.add(
+            None,
+            constant_type=ConstantType.NULL,
+        )
+
+    def add_bool(self, value: bool) -> int:
+        """Fügt eine Boolean-Konstante hinzu."""
+
+        return self.add(
+            value,
+            constant_type=ConstantType.BOOL,
+        )
+
+    def add_int(self, value: int) -> int:
+        """Fügt eine Integer-Konstante hinzu."""
+
+        return self.add(
+            value,
+            constant_type=ConstantType.INT,
+        )
+
+    def add_float(self, value: float) -> int:
+        """Fügt eine Float-Konstante hinzu."""
+
+        return self.add(
+            value,
+            constant_type=ConstantType.FLOAT,
+        )
+
+    def add_string(self, value: str) -> int:
+        """Fügt eine String-Konstante hinzu."""
+
+        return self.add(
+            value,
+            constant_type=ConstantType.STRING,
+        )
+
+    def add_bytes(self, value: bytes) -> int:
+        """Fügt eine Bytes-Konstante hinzu."""
+
+        return self.add(
+            value,
+            constant_type=ConstantType.BYTES,
+        )
+
+    # ────────────────────────────────────────────────────────────────
+    # LOOKUP
+    # ────────────────────────────────────────────────────────────────
+
+    def get(self, index: int) -> Constant:
+        """
+        Liefert eine Konstante anhand ihres Index.
+        """
+
+        if index < 0 or index >= len(self._constants):
+            raise ConstantPoolError(
+                f"Invalid constant index: {index}",
+                code=CompileErrorCode.INVALID_CONSTANT,
+            )
+
+        return self._constants[index]
+
+    def find(
+        self,
+        value: Any,
+        *,
+        constant_type: Optional[ConstantType] = None,
+    ) -> Optional[int]:
+        """
+        Sucht eine Konstante ohne sie hinzuzufügen.
+
+        Gibt None zurück, wenn sie nicht existiert.
+        """
+
+        if constant_type is None:
+            constant_type = infer_constant_type(value)
+
+        _validate_constant_value(
+            constant_type,
+            value,
+        )
+
+        return self._index.get(
+            _constant_key(
+                constant_type,
+                value,
+            )
+        )
+
+    def contains(
+        self,
+        value: Any,
+        *,
+        constant_type: Optional[ConstantType] = None,
+    ) -> bool:
+        """Prüft, ob eine Konstante vorhanden ist."""
+
+        return (
+            self.find(
+                value,
+                constant_type=constant_type,
+            )
+            is not None
+        )
+
+    # ────────────────────────────────────────────────────────────────
+    # PROPERTIES
+    # ────────────────────────────────────────────────────────────────
+
+    @property
+    def size(self) -> int:
+        """Aktuelle Anzahl der Konstanten."""
+
+        return len(self._constants)
+
+    @property
+    def is_full(self) -> bool:
+        """Gibt an, ob der Constant Pool voll ist."""
+
+        return self.size >= self.max_size
+
+    @property
+    def constants(self) -> Tuple[Constant, ...]:
+        """Read-only Sicht auf den Constant Pool."""
+
+        return tuple(self._constants)
+
+    # ────────────────────────────────────────────────────────────────
+    # ITERATION
+    # ────────────────────────────────────────────────────────────────
+
+    def __iter__(self) -> Iterator[Constant]:
+        return iter(self._constants)
+
+    def __len__(self) -> int:
+        return len(self._constants)
+
+    # ────────────────────────────────────────────────────────────────
+    # SERIALIZATION
+    # ────────────────────────────────────────────────────────────────
+
+    def to_dict(self) -> List[dict]:
+        """Serialisiert den kompletten Constant Pool."""
+
+        return [
+            constant.to_dict()
+            for constant in self._constants
+        ]
+
+    @classmethod
+    def from_dict(
+        cls,
+        data: Iterable[dict],
+        *,
+        max_size: int = DEFAULT_MAX_SIZE,
+    ) -> "ConstantPool":
+        """
+        Rekonstruiert einen Constant Pool.
+
+        Die serialisierten Indizes müssen exakt der
+        Einfügereihenfolge entsprechen.
+        """
+
+        pool = cls(max_size=max_size)
+
+        for expected_index, item in enumerate(data):
+            constant = Constant.from_dict(item)
+
+            if constant.index != expected_index:
+                raise ConstantPoolError(
+                    (
+                        "Invalid constant pool ordering: "
+                        f"expected index {expected_index}, "
+                        f"got {constant.index}"
+                    ),
+                    code=CompileErrorCode.INVALID_CONSTANT,
+                )
+
+            actual_index = pool.add(
+                constant.value,
+                constant_type=constant.type,
+            )
+
+            if actual_index != expected_index:
+                raise ConstantPoolError(
+                    "Constant pool contains duplicate entries",
+                    code=CompileErrorCode.INVALID_CONSTANT,
+                )
+
+        return pool
+
+    # ────────────────────────────────────────────────────────────────
+    # COPY
+    # ────────────────────────────────────────────────────────────────
+
+    def copy(self) -> "ConstantPool":
+        """Erstellt eine unabhängige Kopie des Constant Pools."""
+
+        result = ConstantPool(
+            max_size=self.max_size,
+        )
+
+        for constant in self._constants:
+            result.add(
+                constant.value,
+                constant_type=constant.type,
+            )
+
+        return result
+
+    # ────────────────────────────────────────────────────────────────
+    # CLEAR
+    # ────────────────────────────────────────────────────────────────
+
+    def clear(self) -> None:
+        """Leert den Constant Pool."""
+
+        self._constants.clear()
+        self._index.clear()
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# CONSTANT POOL BUILDER
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class ConstantPoolBuilder:
+    """
+    Convenience-Builder für Compiler-Komponenten.
+
+    Der Builder kapselt den Pool und bietet eine klar definierte
+    API für Expression- und Literal-Lowering.
+    """
+
+    def __init__(
+        self,
+        *,
+        max_size: int = ConstantPool.DEFAULT_MAX_SIZE,
+    ) -> None:
+        self.pool = ConstantPool(
+            max_size=max_size,
+        )
+
+    def literal(self, value: Any) -> int:
+        """Registriert ein Literal."""
+
+        return self.pool.add(value)
+
+    def null(self) -> int:
+        return self.pool.add_null()
+
+    def boolean(self, value: bool) -> int:
+        return self.pool.add_bool(value)
+
+    def integer(self, value: int) -> int:
+        return self.pool.add_int(value)
+
+    def floating(self, value: float) -> int:
+        return self.pool.add_float(value)
+
+    def string(self, value: str) -> int:
+        return self.pool.add_string(value)
+
+    def bytes(self, value: bytes) -> int:
+        return self.pool.add_bytes(value)
+
+    def build(self) -> ConstantPool:
+        """Gibt den aufgebauten Constant Pool zurück."""
+
+        return self.pool
+
+
+# ═══════════════════════════════════════════════════════════════════════
 # PUBLIC API
-# ══════════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
+
 
 __all__ = [
-    # Version
-    "ATCLANG_VERSION",
-    "ATCLANG_VERSION_MAJOR",
-    "ATCLANG_VERSION_MINOR",
-    "ATCLANG_VERSION_PATCH",
-    "LANGUAGE_VERSION",
-
-    # Bytecode
-    "BYTECODE_MAGIC",
-    "BYTECODE_VERSION_MAJOR",
-    "BYTECODE_VERSION_MINOR",
-    "BYTECODE_EXTENSION",
-    "SOURCE_EXTENSION",
-    "MAGIC",
-    "VERSION",
-
-    # Compiler
-    "COMPILER_NAME",
-    "COMPILER_ID",
-    "COMPILER_VENDOR",
-    "COMPILER_STANDARD",
-
-    # Optimization
-    "OptimizationLevel",
-    "DEFAULT_OPTIMIZATION_LEVEL",
-
-    # Limits
-    "MAX_CONSTANTS",
-    "MAX_FUNCTIONS",
-    "MAX_GLOBAL_SYMBOLS",
-    "MAX_LOCAL_SYMBOLS",
-    "MAX_PARAMETERS",
-    "MAX_NESTING_DEPTH",
-    "MAX_BASIC_BLOCKS",
-    "MAX_INSTRUCTIONS",
-    "MAX_IDENTIFIER_LENGTH",
-    "MAX_STRING_LITERAL_LENGTH",
-    "MAX_MODULE_NAME_LENGTH",
-    "MAX_EXPORTS",
-
-    # Symbols
-    "SYMBOL_LOCAL",
-    "SYMBOL_GLOBAL",
-    "SYMBOL_FUNCTION",
-    "SYMBOL_CONTRACT",
-    "SYMBOL_STATE",
-    "SYMBOL_PARAMETER",
-    "SYMBOL_TYPE",
-    "SYMBOL_ENUM",
-    "SYMBOL_CONSTANT",
-    "SYMBOL_IMPORT",
-    "SYMBOL_KINDS",
-
-    # Internal symbols
-    "INTERNAL_PREFIX",
-    "ITERATOR_PREFIX",
-    "LOOP_INDEX_PREFIX",
-    "TEMP_PREFIX",
-    "RETURN_PREFIX",
-    "PARAM_PREFIX",
-
-    # Namespaces
-    "NAMESPACE_SEPARATOR",
-    "ATC_NAMESPACE",
-    "STANDARD_NAMESPACE",
-    "IMPORT_NAMESPACE",
-    "SYSTEM_NAMESPACE",
-    "VM_NAMESPACE",
-
-    # Builtins
-    "BUILTIN_PRINT",
-    "BUILTIN_LEN",
-    "BUILTIN_FUNCTIONS",
-    "DYNAMIC_CALL_NAME",
-    "STD_LEN_FUNCTION",
-    "IMPORT_FUNCTION_PREFIX",
-
-    # Reserved
-    "RESERVED_IDENTIFIERS",
-
-    # Control flow
-    "MAX_CONTROL_FLOW_DEPTH",
-    "NO_TARGET",
-
-    # Source maps
-    "SOURCE_MAP_ENTRY_SIZE",
-    "UNKNOWN_SOURCE_LINE",
-    "UNKNOWN_SOURCE_COLUMN",
-    "SOURCE_MAP_VERSION",
-
-    # Constants
-    "ConstantKind",
-
     # Types
-    "TYPE_ANY",
-    "TYPE_NULL",
-    "TYPE_BOOL",
-    "TYPE_INT",
-    "TYPE_FLOAT",
-    "TYPE_STRING",
-    "TYPE_BYTES",
-    "TYPE_LIST",
-    "TYPE_MAP",
-    "TYPE_TUPLE",
-    "TYPE_ADDRESS",
-    "TYPE_ATC_WALLET",
-    "PRIMITIVE_TYPES",
+    "ConstantType",
+    "Constant",
 
-    # Operators
-    "ARITHMETIC_OPERATORS",
-    "COMPARISON_OPERATORS",
-    "LOGICAL_OPERATORS",
-    "BITWISE_OPERATORS",
-    "UNARY_OPERATORS",
-    "ALL_BINARY_OPERATORS",
-
-    # Calls / ABI
-    "MAX_CALL_ARGUMENTS",
-    "ARGUMENT_EVALUATION_ORDER",
-    "CALL_ABI_VERSION",
-
-    # Contracts
-    "STATE_NAMESPACE_SEPARATOR",
-    "CONTRACT_FUNCTION_SEPARATOR",
-    "MAX_CONTRACT_STATES",
-    "MAX_CONTRACT_FUNCTIONS",
-    "MAX_CONTRACT_EVENTS",
-
-    # Exports
-    "EXPORT_NAME_SEPARATOR",
-
-    # Errors
-    "ERROR_PREFIX",
-    "ERR_INVALID_AST",
-    "ERR_UNKNOWN_NODE",
-    "ERR_UNKNOWN_OPERATOR",
-    "ERR_UNDEFINED_SYMBOL",
-    "ERR_DUPLICATE_SYMBOL",
-    "ERR_INVALID_CONTROL_FLOW",
-    "ERR_INVALID_FUNCTION",
-    "ERR_INVALID_CONTRACT",
-    "ERR_BYTECODE_LIMIT",
-    "ERR_CONSTANT_LIMIT",
-    "ERR_INVALID_TARGET",
+    # Pool
+    "ConstantPool",
+    "ConstantPoolBuilder",
 
     # Helpers
-    "is_reserved_identifier",
-    "is_valid_identifier_length",
-    "is_valid_module_name",
-    "validate_optimization_level",
+    "infer_constant_type",
 ]
+
+
+__version__ = "0.3.0"
