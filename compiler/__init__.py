@@ -7,16 +7,27 @@ ATCLang Compiler Package
 
 Public compiler API for ATCLang.
 
-This package provides:
+Pipeline:
 
-    - AST → ATC bytecode compilation
-    - Static type checking
-    - Compiler optimization
-    - Symbol and module management
+    Source
+      ↓
+    Lexer
+      ↓
+    Parser
+      ↓
+    AST
+      ↓
+    TypeChecker
+      ↓
+    Compiler
+      ↓
+    ATC Bytecode
+      ↓
+    ATC VM
 
-The package intentionally exposes only compiler-level APIs.
-Lexer, parser, VM and runtime components remain in their
-respective ATCLang packages.
+This package exposes compiler-level APIs only.
+Lexer, parser, VM and runtime components remain
+in their respective ATCLang packages.
 """
 
 from .compiler import (
@@ -24,6 +35,8 @@ from .compiler import (
     CompiledModule,
     Symbol,
     SymbolTable,
+    compile_source,
+    disassemble,
 )
 
 from .type_checker import (
@@ -31,7 +44,7 @@ from .type_checker import (
     ATCType,
     ATCGenericType,
     TypeEnvironment,
-    TypeError,
+    TypeError as ATCTypeError,
 )
 
 from .optimizer import Optimizer
@@ -41,6 +54,8 @@ __all__ = [
     # Compiler
     "ATCCompiler",
     "CompiledModule",
+    "compile_source",
+    "disassemble",
 
     # Symbol management
     "Symbol",
@@ -51,7 +66,7 @@ __all__ = [
     "ATCType",
     "ATCGenericType",
     "TypeEnvironment",
-    "TypeError",
+    "ATCTypeError",
 
     # Optimization
     "Optimizer",
