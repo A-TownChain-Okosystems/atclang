@@ -2,88 +2,106 @@
 # All Rights Reserved.
 
 """
-ATCLang Compiler — Error System
-================================
+ATCLang Compiler Errors
+=======================
 
-Zentrales Fehler-System des ATCLang-Compilers.
+Zentrales Error-System für den ATCLang Compiler.
 
-Compiler-Pipeline:
+Architektur:
 
-    Lexer
-      ↓
-    Parser
-      ↓
-    AST
-      ↓
+    Lexer / Parser
+          │
+          ▼
+       AST
+          │
+          ▼
     TypeChecker
-      ↓
-    Compiler
-      ↓
-    ATC Bytecode
-      ↓
-    ATC VM
+          │
+          ▼
+    Compiler Errors
+          │
+          ├── CompileError
+          ├── CompileSyntaxError
+          ├── CompileNameError
+          ├── CompileTypeError
+          ├── CompileControlFlowError
+          ├── CompileBytecodeError
+          ├── CompileSymbolError
+          └── CompileInternalError
 
-Dieses Modul definiert ausschließlich Compiler-Fehler.
-Lexer-, Parser- und VM-Fehler bleiben in ihren jeweiligen
-Subsystemen.
+Design-Ziele
+------------
 
-Designziele:
-
-    - stabile Fehler-Hierarchie
-    - strukturierte Source-Location
-    - maschinenlesbare Fehlercodes
-    - menschenlesbare Fehlermeldungen
-    - kompatibel mit CompilerContext
-    - keine Abhängigkeit von anderen Compiler-Modulen
+- Keine Abhängigkeit zu Parser oder VM
+- Keine Abhängigkeit zu Compiler-Modulen
+- Strukturierte Fehler statt String-only Exceptions
+- Source-Location-Unterstützung
+- Fehlercodes für Tooling / IDE / CI
+- Deterministische Formatierung
+- Kompatibel mit Compiler-Pipeline und späterem LSP
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 
-# ═════════════════════════════════════════════════════════════
-# ERROR PHASE
-# ═════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
+# ERROR SEVERITY
+# ═══════════════════════════════════════════════════════════════════════
 
 
-class ErrorPhase(str, Enum):
-    """Compilerphase, in der ein Fehler entstanden ist."""
+class ErrorSeverity(str, Enum):
+    """Severity eines Compiler-Diagnoseeintrags."""
 
-    LEXER = "lexer"
-    PARSER = "parser"
-    TYPE_CHECKER = "type_checker"
-    COMPILER = "compiler"
-    OPTIMIZER = "optimizer"
-    BYTECODE = "bytecode"
-    INTERNAL = "internal"
+    ERROR = "error"
+    WARNING = "warning"
+    NOTE = "note"
 
 
-# ═════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 # SOURCE LOCATION
-# ═════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 
 
 @dataclass(frozen=True)
 class SourceLocation:
     """
-    Position eines Fehlers im ATCLang-Quellcode.
+    Position innerhalb des ATCLang-Quellcodes.
 
-    line/column sind 1-basiert.
+    line und column sind 1-basiert.
+    end_line/end_column sind optional und können einen Bereich markieren.
     """
 
     line: int = 0
     column: int = 0
-
-    # Optionales Ende eines Bereichs.
     end_line: Optional[int] = None
     end_column: Optional[int] = None
 
-    def __str__(self) -> str:
+    def __post_init__(self) -> None:
+        if self.line < 0:
+            raise ValueError("SourceLocation.line darf nicht negativ sein")
+
+        if self.column < 0:
+            raise ValueError("SourceLocation.column darf nicht negativ sein")
+
+        if self.end_line is not None and self.end_line < 0:
+            raise ValueError("SourceLocation.end_line darf nicht negativ sein")
+
+        if self.end_column is not None and self.end_column < 0:
+            raise ValueError("SourceLocation.end_column darf nicht negativ sein")
+
+    @property
+    def is_known(self) -> bool:
+        """Gibt an, ob eine gültige Source-Position vorhanden ist."""
+        return self.line > 0
+
+    def format(self) -> str:
+        """Formatiert die Position für Compiler-Meldungen."""
         if self.line <= 0:
-            return "<unknown>"
+            return ""
 
         if self.column > 0:
             return f"{self.line}:{self.column}"
@@ -91,395 +109,614 @@ class SourceLocation:
         return str(self.line)
 
 
-# ═════════════════════════════════════════════════════════════
-# ERROR CODE
-# ═════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
+# SOURCE SPAN
+# ═══════════════════════════════════════════════════════════════════════
 
 
-class CompileErrorCode(str, Enum):
-    """Stabile maschinenlesbare Compiler-Fehlercodes."""
+@dataclass(frozen=True)
+class SourceSpan:
+    """
+    Source-Bereich.
 
-    # General
-    INTERNAL_ERROR = "ATC-C000"
-    INVALID_AST = "ATC-C001"
-    UNSUPPORTED_NODE = "ATC-C002"
+    Unterstützt sowohl einzelne Positionen als auch mehrzeilige Bereiche.
+    """
 
-    # Symbol system
-    DUPLICATE_SYMBOL = "ATC-C100"
-    UNDEFINED_SYMBOL = "ATC-C101"
-    INVALID_SYMBOL = "ATC-C102"
+    start: SourceLocation
+    end: Optional[SourceLocation] = None
 
-    # Expressions
-    INVALID_EXPRESSION = "ATC-C200"
-    INVALID_OPERATOR = "ATC-C201"
-    INVALID_CALL = "ATC-C202"
-    INVALID_ASSIGNMENT = "ATC-C203"
+    @classmethod
+    def from_node(cls, node: Any) -> "SourceSpan":
+        """
+        Erstellt einen SourceSpan aus einem AST-Node.
 
-    # Statements
-    INVALID_STATEMENT = "ATC-C300"
-    INVALID_RETURN = "ATC-C301"
-    BREAK_OUTSIDE_LOOP = "ATC-C302"
-    CONTINUE_OUTSIDE_LOOP = "ATC-C303"
+        Erwartete Attribute:
+            line
+            col / column
+            end_line
+            end_col / end_column
+        """
 
-    # Functions
-    DUPLICATE_FUNCTION = "ATC-C400"
-    UNKNOWN_FUNCTION = "ATC-C401"
-    INVALID_FUNCTION = "ATC-C402"
+        line = int(getattr(node, "line", 0) or 0)
 
-    # Contracts
-    DUPLICATE_CONTRACT = "ATC-C500"
-    INVALID_CONTRACT = "ATC-C501"
-    INVALID_STATE = "ATC-C502"
+        column = getattr(node, "column", None)
+        if column is None:
+            column = getattr(node, "col", 0)
 
-    # Bytecode
-    INVALID_OPCODE = "ATC-C600"
-    INVALID_OPERAND = "ATC-C601"
-    INVALID_JUMP = "ATC-C602"
-    INVALID_MODULE = "ATC-C603"
+        end_line = getattr(node, "end_line", None)
 
-    # Optimization
-    OPTIMIZATION_ERROR = "ATC-C700"
+        end_column = getattr(node, "end_column", None)
+        if end_column is None:
+            end_column = getattr(node, "end_col", None)
+
+        start = SourceLocation(
+            line=line,
+            column=int(column or 0),
+            end_line=end_line,
+            end_column=end_column,
+        )
+
+        end = None
+
+        if end_line is not None or end_column is not None:
+            end = SourceLocation(
+                line=int(end_line or line),
+                column=int(end_column or 0),
+            )
+
+        return cls(start=start, end=end)
+
+    @property
+    def line(self) -> int:
+        return self.start.line
+
+    @property
+    def column(self) -> int:
+        return self.start.column
+
+    def format(self) -> str:
+        if self.end is None:
+            return self.start.format()
+
+        start = self.start.format()
+        end = self.end.format()
+
+        if start == end:
+            return start
+
+        return f"{start}-{end}"
 
 
-# ═════════════════════════════════════════════════════════════
-# COMPILER ERROR
-# ═════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
+# COMPILER DIAGNOSTIC
+# ═══════════════════════════════════════════════════════════════════════
+
+
+@dataclass
+class CompilerDiagnostic:
+    """
+    Strukturierte Compiler-Diagnose.
+
+    Diese Struktur kann später direkt von:
+        - CLI
+        - IDE
+        - LSP
+        - JSON diagnostics
+        - CI
+    verwendet werden.
+    """
+
+    code: str
+    message: str
+    severity: ErrorSeverity = ErrorSeverity.ERROR
+    span: Optional[SourceSpan] = None
+    hint: Optional[str] = None
+    note: Optional[str] = None
+
+    def format(self) -> str:
+        """Menschenlesbare Compiler-Diagnose."""
+
+        location = ""
+
+        if self.span is not None:
+            formatted_span = self.span.format()
+
+            if formatted_span:
+                location = f" @ {formatted_span}"
+
+        result = (
+            f"[{self.code}] "
+            f"{self.severity.value}{location}: "
+            f"{self.message}"
+        )
+
+        if self.hint:
+            result += f"\n  hint: {self.hint}"
+
+        if self.note:
+            result += f"\n  note: {self.note}"
+
+        return result
+
+    def __str__(self) -> str:
+        return self.format()
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# ERROR CODES
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class CompileErrorCode:
+    """
+    Zentrale Compiler-Error-Codes.
+
+    Format:
+
+        ATC-Cxxx
+
+    x = Kategorie.
+    """
+
+    GENERAL = "ATC-C000"
+
+    SYNTAX = "ATC-C100"
+    INVALID_AST = "ATC-C101"
+
+    NAME = "ATC-C200"
+    UNDEFINED_SYMBOL = "ATC-C201"
+    DUPLICATE_SYMBOL = "ATC-C202"
+
+    TYPE = "ATC-C300"
+    TYPE_MISMATCH = "ATC-C301"
+    INVALID_CAST = "ATC-C302"
+    INVALID_OPERATION = "ATC-C303"
+
+    CONTROL_FLOW = "ATC-C400"
+    BREAK_OUTSIDE_LOOP = "ATC-C401"
+    CONTINUE_OUTSIDE_LOOP = "ATC-C402"
+    INVALID_RETURN = "ATC-C403"
+
+    FUNCTION = "ATC-C500"
+    INVALID_CALL = "ATC-C501"
+    ARGUMENT_COUNT = "ATC-C502"
+    DUPLICATE_PARAMETER = "ATC-C503"
+
+    CONTRACT = "ATC-C600"
+    INVALID_CONTRACT = "ATC-C601"
+    INVALID_STATE = "ATC-C602"
+
+    BYTECODE = "ATC-C700"
+    INVALID_OPCODE = "ATC-C701"
+    INVALID_OPERAND = "ATC-C702"
+    INVALID_JUMP = "ATC-C703"
+
+    CONSTANT = "ATC-C800"
+    CONSTANT_POOL_OVERFLOW = "ATC-C801"
+
+    OPTIMIZATION = "ATC-C900"
+
+    INTERNAL = "ATC-C999"
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# BASE ERROR
+# ═══════════════════════════════════════════════════════════════════════
 
 
 class CompileError(Exception):
     """
-    Basisklasse für alle ATCLang-Compilerfehler.
+    Basisklasse aller ATCLang Compiler-Fehler.
 
     Beispiel:
 
         raise CompileError(
-            "undefined symbol 'wallet'",
+            "Symbol konnte nicht aufgelöst werden",
             code=CompileErrorCode.UNDEFINED_SYMBOL,
-            location=SourceLocation(12, 5),
+            node=node,
         )
     """
 
+    code = CompileErrorCode.GENERAL
+    severity = ErrorSeverity.ERROR
+
     def __init__(
         self,
         message: str,
         *,
-        code: CompileErrorCode = CompileErrorCode.INTERNAL_ERROR,
-        location: Optional[SourceLocation] = None,
-        phase: ErrorPhase = ErrorPhase.COMPILER,
-        source_name: Optional[str] = None,
-        cause: Optional[BaseException] = None,
+        code: Optional[str] = None,
+        node: Any = None,
+        span: Optional[SourceSpan] = None,
+        hint: Optional[str] = None,
+        note: Optional[str] = None,
     ) -> None:
         self.message = message
-        self.code = code
-        self.location = location or SourceLocation()
-        self.phase = phase
-        self.source_name = source_name
-        self.cause = cause
+        self.code = code or self.code
+        self.severity = self.severity
+        self.hint = hint
+        self.note = note
 
-        super().__init__(self.format_message())
+        if span is not None:
+            self.span = span
+        elif node is not None:
+            self.span = SourceSpan.from_node(node)
+        else:
+            self.span = None
 
-    def format_message(self) -> str:
-        """Erzeugt die standardisierte Fehlermeldung."""
+        self.diagnostic = CompilerDiagnostic(
+            code=self.code,
+            message=self.message,
+            severity=self.severity,
+            span=self.span,
+            hint=self.hint,
+            note=self.note,
+        )
 
-        prefix = f"[{self.code.value}]"
+        super().__init__(self.diagnostic.format())
 
-        if self.source_name:
-            prefix += f" {self.source_name}"
-
-        if self.location.line > 0:
-            prefix += f":{self.location}"
-
-        prefix += f" [{self.phase.value}]"
-
-        return f"{prefix}: {self.message}"
+    def format(self) -> str:
+        return self.diagnostic.format()
 
     def __str__(self) -> str:
-        return self.format_message()
+        return self.format()
 
 
-# ═════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 # SPECIALIZED ERRORS
-# ═════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════
 
 
-class InternalCompilerError(CompileError):
-    """Interner Compilerfehler."""
+class CompileSyntaxError(CompileError):
+    """Fehlerhafte AST-/Syntax-Struktur."""
 
-    def __init__(
-        self,
-        message: str,
-        *,
-        location: Optional[SourceLocation] = None,
-        cause: Optional[BaseException] = None,
-    ) -> None:
-        super().__init__(
-            message,
-            code=CompileErrorCode.INTERNAL_ERROR,
-            location=location,
-            phase=ErrorPhase.INTERNAL,
-            cause=cause,
-        )
+    code = CompileErrorCode.SYNTAX
 
 
 class InvalidASTError(CompileError):
-    """Ungültiger oder inkonsistenter AST."""
+    """AST entspricht nicht den Compiler-Anforderungen."""
+
+    code = CompileErrorCode.INVALID_AST
+
+
+class CompileNameError(CompileError):
+    """Fehler bei Symbolauflösung."""
+
+    code = CompileErrorCode.NAME
+
+
+class UndefinedSymbolError(CompileNameError):
+    """Symbol ist nicht definiert."""
+
+    code = CompileErrorCode.UNDEFINED_SYMBOL
 
     def __init__(
         self,
-        message: str,
+        name: str,
         *,
-        location: Optional[SourceLocation] = None,
+        node: Any = None,
+        hint: Optional[str] = None,
     ) -> None:
+        self.name = name
+
         super().__init__(
-            message,
-            code=CompileErrorCode.INVALID_AST,
-            location=location,
-            phase=ErrorPhase.COMPILER,
+            f"Undefined symbol: '{name}'",
+            node=node,
+            hint=hint,
         )
 
 
-class UnsupportedNodeError(CompileError):
-    """AST-Node wird vom Compiler nicht unterstützt."""
-
-    def __init__(
-        self,
-        node_type: str,
-        *,
-        location: Optional[SourceLocation] = None,
-    ) -> None:
-        super().__init__(
-            f"unsupported AST node: {node_type}",
-            code=CompileErrorCode.UNSUPPORTED_NODE,
-            location=location,
-            phase=ErrorPhase.COMPILER,
-        )
-
-
-class DuplicateSymbolError(CompileError):
+class DuplicateSymbolError(CompileNameError):
     """Symbol wurde mehrfach definiert."""
 
-    def __init__(
-        self,
-        name: str,
-        *,
-        location: Optional[SourceLocation] = None,
-    ) -> None:
-        super().__init__(
-            f"duplicate symbol: '{name}'",
-            code=CompileErrorCode.DUPLICATE_SYMBOL,
-            location=location,
-            phase=ErrorPhase.COMPILER,
-        )
-
-
-class UndefinedSymbolError(CompileError):
-    """Symbol konnte nicht aufgelöst werden."""
+    code = CompileErrorCode.DUPLICATE_SYMBOL
 
     def __init__(
         self,
         name: str,
         *,
-        location: Optional[SourceLocation] = None,
+        node: Any = None,
     ) -> None:
+        self.name = name
+
         super().__init__(
-            f"undefined symbol: '{name}'",
-            code=CompileErrorCode.UNDEFINED_SYMBOL,
-            location=location,
-            phase=ErrorPhase.COMPILER,
+            f"Symbol '{name}' is already defined",
+            node=node,
         )
 
 
-class InvalidExpressionError(CompileError):
-    """Ungültiger Ausdruck."""
+class CompileTypeError(CompileError):
+    """Statischer Typfehler."""
+
+    code = CompileErrorCode.TYPE
+
+
+class TypeMismatchError(CompileTypeError):
+    """Zwei inkompatible Typen wurden verwendet."""
+
+    code = CompileErrorCode.TYPE_MISMATCH
 
     def __init__(
         self,
-        message: str,
+        expected: str,
+        actual: str,
         *,
-        location: Optional[SourceLocation] = None,
+        node: Any = None,
+        hint: Optional[str] = None,
     ) -> None:
+        self.expected = expected
+        self.actual = actual
+
         super().__init__(
-            message,
-            code=CompileErrorCode.INVALID_EXPRESSION,
-            location=location,
-            phase=ErrorPhase.COMPILER,
+            f"Type mismatch: expected '{expected}', got '{actual}'",
+            node=node,
+            hint=hint,
         )
 
 
-class InvalidAssignmentError(CompileError):
-    """Ungültiges Assignment."""
+class InvalidCastError(CompileTypeError):
+    """Nicht erlaubter Cast."""
 
-    def __init__(
-        self,
-        message: str,
-        *,
-        location: Optional[SourceLocation] = None,
-    ) -> None:
-        super().__init__(
-            message,
-            code=CompileErrorCode.INVALID_ASSIGNMENT,
-            location=location,
-            phase=ErrorPhase.COMPILER,
-        )
+    code = CompileErrorCode.INVALID_CAST
 
 
-class BreakOutsideLoopError(CompileError):
+class InvalidOperationError(CompileTypeError):
+    """Nicht erlaubte Operation für einen Typ."""
+
+    code = CompileErrorCode.INVALID_OPERATION
+
+
+class CompileControlFlowError(CompileError):
+    """Fehler in der Kontrollflussstruktur."""
+
+    code = CompileErrorCode.CONTROL_FLOW
+
+
+class BreakOutsideLoopError(CompileControlFlowError):
     """break außerhalb einer Schleife."""
 
-    def __init__(
-        self,
-        *,
-        location: Optional[SourceLocation] = None,
-    ) -> None:
-        super().__init__(
-            "break outside loop",
-            code=CompileErrorCode.BREAK_OUTSIDE_LOOP,
-            location=location,
-            phase=ErrorPhase.COMPILER,
-        )
+    code = CompileErrorCode.BREAK_OUTSIDE_LOOP
 
 
-class ContinueOutsideLoopError(CompileError):
+class ContinueOutsideLoopError(CompileControlFlowError):
     """continue außerhalb einer Schleife."""
 
+    code = CompileErrorCode.CONTINUE_OUTSIDE_LOOP
+
+
+class InvalidReturnError(CompileControlFlowError):
+    """Ungültiges return."""
+
+    code = CompileErrorCode.INVALID_RETURN
+
+
+class CompileFunctionError(CompileError):
+    """Fehler beim Kompilieren einer Funktion."""
+
+    code = CompileErrorCode.FUNCTION
+
+
+class InvalidCallError(CompileFunctionError):
+    """Ungültiger Funktionsaufruf."""
+
+    code = CompileErrorCode.INVALID_CALL
+
+
+class ArgumentCountError(CompileFunctionError):
+    """Falsche Anzahl von Argumenten."""
+
+    code = CompileErrorCode.ARGUMENT_COUNT
+
     def __init__(
         self,
+        function_name: str,
+        expected: int,
+        actual: int,
         *,
-        location: Optional[SourceLocation] = None,
+        node: Any = None,
     ) -> None:
+        self.function_name = function_name
+        self.expected = expected
+        self.actual = actual
+
         super().__init__(
-            "continue outside loop",
-            code=CompileErrorCode.CONTINUE_OUTSIDE_LOOP,
-            location=location,
-            phase=ErrorPhase.COMPILER,
+            (
+                f"Function '{function_name}' expects "
+                f"{expected} argument(s), got {actual}"
+            ),
+            node=node,
         )
 
 
-class InvalidBytecodeError(CompileError):
-    """Ungültiges generiertes ATC-Bytecode."""
+class DuplicateParameterError(CompileFunctionError):
+    """Parametername wurde innerhalb einer Funktion doppelt verwendet."""
 
-    def __init__(
-        self,
-        message: str,
-        *,
-        location: Optional[SourceLocation] = None,
-    ) -> None:
-        super().__init__(
-            message,
-            code=CompileErrorCode.INVALID_MODULE,
-            location=location,
-            phase=ErrorPhase.BYTECODE,
-        )
+    code = CompileErrorCode.DUPLICATE_PARAMETER
+
+
+class CompileContractError(CompileError):
+    """Fehler beim Kompilieren eines Contracts."""
+
+    code = CompileErrorCode.CONTRACT
+
+
+class InvalidContractError(CompileContractError):
+    """Ungültige Contract-Struktur."""
+
+    code = CompileErrorCode.INVALID_CONTRACT
+
+
+class InvalidStateError(CompileContractError):
+    """Ungültiges Contract-State-Feld."""
+
+    code = CompileErrorCode.INVALID_STATE
+
+
+class CompileBytecodeError(CompileError):
+    """Fehler beim Erzeugen von ATC-Bytecode."""
+
+    code = CompileErrorCode.BYTECODE
+
+
+class InvalidOpcodeError(CompileBytecodeError):
+    """Ungültiger Opcode."""
+
+    code = CompileErrorCode.INVALID_OPCODE
+
+
+class InvalidOperandError(CompileBytecodeError):
+    """Ungültiger Bytecode-Operand."""
+
+    code = CompileErrorCode.INVALID_OPERAND
+
+
+class InvalidJumpError(CompileBytecodeError):
+    """Ungültiges Sprungziel."""
+
+    code = CompileErrorCode.INVALID_JUMP
+
+
+class ConstantPoolError(CompileError):
+    """Fehler im Constant Pool."""
+
+    code = CompileErrorCode.CONSTANT
+
+
+class ConstantPoolOverflowError(ConstantPoolError):
+    """Constant Pool hat seine maximale Größe überschritten."""
+
+    code = CompileErrorCode.CONSTANT_POOL_OVERFLOW
 
 
 class OptimizationError(CompileError):
-    """Fehler während der Compileroptimierung."""
+    """Fehler während einer Compiler-Optimierung."""
 
-    def __init__(
-        self,
-        message: str,
-        *,
-        location: Optional[SourceLocation] = None,
-    ) -> None:
-        super().__init__(
-            message,
-            code=CompileErrorCode.OPTIMIZATION_ERROR,
-            location=location,
-            phase=ErrorPhase.OPTIMIZER,
-        )
+    code = CompileErrorCode.OPTIMIZATION
 
 
-# ═════════════════════════════════════════════════════════════
-# HELPERS
-# ═════════════════════════════════════════════════════════════
-
-
-def location_from_node(node: object) -> SourceLocation:
+class CompileInternalError(CompileError):
     """
-    Erstellt eine SourceLocation aus einem AST-Node.
+    Interner Compilerfehler.
 
-    Unterstützt Nodes mit:
-        line
-        col
-        end_line
-        end_col
+    Diese Fehler sollten im normalen ATCLang-Programmfluss
+    nicht auftreten.
+    """
+
+    code = CompileErrorCode.INTERNAL
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# HELPER FUNCTIONS
+# ═══════════════════════════════════════════════════════════════════════
+
+
+def location_from_node(node: Any) -> Optional[SourceSpan]:
+    """
+    Sicherer Helper für Compiler-Module.
+
+    Gibt None zurück, wenn kein Node vorhanden ist.
     """
 
     if node is None:
-        return SourceLocation()
+        return None
 
-    line = getattr(node, "line", 0) or 0
-    column = getattr(node, "col", 0) or 0
-
-    end_line = getattr(node, "end_line", None)
-    end_column = getattr(node, "end_col", None)
-
-    return SourceLocation(
-        line=line,
-        column=column,
-        end_line=end_line,
-        end_column=end_column,
-    )
+    return SourceSpan.from_node(node)
 
 
-def compiler_error(
+def raise_compile_error(
     message: str,
-    node: object = None,
     *,
-    code: CompileErrorCode = CompileErrorCode.INTERNAL_ERROR,
-    phase: ErrorPhase = ErrorPhase.COMPILER,
-) -> CompileError:
+    code: str = CompileErrorCode.GENERAL,
+    node: Any = None,
+    hint: Optional[str] = None,
+    note: Optional[str] = None,
+) -> None:
     """
-    Convenience Factory für Compilerfehler.
-
-    Beispiel:
-
-        raise compiler_error(
-            "unknown operator '+'",
-            node,
-            code=CompileErrorCode.INVALID_OPERATOR,
-        )
+    Convenience Helper für Compiler-Module.
     """
 
-    return CompileError(
+    raise CompileError(
         message,
         code=code,
-        location=location_from_node(node),
-        phase=phase,
+        node=node,
+        hint=hint,
+        note=note,
     )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# PUBLIC API
+# ═══════════════════════════════════════════════════════════════════════
 
 
 __all__ = [
-    # Enums
-    "ErrorPhase",
+    # Severity
+    "ErrorSeverity",
+
+    # Source information
+    "SourceLocation",
+    "SourceSpan",
+
+    # Diagnostics
+    "CompilerDiagnostic",
+
+    # Error codes
     "CompileErrorCode",
 
-    # Location
-    "SourceLocation",
-    "location_from_node",
-
-    # Base errors
+    # Base error
     "CompileError",
-    "InternalCompilerError",
+
+    # AST / syntax
+    "CompileSyntaxError",
     "InvalidASTError",
-    "UnsupportedNodeError",
 
-    # Symbol errors
-    "DuplicateSymbolError",
+    # Symbols
+    "CompileNameError",
     "UndefinedSymbolError",
+    "DuplicateSymbolError",
 
-    # Expression errors
-    "InvalidExpressionError",
-    "InvalidAssignmentError",
+    # Types
+    "CompileTypeError",
+    "TypeMismatchError",
+    "InvalidCastError",
+    "InvalidOperationError",
 
-    # Control flow errors
+    # Control flow
+    "CompileControlFlowError",
     "BreakOutsideLoopError",
     "ContinueOutsideLoopError",
+    "InvalidReturnError",
 
-    # Bytecode / optimizer
-    "InvalidBytecodeError",
+    # Functions
+    "CompileFunctionError",
+    "InvalidCallError",
+    "ArgumentCountError",
+    "DuplicateParameterError",
+
+    # Contracts
+    "CompileContractError",
+    "InvalidContractError",
+    "InvalidStateError",
+
+    # Bytecode
+    "CompileBytecodeError",
+    "InvalidOpcodeError",
+    "InvalidOperandError",
+    "InvalidJumpError",
+
+    # Constants
+    "ConstantPoolError",
+    "ConstantPoolOverflowError",
+
+    # Optimization
     "OptimizationError",
 
+    # Internal
+    "CompileInternalError",
+
     # Helpers
-    "compiler_error",
+    "location_from_node",
+    "raise_compile_error",
 ]
+
+
+__version__ = "0.3.0"
