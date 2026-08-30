@@ -796,7 +796,6 @@ def test_invalid_section_order_is_rejected() -> None:
     module = make_module()
     encoded = bytearray(encode_module(module))
 
-    # First section starts at offset 20.
     first_id = encoded[20:24]
 
     second_offset = (
@@ -974,8 +973,6 @@ def test_corrupt_section_length_is_rejected() -> None:
     module = make_module()
     encoded = bytearray(encode_module(module))
 
-    # First section starts at offset 20.
-    # Section length occupies bytes 24..27.
     encoded[24:28] = encode_u32(0xFFFFFFFF)
 
     with pytest.raises(BytecodeFormatError):
