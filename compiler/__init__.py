@@ -33,10 +33,13 @@ in their respective ATCLang packages.
 from .compiler import (
     ATCCompiler,
     CompiledModule,
-    Symbol,
-    SymbolTable,
     compile_source,
     disassemble,
+)
+
+from .symbols import (
+    Symbol,
+    SymbolTable,
 )
 
 from .type_checker import (
@@ -47,8 +50,15 @@ from .type_checker import (
     TypeError as ATCTypeError,
 )
 
-from .optimizer import Optimizer
+from .optimizer import (
+    ATCOptimizer,
+    OptimizerConfig,
+    OptimizationStats,
+)
 
+from .errors import (
+    CompileError,
+)
 
 __all__ = [
     # Compiler
@@ -57,7 +67,7 @@ __all__ = [
     "compile_source",
     "disassemble",
 
-    # Symbol management
+    # Symbols
     "Symbol",
     "SymbolTable",
 
@@ -68,9 +78,13 @@ __all__ = [
     "TypeEnvironment",
     "ATCTypeError",
 
-    # Optimization
-    "Optimizer",
-]
+    # Optimizer
+    "ATCOptimizer",
+    "OptimizerConfig",
+    "OptimizationStats",
 
+    # Errors
+    "CompileError",
+]
 
 __version__ = "0.3.0"
