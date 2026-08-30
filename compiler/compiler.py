@@ -1,3 +1,5 @@
+"atclang/compiler/compiler.py"
+
 # Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems.
 # All Rights Reserved.
 
@@ -11,58 +13,49 @@ Pipeline:
 
     Source
       |
-      v
     Lexer
       |
-      v
     Parser
       |
-      v
-     AST
+    AST
       |
-      v
     TypeChecker
       |
-      v
-    ATCCompiler
+    Compiler
       |
-      v
     ATC Bytecode
       |
-      v
     ATC VM
 
-ATC-92 / ATC-93
+This module contains the compiler/code-generator only.
 
-Design goals
-------------
+Responsibilities
+----------------
+* AST -> ATC bytecode
+* symbol management
+* function compilation
+* contract compilation
+* branch/loop lowering
+* source-map generation
+* module metadata generation
 
-* deterministic compilation
-* explicit lexical scopes
-* isolated function compilation contexts
-* correct nested loop control flow
-* source-map preservation
-* explicit symbol management
-* contract/function metadata
-* no LLVM/GCC dependency
-* compiler-level API only
+Non-responsibilities
+--------------------
+* lexing
+* parsing
+* type checking
+* optimization
+* VM execution
+* runtime object management
 
-The compiler assumes the parser and VM expose the AST and OP/Instruction
-interfaces used by the ATCLang project.
+ATC-92 | ATCLang Compiler
+Version: 0.3.0
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import (
-    Any,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-)
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from atclang.parser.ast_nodes import (
     ASTNode,
@@ -116,14 +109,17 @@ from atclang.vm.atcvm import Instruction, OP
 # BYTECODE FORMAT
 # ============================================================================
 
-MAGIC = b"ATCB"
-VERSION = b"\x01\x00"
+ATCB_MAGIC = b"ATCB"
+ATCB_VERSION_MAJOR = 1
+ATCB_VERSION_MINOR = 0
+ATCB_VERSION = bytes(
+    [ATCB_VERSION_MAJOR, ATCB_VERSION_MINOR]
+)
 
 
 # ============================================================================
 # ERRORS
 # ============================================================================
-
 
 class CompileError(Exception):
     """Raised when AST compilation fails."""
@@ -150,11 +146,23 @@ class CompileError(Exception):
 
 
 # ============================================================================
-# SYMBOL MANAGEMENT
+# SOURCE MAP
 # ============================================================================
 
-
 @dataclass(frozen=True)
+class SourceLocation:
+    """Maps bytecode instruction to source location."""
+
+    instruction: int
+    line: int
+    col: int
+
+
+# ============================================================================
+# SYMBOL SYSTEM
+# ============================================================================
+
+@dataclass
 class Symbol:
     """
     Compiler symbol.
@@ -169,57 +177,34 @@ class Symbol:
         enum
         enum_variant
         import
-        wallet
     """
 
     name: str
     kind: str
     index: int
     typ: str = ""
-    owner: Optional[str] = None
 
 
 class SymbolTable:
-    """
-    Lexical symbol table.
-
-    Resolution walks from the current scope towards the parent scope.
-    """
+    """Hierarchical compiler symbol table."""
 
     def __init__(
         self,
         parent: Optional["SymbolTable"] = None,
-        *,
-        name: str = "<scope>",
     ) -> None:
         self.parent = parent
-        self.name = name
-
         self.symbols: Dict[str, Symbol] = {}
         self._next_index = 0
-
-    @property
-    def next_index(self) -> int:
-        return self._next_index
 
     def define(
         self,
         name: str,
         kind: str,
         typ: str = "",
-        *,
-        owner: Optional[str] = None,
     ) -> Symbol:
-        """
-        Define a symbol in the current scope.
-
-        Shadowing parent symbols is allowed.
-        Redefinition in the same scope is rejected.
-        """
-
         if name in self.symbols:
             raise CompileError(
-                f"Symbol bereits definiert: '{name}'"
+                f"Symbol '{name}' already defined"
             )
 
         symbol = Symbol(
@@ -227,7 +212,6 @@ class SymbolTable:
             kind=kind,
             index=self._next_index,
             typ=typ,
-            owner=owner,
         )
 
         self.symbols[name] = symbol
@@ -235,10 +219,23 @@ class SymbolTable:
 
         return symbol
 
-    def resolve_local(self, name: str) -> Optional[Symbol]:
-        return self.symbols.get(name)
+    def define_or_get(
+        self,
+        name: str,
+        kind: str,
+        typ: str = "",
+    ) -> Symbol:
+        existing = self.symbols.get(name)
 
-    def resolve(self, name: str) -> Optional[Symbol]:
+        if existing is not None:
+            return existing
+
+        return self.define(name, kind, typ)
+
+    def resolve(
+        self,
+        name: str,
+    ) -> Optional[Symbol]:
         symbol = self.symbols.get(name)
 
         if symbol is not None:
@@ -249,72 +246,23 @@ class SymbolTable:
 
         return None
 
-    def child(self, *, name: str = "<child>") -> "SymbolTable":
-        return SymbolTable(
-            parent=self,
-            name=name,
-        )
+    def child(self) -> "SymbolTable":
+        return SymbolTable(parent=self)
 
-
-# ============================================================================
-# CONTROL FLOW
-# ============================================================================
-
-
-@dataclass
-class LoopContext:
-    """
-    Control-flow context for one loop.
-
-    continue_target:
-        Target used by continue.
-
-    break_jumps:
-        Jump instructions waiting for the final loop end position.
-    """
-
-    continue_target: int
-    break_jumps: List[int] = field(default_factory=list)
-
-
-# ============================================================================
-# COMPILATION CONTEXT
-# ============================================================================
-
-
-@dataclass
-class CompileContext:
-    """
-    Instruction-generation context.
-
-    A separate context is created for every function. This prevents function
-    compilation from mutating the main instruction stream.
-    """
-
-    instructions: List[Instruction] = field(default_factory=list)
-
-    source_map: List[Tuple[int, int, int]] = field(
-        default_factory=list
-    )
-
-    scope: Optional[SymbolTable] = None
-
-    function_name: Optional[str] = None
-
-    loop_stack: List[LoopContext] = field(
-        default_factory=list
-    )
+    def contains_local(self, name: str) -> bool:
+        return name in self.symbols
 
 
 # ============================================================================
 # COMPILED MODULE
 # ============================================================================
 
-
 @dataclass
 class CompiledModule:
     """
     Result of ATCLang compilation.
+
+    The VM consumes the instruction streams and function metadata.
     """
 
     name: str
@@ -335,16 +283,7 @@ class CompiledModule:
         default_factory=list
     )
 
-    function_source_maps: Dict[
-        str,
-        List[Tuple[int, int, int]]
-    ] = field(default_factory=dict)
-
-    compiler_version: str = "0.3.0"
-
-    bytecode_magic: bytes = MAGIC
-
-    bytecode_version: bytes = VERSION
+    version: bytes = ATCB_VERSION
 
     def summary(self) -> str:
         return (
@@ -360,55 +299,58 @@ class CompiledModule:
 # COMPILER
 # ============================================================================
 
-
 class ATCCompiler:
     """
     ATCLang AST -> ATC bytecode compiler.
 
-    The compiler itself does not perform parsing or type checking.
-
-    Expected pipeline:
-
-        parse(source)
-            ->
-        type checker
-            ->
-        ATCCompiler.compile_program(ast)
+    The compiler deliberately does not perform optimization.
+    Optimization belongs to `atclang.compiler.optimizer`.
     """
 
-    VERSION = "0.3.0"
+    def __init__(
+        self,
+        *,
+        module_name: str = "main",
+    ) -> None:
+        self.module_name = module_name
 
-    # ---------------------------------------------------------------------
-    # Initialization
-    # ---------------------------------------------------------------------
+        # Current instruction stream.
+        self.instructions: List[Instruction] = []
 
-    def __init__(self) -> None:
+        # Module constant pool.
         self.constants: List[Any] = []
 
+        # Compiled functions.
         self.functions: Dict[str, List[Instruction]] = {}
 
+        # Function parameter metadata.
         self.function_params: Dict[str, List[str]] = {}
 
-        self.function_source_maps: Dict[
-            str,
-            List[Tuple[int, int, int]]
-        ] = {}
-
+        # Public exports.
         self.exports: List[str] = []
 
-        self.globals = SymbolTable(
-            name="<global>"
-        )
+        # instruction -> (line, col)
+        self.source_map: List[Tuple[int, int, int]] = []
 
-        self.context = CompileContext(
-            scope=self.globals
-        )
+        # Global symbol table.
+        self.globals = SymbolTable()
 
-        self._label_count = 0
+        # Unique compiler-generated names.
+        self._temporary_counter = 0
 
-    # ---------------------------------------------------------------------
-    # Error handling
-    # ---------------------------------------------------------------------
+        # Loop control stacks.
+        #
+        # Every active loop owns one break target list.
+        # Every active loop owns one continue target.
+        self._break_stack: List[List[int]] = []
+        self._continue_stack: List[int] = []
+
+        # Compilation state.
+        self._current_function: Optional[str] = None
+
+    # ------------------------------------------------------------------
+    # Diagnostics
+    # ------------------------------------------------------------------
 
     def error(
         self,
@@ -424,17 +366,9 @@ class ATCCompiler:
             col=col,
         )
 
-    # ---------------------------------------------------------------------
-    # Instruction API
-    # ---------------------------------------------------------------------
-
-    @property
-    def instructions(self) -> List[Instruction]:
-        return self.context.instructions
-
-    @property
-    def source_map(self) -> List[Tuple[int, int, int]]:
-        return self.context.source_map
+    # ------------------------------------------------------------------
+    # Instruction emission
+    # ------------------------------------------------------------------
 
     def emit(
         self,
@@ -444,24 +378,19 @@ class ATCCompiler:
         col: int = 0,
     ) -> int:
         """
-        Emit one instruction and return its instruction index.
+        Emit one instruction.
+
+        Returns the instruction index.
         """
 
         index = len(self.instructions)
 
         self.instructions.append(
-            Instruction(
-                op,
-                list(args),
-            )
+            Instruction(op, list(args))
         )
 
         self.source_map.append(
-            (
-                index,
-                line,
-                col,
-            )
+            (index, line, col)
         )
 
         return index
@@ -471,62 +400,32 @@ class ATCCompiler:
         instruction_index: int,
         *args: Any,
     ) -> None:
-        """
-        Patch instruction arguments.
-
-        Used primarily for unresolved jump targets.
-        """
+        """Patch a previously emitted instruction."""
 
         if not (
             0 <= instruction_index
             < len(self.instructions)
         ):
-            self.error(
-                f"Ungültiger Patch-Index: "
-                f"{instruction_index}"
+            raise CompileError(
+                f"Invalid patch index: {instruction_index}"
             )
 
         self.instructions[
             instruction_index
         ].args = list(args)
 
-    def emit_jump(
-        self,
-        op: OP,
-        *,
-        line: int = 0,
-        col: int = 0,
-    ) -> int:
-        """
-        Emit an unresolved jump.
-        """
+    def current_pos(self) -> int:
+        return len(self.instructions)
 
-        if op not in (
-            OP.JUMP,
-            OP.JUMP_IF,
-            OP.JUMP_NOT,
-        ):
-            raise ValueError(
-                "emit_jump() erwartet einen Jump-Opcode"
-            )
-
-        return self.emit(
-            op,
-            0,
-            line=line,
-            col=col,
-        )
-
-    # ---------------------------------------------------------------------
+    # ------------------------------------------------------------------
     # Constants
-    # ---------------------------------------------------------------------
+    # ------------------------------------------------------------------
 
     def add_constant(self, value: Any) -> int:
         """
-        Add a value to the module constant pool.
+        Add value to module constant pool.
 
-        Equality-based deduplication is intentional to keep bytecode
-        deterministic.
+        Returns constant-pool index.
         """
 
         for index, existing in enumerate(self.constants):
@@ -534,115 +433,33 @@ class ATCCompiler:
                 if existing == value:
                     return index
             except Exception:
-                continue
+                pass
 
         self.constants.append(value)
-
         return len(self.constants) - 1
 
-    # ---------------------------------------------------------------------
-    # Labels
-    # ---------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Temporary names
+    # ------------------------------------------------------------------
 
-    def new_label(self) -> int:
-        self._label_count += 1
-        return self._label_count
+    def new_temp(self, prefix: str = "__tmp") -> str:
+        self._temporary_counter += 1
+        return f"{prefix}_{self._temporary_counter}"
 
-    def current_pos(self) -> int:
-        return len(self.instructions)
-
-    # =========================================================================
-    # LOOP CONTROL
-    # =========================================================================
-
-    def begin_loop(
-        self,
-        continue_target: int,
-    ) -> LoopContext:
-        context = LoopContext(
-            continue_target=continue_target
-        )
-
-        self.context.loop_stack.append(context)
-
-        return context
-
-    def end_loop(
-        self,
-        end_position: int,
-    ) -> None:
-        if not self.context.loop_stack:
-            self.error(
-                "Interner Fehler: kein aktiver Loop-Context"
-            )
-
-        context = self.context.loop_stack.pop()
-
-        for jump_index in context.break_jumps:
-            self.patch(
-                jump_index,
-                end_position,
-            )
-
-    def emit_break(
-        self,
-        node: ASTNode,
-    ) -> None:
-        if not self.context.loop_stack:
-            self.error(
-                "break außerhalb einer Schleife",
-                node,
-            )
-
-        jump_index = self.emit_jump(
-            OP.JUMP,
-            line=getattr(node, "line", 0),
-            col=getattr(node, "col", 0),
-        )
-
-        self.context.loop_stack[
-            -1
-        ].break_jumps.append(
-            jump_index
-        )
-
-    def emit_continue(
-        self,
-        node: ASTNode,
-    ) -> None:
-        if not self.context.loop_stack:
-            self.error(
-                "continue außerhalb einer Schleife",
-                node,
-            )
-
-        target = self.context.loop_stack[
-            -1
-        ].continue_target
-
-        self.emit(
-            OP.JUMP,
-            target,
-            line=getattr(node, "line", 0),
-            col=getattr(node, "col", 0),
-        )
-
-    # =========================================================================
+    # ==================================================================
     # EXPRESSIONS
-    # =========================================================================
+    # ==================================================================
 
     def compile_expr(
         self,
         node: ASTNode,
         scope: SymbolTable,
     ) -> None:
+        """Compile an expression and leave its result on the VM stack."""
 
-        if node is None:
-            self.error("Expression darf nicht None sein")
-
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
         # Literals
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
 
         if isinstance(node, IntLiteral):
             self.emit(
@@ -689,37 +506,27 @@ class ATCCompiler:
             )
             return
 
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
         # Identifier
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
 
         if isinstance(node, Identifier):
             symbol = scope.resolve(node.name)
 
-            # LOAD uses the symbolic name because the current VM ABI resolves
-            # names at runtime. The symbol lookup here is still important for
-            # compiler validation and future indexed locals.
-            if symbol is None:
-                # Builtins / external runtime symbols are allowed.
-                self.emit(
-                    OP.LOAD,
-                    node.name,
-                    line=node.line,
-                    col=getattr(node, "col", 0),
-                )
-                return
-
+            # LOAD currently addresses names.
+            # Symbol indices remain compiler metadata and can later
+            # be lowered to indexed locals when the VM ABI supports it.
             self.emit(
                 OP.LOAD,
-                symbol.name,
+                node.name,
                 line=node.line,
                 col=getattr(node, "col", 0),
             )
             return
 
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
         # Namespace access
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
 
         if isinstance(node, NamespaceAccess):
             name = "::".join(node.parts)
@@ -730,25 +537,17 @@ class ATCCompiler:
                 line=node.line,
                 col=getattr(node, "col", 0),
             )
-
             return
 
-        # -----------------------------------------------------------------
-        # Binary operation
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
+        # Binary operators
+        # --------------------------------------------------------------
 
         if isinstance(node, BinaryOp):
-            self.compile_expr(
-                node.left,
-                scope,
-            )
+            self.compile_expr(node.left, scope)
+            self.compile_expr(node.right, scope)
 
-            self.compile_expr(
-                node.right,
-                scope,
-            )
-
-            operator_map = {
+            op_map = {
                 "+": OP.ADD,
                 "-": OP.SUB,
                 "*": OP.MUL,
@@ -758,7 +557,6 @@ class ATCCompiler:
 
                 "==": OP.EQ,
                 "!=": OP.NEQ,
-
                 "<": OP.LT,
                 ">": OP.GT,
                 "<=": OP.LTE,
@@ -766,23 +564,21 @@ class ATCCompiler:
 
                 "&&": OP.AND,
                 "and": OP.AND,
-
                 "||": OP.OR,
                 "or": OP.OR,
 
                 "&": OP.BITAND,
                 "|": OP.BITOR,
                 "^": OP.BITXOR,
-
                 "<<": OP.SHL,
                 ">>": OP.SHR,
             }
 
-            opcode = operator_map.get(node.op)
+            opcode = op_map.get(node.op)
 
             if opcode is None:
                 self.error(
-                    f"Unbekannter Operator: '{node.op}'",
+                    f"Unknown binary operator '{node.op}'",
                     node,
                 )
 
@@ -791,38 +587,26 @@ class ATCCompiler:
                 line=node.line,
                 col=getattr(node, "col", 0),
             )
-
             return
 
-        # -----------------------------------------------------------------
-        # Unary operation
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
+        # Unary operators
+        # --------------------------------------------------------------
 
         if isinstance(node, UnaryOp):
-            self.compile_expr(
-                node.operand,
-                scope,
-            )
+            self.compile_expr(node.operand, scope)
 
-            if node.op == "-":
-                opcode = OP.NEG
+            op_map = {
+                "-": OP.NEG,
+                "!": OP.NOT,
+                "~": getattr(OP, "BITNOT", OP.NOT),
+            }
 
-            elif node.op == "!":
-                opcode = OP.NOT
+            opcode = op_map.get(node.op)
 
-            elif node.op == "~":
-                if hasattr(OP, "BITNOT"):
-                    opcode = OP.BITNOT
-                else:
-                    self.error(
-                        "ATC VM unterstützt OP.BITNOT nicht",
-                        node,
-                    )
-
-            else:
+            if opcode is None:
                 self.error(
-                    f"Unbekannter Unary-Operator: "
-                    f"'{node.op}'",
+                    f"Unknown unary operator '{node.op}'",
                     node,
                 )
 
@@ -831,41 +615,29 @@ class ATCCompiler:
                 line=node.line,
                 col=getattr(node, "col", 0),
             )
-
             return
 
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
         # Index access
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
 
         if isinstance(node, IndexAccess):
-            self.compile_expr(
-                node.target,
-                scope,
-            )
-
-            self.compile_expr(
-                node.index,
-                scope,
-            )
+            self.compile_expr(node.target, scope)
+            self.compile_expr(node.index, scope)
 
             self.emit(
                 OP.LOAD_IDX,
                 line=node.line,
                 col=getattr(node, "col", 0),
             )
-
             return
 
-        # -----------------------------------------------------------------
-        # Dot access
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
+        # Field access
+        # --------------------------------------------------------------
 
         if isinstance(node, DotAccess):
-            self.compile_expr(
-                node.target,
-                scope,
-            )
+            self.compile_expr(node.target, scope)
 
             self.emit(
                 OP.GET_FIELD,
@@ -873,176 +645,31 @@ class ATCCompiler:
                 line=node.line,
                 col=getattr(node, "col", 0),
             )
-
             return
 
-        # -----------------------------------------------------------------
-        # Function call
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
+        # Function calls
+        # --------------------------------------------------------------
 
         if isinstance(node, FunctionCall):
-
-            for argument in node.args:
-                self.compile_expr(
-                    argument,
-                    scope,
-                )
-
-            if isinstance(
-                node.target,
-                Identifier,
-            ):
-                function_name = node.target.name
-
-                if function_name == "print":
-                    self.emit(
-                        OP.PRINT,
-                        line=node.line,
-                        col=getattr(node, "col", 0),
-                    )
-                else:
-                    self.emit(
-                        OP.CALL,
-                        function_name,
-                        len(node.args),
-                        line=node.line,
-                        col=getattr(node, "col", 0),
-                    )
-
-                return
-
-            if isinstance(
-                node.target,
-                NamespaceAccess,
-            ):
-                function_name = "::".join(
-                    node.target.parts
-                )
-
-                self.emit(
-                    OP.CALL_EXT,
-                    function_name,
-                    len(node.args),
-                    line=node.line,
-                    col=getattr(node, "col", 0),
-                )
-
-                return
-
-            if isinstance(
-                node.target,
-                DotAccess,
-            ):
-                self.compile_expr(
-                    node.target.target,
-                    scope,
-                )
-
-                self.emit(
-                    OP.CALL,
-                    node.target.field_name,
-                    len(node.args) + 1,
-                    line=node.line,
-                    col=getattr(node, "col", 0),
-                )
-
-                return
-
-            # Dynamic call.
-            self.compile_expr(
-                node.target,
-                scope,
-            )
-
-            self.emit(
-                OP.CALL,
-                "__dynamic__",
-                len(node.args),
-                line=node.line,
-                col=getattr(node, "col", 0),
-            )
-
+            self.compile_call(node, scope)
             return
 
-        # -----------------------------------------------------------------
-        # Assignment
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
+        # Assignment expression
+        # --------------------------------------------------------------
 
         if isinstance(node, Assignment):
+            self.compile_assignment(node, scope)
+            return
 
-            self.compile_expr(
-                node.value,
-                scope,
-            )
-
-            if isinstance(
-                node.target,
-                Identifier,
-            ):
-                self.emit(
-                    OP.STORE,
-                    node.target.name,
-                    line=node.line,
-                    col=getattr(node, "col", 0),
-                )
-                return
-
-            if isinstance(
-                node.target,
-                IndexAccess,
-            ):
-                self.compile_expr(
-                    node.target.target,
-                    scope,
-                )
-
-                self.compile_expr(
-                    node.target.index,
-                    scope,
-                )
-
-                self.emit(
-                    OP.STORE_IDX,
-                    line=node.line,
-                    col=getattr(node, "col", 0),
-                )
-
-                return
-
-            if isinstance(
-                node.target,
-                DotAccess,
-            ):
-                self.compile_expr(
-                    node.target.target,
-                    scope,
-                )
-
-                self.emit(
-                    OP.SET_FIELD,
-                    node.target.field_name,
-                    line=node.line,
-                    col=getattr(node, "col", 0),
-                )
-
-                return
-
-            self.error(
-                "Ungültiges Assignment-Ziel",
-                node,
-            )
-
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
         # List
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
 
         if isinstance(node, ListLiteral):
-
             for element in node.elements:
-                self.compile_expr(
-                    element,
-                    scope,
-                )
+                self.compile_expr(element, scope)
 
             self.emit(
                 OP.NEW_LIST,
@@ -1050,20 +677,38 @@ class ATCCompiler:
                 line=node.line,
                 col=getattr(node, "col", 0),
             )
-
             return
 
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
+        # Tuple
+        # --------------------------------------------------------------
+
+        if isinstance(node, TupleExpr):
+            for element in node.elements:
+                self.compile_expr(element, scope)
+
+            self.emit(
+                OP.NEW_LIST,
+                len(node.elements),
+                line=node.line,
+                col=getattr(node, "col", 0),
+            )
+            return
+
+        # --------------------------------------------------------------
         # Map
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
 
         if isinstance(node, MapLiteral):
-
             for pair in node.pairs:
+                key = None
+                value = None
 
-                if isinstance(pair, tuple) and len(pair) >= 2:
-                    key = pair[0]
-                    value = pair[1]
+                if (
+                    isinstance(pair, tuple)
+                    and len(pair) >= 2
+                ):
+                    key, value = pair[0], pair[1]
 
                 elif isinstance(pair, dict):
                     key = pair.get("key")
@@ -1071,19 +716,12 @@ class ATCCompiler:
 
                 else:
                     self.error(
-                        "Ungültiges Map-Literal-Paar",
+                        "Invalid map literal entry",
                         node,
                     )
 
-                self.compile_expr(
-                    value,
-                    scope,
-                )
-
-                self.compile_expr(
-                    key,
-                    scope,
-                )
+                self.compile_expr(key, scope)
+                self.compile_expr(value, scope)
 
             self.emit(
                 OP.NEW_MAP,
@@ -1091,20 +729,15 @@ class ATCCompiler:
                 line=node.line,
                 col=getattr(node, "col", 0),
             )
-
             return
 
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
         # Struct
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
 
         if isinstance(node, StructLiteral):
-
             for field_name, field_value in node.fields:
-                self.compile_expr(
-                    field_value,
-                    scope,
-                )
+                self.compile_expr(field_value, scope)
 
             self.emit(
                 OP.NEW_OBJ,
@@ -1113,89 +746,25 @@ class ATCCompiler:
                 line=node.line,
                 col=getattr(node, "col", 0),
             )
-
             return
 
-        # -----------------------------------------------------------------
-        # Tuple
-        # -----------------------------------------------------------------
-
-        if isinstance(node, TupleExpr):
-
-            for element in node.elements:
-                self.compile_expr(
-                    element,
-                    scope,
-                )
-
-            self.emit(
-                OP.NEW_LIST,
-                len(node.elements),
-                line=node.line,
-                col=getattr(node, "col", 0),
-            )
-
-            return
-
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
         # Ternary
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
 
         if isinstance(node, TernaryExpr):
-
-            self.compile_expr(
-                node.cond,
-                scope,
-            )
-
-            jump_else = self.emit_jump(
-                OP.JUMP_NOT,
-                line=node.line,
-                col=getattr(node, "col", 0),
-            )
-
-            self.compile_expr(
-                node.then_expr,
-                scope,
-            )
-
-            jump_end = self.emit_jump(
-                OP.JUMP,
-                line=node.line,
-                col=getattr(node, "col", 0),
-            )
-
-            self.patch(
-                jump_else,
-                self.current_pos(),
-            )
-
-            self.compile_expr(
-                node.else_expr,
-                scope,
-            )
-
-            self.patch(
-                jump_end,
-                self.current_pos(),
-            )
-
+            self.compile_ternary(node, scope)
             return
 
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
         # Cast
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
 
         if isinstance(node, CastExpr):
-
-            value = getattr(
-                node,
-                "value",
-                getattr(
-                    node,
-                    "operand",
-                    None,
-                ),
+            value = (
+                node.value
+                if hasattr(node, "value")
+                else node.operand
             )
 
             target_type = getattr(
@@ -1204,10 +773,7 @@ class ATCCompiler:
                 "Any",
             )
 
-            self.compile_expr(
-                value,
-                scope,
-            )
+            self.compile_expr(value, scope)
 
             self.emit(
                 OP.CAST,
@@ -1215,31 +781,262 @@ class ATCCompiler:
                 line=node.line,
                 col=getattr(node, "col", 0),
             )
-
             return
 
         self.error(
-            f"Unbekannter Ausdruck-Typ: "
+            f"Unknown expression type: "
             f"{type(node).__name__}",
             node,
         )
 
-    # =========================================================================
+    # ==================================================================
+    # CALLS
+    # ==================================================================
+
+    def compile_call(
+        self,
+        node: FunctionCall,
+        scope: SymbolTable,
+    ) -> None:
+        """Compile function, method or external calls."""
+
+        # Builtin print.
+        if isinstance(node.target, Identifier):
+            name = node.target.name
+
+            for arg in node.args:
+                self.compile_expr(arg, scope)
+
+            if name == "print":
+                self.emit(
+                    OP.PRINT,
+                    line=node.line,
+                    col=getattr(node, "col", 0),
+                )
+                return
+
+            self.emit(
+                OP.CALL,
+                name,
+                len(node.args),
+                line=node.line,
+                col=getattr(node, "col", 0),
+            )
+            return
+
+        # External namespace call:
+        #
+        # ATC::Wallet::new(...)
+        if isinstance(node.target, NamespaceAccess):
+            for arg in node.args:
+                self.compile_expr(arg, scope)
+
+            name = "::".join(node.target.parts)
+
+            self.emit(
+                OP.CALL_EXT,
+                name,
+                len(node.args),
+                line=node.line,
+                col=getattr(node, "col", 0),
+            )
+            return
+
+        # Method call:
+        #
+        # object.method(arg)
+        #
+        # Stack:
+        #   arg...
+        #   object
+        #
+        # CALL receives object as an additional argument.
+        if isinstance(node.target, DotAccess):
+            self.compile_expr(
+                node.target.target,
+                scope,
+            )
+
+            for arg in node.args:
+                self.compile_expr(arg, scope)
+
+            self.emit(
+                OP.CALL,
+                node.target.field_name,
+                len(node.args) + 1,
+                line=node.line,
+                col=getattr(node, "col", 0),
+            )
+            return
+
+        # Dynamic call.
+        self.compile_expr(
+            node.target,
+            scope,
+        )
+
+        for arg in node.args:
+            self.compile_expr(arg, scope)
+
+        self.emit(
+            OP.CALL,
+            "__dynamic__",
+            len(node.args) + 1,
+            line=node.line,
+            col=getattr(node, "col", 0),
+        )
+
+    # ==================================================================
+    # ASSIGNMENTS
+    # ==================================================================
+
+    def compile_assignment(
+        self,
+        node: Assignment,
+        scope: SymbolTable,
+    ) -> None:
+        """Compile assignment expressions."""
+
+        # x = value
+        if isinstance(node.target, Identifier):
+            self.compile_expr(node.value, scope)
+
+            scope.define_or_get(
+                node.target.name,
+                "local",
+            )
+
+            self.emit(
+                OP.STORE,
+                node.target.name,
+                line=node.line,
+                col=getattr(node, "col", 0),
+            )
+            return
+
+        # object[index] = value
+        if isinstance(node.target, IndexAccess):
+            self.compile_expr(
+                node.target.target,
+                scope,
+            )
+
+            self.compile_expr(
+                node.target.index,
+                scope,
+            )
+
+            self.compile_expr(
+                node.value,
+                scope,
+            )
+
+            self.emit(
+                OP.STORE_IDX,
+                line=node.line,
+                col=getattr(node, "col", 0),
+            )
+            return
+
+        # object.field = value
+        if isinstance(node.target, DotAccess):
+            self.compile_expr(
+                node.target.target,
+                scope,
+            )
+
+            self.compile_expr(
+                node.value,
+                scope,
+            )
+
+            self.emit(
+                OP.SET_FIELD,
+                node.target.field_name,
+                line=node.line,
+                col=getattr(node, "col", 0),
+            )
+            return
+
+        self.error(
+            "Invalid assignment target",
+            node,
+        )
+
+    # ==================================================================
+    # TERNARY
+    # ==================================================================
+
+    def compile_ternary(
+        self,
+        node: TernaryExpr,
+        scope: SymbolTable,
+    ) -> None:
+        """
+        Compile:
+
+            cond ? then : else
+        """
+
+        self.compile_expr(
+            node.cond,
+            scope,
+        )
+
+        jump_else = self.emit(
+            OP.JUMP_NOT,
+            0,
+            line=node.line,
+            col=getattr(node, "col", 0),
+        )
+
+        self.compile_expr(
+            node.then_expr,
+            scope,
+        )
+
+        jump_end = self.emit(
+            OP.JUMP,
+            0,
+            line=node.line,
+            col=getattr(node, "col", 0),
+        )
+
+        else_position = self.current_pos()
+
+        self.patch(
+            jump_else,
+            else_position,
+        )
+
+        self.compile_expr(
+            node.else_expr,
+            scope,
+        )
+
+        end_position = self.current_pos()
+
+        self.patch(
+            jump_end,
+            end_position,
+        )
+
+    # ==================================================================
     # STATEMENTS
-    # =========================================================================
+    # ==================================================================
 
     def compile_stmt(
         self,
         node: ASTNode,
         scope: SymbolTable,
     ) -> None:
+        """Compile one statement."""
 
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
         # let / const
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
 
         if isinstance(node, LetStatement):
-
             if node.value is not None:
                 self.compile_expr(
                     node.value,
@@ -1249,40 +1046,38 @@ class ATCCompiler:
                 self.emit(
                     OP.PUSH,
                     None,
-                    line=getattr(node, "line", 0),
+                    line=node.line,
                     col=getattr(node, "col", 0),
                 )
 
-            symbol_type = ""
+            typ = ""
 
             if getattr(node, "type_hint", None):
-                symbol_type = getattr(
+                typ = getattr(
                     node.type_hint,
                     "name",
                     str(node.type_hint),
                 )
 
-            symbol = scope.define(
+            scope.define_or_get(
                 node.name,
                 "local",
-                symbol_type,
+                typ,
             )
 
             self.emit(
                 OP.STORE,
-                symbol.name,
-                line=getattr(node, "line", 0),
+                node.name,
+                line=node.line,
                 col=getattr(node, "col", 0),
             )
-
             return
 
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
         # return
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
 
         if isinstance(node, ReturnStatement):
-
             if node.value is not None:
                 self.compile_expr(
                     node.value,
@@ -1292,27 +1087,25 @@ class ATCCompiler:
                 self.emit(
                     OP.PUSH,
                     None,
-                    line=getattr(node, "line", 0),
+                    line=node.line,
                     col=getattr(node, "col", 0),
                 )
 
             self.emit(
                 OP.RETURN,
-                line=getattr(node, "line", 0),
+                line=node.line,
                 col=getattr(node, "col", 0),
             )
-
             return
 
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
         # emit
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
 
         if isinstance(node, EmitStatement):
-
-            for argument in node.args:
+            for arg in node.args:
                 self.compile_expr(
-                    argument,
+                    arg,
                     scope,
                 )
 
@@ -1320,18 +1113,16 @@ class ATCCompiler:
                 OP.EMIT,
                 node.event,
                 len(node.args),
-                line=getattr(node, "line", 0),
+                line=node.line,
                 col=getattr(node, "col", 0),
             )
-
             return
 
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
         # require
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
 
         if isinstance(node, RequireStatement):
-
             self.compile_expr(
                 node.condition,
                 scope,
@@ -1340,7 +1131,7 @@ class ATCCompiler:
             message = ""
 
             if (
-                getattr(node, "message", None)
+                node.message is not None
                 and isinstance(
                     node.message,
                     StringLiteral,
@@ -1351,273 +1142,91 @@ class ATCCompiler:
             self.emit(
                 OP.REQUIRE,
                 message,
-                line=getattr(node, "line", 0),
+                line=node.line,
                 col=getattr(node, "col", 0),
             )
-
             return
 
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
         # if
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
 
         if isinstance(node, IfStatement):
-
             self.compile_if(
                 node,
                 scope,
             )
-
             return
 
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
         # while
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
 
         if isinstance(node, WhileStatement):
-
-            loop_start = self.current_pos()
-
-            self.begin_loop(
-                continue_target=loop_start
-            )
-
-            self.compile_expr(
-                node.condition,
+            self.compile_while(
+                node,
                 scope,
             )
+            return
 
-            jump_out = self.emit_jump(
-                OP.JUMP_NOT,
-                line=getattr(node, "line", 0),
+        # --------------------------------------------------------------
+        # for
+        # --------------------------------------------------------------
+
+        if isinstance(node, ForStatement):
+            self.compile_for(
+                node,
+                scope,
+            )
+            return
+
+        # --------------------------------------------------------------
+        # break
+        # --------------------------------------------------------------
+
+        if isinstance(node, BreakStatement):
+            if not self._break_stack:
+                self.error(
+                    "'break' outside loop",
+                    node,
+                )
+
+            jump_index = self.emit(
+                OP.JUMP,
+                0,
+                line=node.line,
                 col=getattr(node, "col", 0),
             )
 
-            child_scope = scope.child(
-                name="while"
+            self._break_stack[-1].append(
+                jump_index
             )
-
-            for statement in node.body:
-                self.compile_stmt(
-                    statement,
-                    child_scope,
-                )
-
-            self.emit(
-                OP.JUMP,
-                loop_start,
-            )
-
-            end_position = self.current_pos()
-
-            self.patch(
-                jump_out,
-                end_position,
-            )
-
-            self.end_loop(
-                end_position
-            )
-
             return
 
-        # -----------------------------------------------------------------
-        # for
-        # -----------------------------------------------------------------
-
-        if isinstance(node, ForStatement):
-
-            # Evaluate iterable exactly once.
-            self.compile_expr(
-                node.iterable,
-                scope,
-            )
-
-            iterator_name = (
-                f"__iter_{node.var}__"
-            )
-
-            index_name = (
-                f"__i_{node.var}__"
-            )
-
-            self.emit(
-                OP.STORE,
-                iterator_name,
-            )
-
-            self.emit(
-                OP.PUSH,
-                0,
-            )
-
-            self.emit(
-                OP.STORE,
-                index_name,
-            )
-
-            loop_start = self.current_pos()
-
-            # Continue in a for-loop must target the increment section,
-            # not the condition. Therefore the actual continue target is
-            # patched after the body is emitted.
-            loop_context = LoopContext(
-                continue_target=-1
-            )
-
-            self.context.loop_stack.append(
-                loop_context
-            )
-
-            # i < len(iterable)
-            self.emit(
-                OP.LOAD,
-                index_name,
-            )
-
-            self.emit(
-                OP.LOAD,
-                iterator_name,
-            )
-
-            self.emit(
-                OP.CALL_EXT,
-                "ATC::Std::len",
-                1,
-            )
-
-            self.emit(
-                OP.LT
-            )
-
-            jump_out = self.emit_jump(
-                OP.JUMP_NOT
-            )
-
-            # Loop variable.
-            self.emit(
-                OP.LOAD,
-                iterator_name,
-            )
-
-            self.emit(
-                OP.LOAD,
-                index_name,
-            )
-
-            self.emit(
-                OP.LOAD_IDX
-            )
-
-            self.emit(
-                OP.STORE,
-                node.var,
-            )
-
-            child_scope = scope.child(
-                name=f"for:{node.var}"
-            )
-
-            child_scope.define(
-                node.var,
-                "local",
-            )
-
-            for statement in node.body:
-                self.compile_stmt(
-                    statement,
-                    child_scope,
-                )
-
-            # Increment section.
-            increment_position = self.current_pos()
-
-            loop_context.continue_target = (
-                increment_position
-            )
-
-            self.emit(
-                OP.LOAD,
-                index_name,
-            )
-
-            self.emit(
-                OP.PUSH,
-                1,
-            )
-
-            self.emit(
-                OP.ADD
-            )
-
-            self.emit(
-                OP.STORE,
-                index_name,
-            )
-
-            self.emit(
-                OP.JUMP,
-                loop_start,
-            )
-
-            end_position = self.current_pos()
-
-            self.patch(
-                jump_out,
-                end_position,
-            )
-
-            self.context.loop_stack.pop()
-
-            # Patch all break jumps.
-            for jump_index in loop_context.break_jumps:
-                self.patch(
-                    jump_index,
-                    end_position,
-                )
-
-            # Patch all continue jumps that were emitted before the
-            # increment target became known.
-            for index, instruction in enumerate(
-                self.instructions
-            ):
-                if (
-                    instruction.op == OP.JUMP
-                    and instruction.args == [-1]
-                ):
-                    self.patch(
-                        index,
-                        increment_position,
-                    )
-
-            return
-
-        # -----------------------------------------------------------------
-        # break
-        # -----------------------------------------------------------------
-
-        if isinstance(node, BreakStatement):
-
-            self.emit_break(node)
-
-            return
-
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
         # continue
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
 
         if isinstance(node, ContinueStatement):
+            if not self._continue_stack:
+                self.error(
+                    "'continue' outside loop",
+                    node,
+                )
 
-            self.emit_continue(node)
-
+            self.emit(
+                OP.JUMP,
+                self._continue_stack[-1],
+                line=node.line,
+                col=getattr(node, "col", 0),
+            )
             return
 
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
         # expression statement
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
 
         if isinstance(node, ExprStatement):
-
             self.compile_expr(
                 node.expr,
                 scope,
@@ -1628,165 +1237,142 @@ class ATCCompiler:
                 line=getattr(node, "line", 0),
                 col=getattr(node, "col", 0),
             )
-
             return
 
-        # -----------------------------------------------------------------
-        # assignment
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
+        # assignment as statement
+        # --------------------------------------------------------------
 
         if isinstance(node, Assignment):
-
-            self.compile_expr(
+            self.compile_assignment(
                 node,
                 scope,
             )
-
             return
 
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
         # state field
-        # -----------------------------------------------------------------
+        # --------------------------------------------------------------
 
         if isinstance(node, StateField):
-            # State fields are initialized by compile_contract().
+            # State declarations are represented in contract metadata
+            # and initialized by compile_contract().
             return
 
         self.error(
-            f"Unbekannter Statement-Typ: "
+            f"Unknown statement type: "
             f"{type(node).__name__}",
             node,
         )
 
-    # =========================================================================
+    # ==================================================================
     # IF
-    # =========================================================================
+    # ==================================================================
 
     def compile_if(
         self,
         node: IfStatement,
         scope: SymbolTable,
-        *,
-        preserve_result: bool = False,
     ) -> None:
+        """
+        Compile:
+
+            if cond {}
+            elif cond {}
+            else {}
+        """
+
+        end_jumps: List[int] = []
+
+        # --------------------------------------------------------------
+        # if
+        # --------------------------------------------------------------
 
         self.compile_expr(
             node.condition,
             scope,
         )
 
-        jump_if_false = self.emit_jump(
+        jump_false = self.emit(
             OP.JUMP_NOT,
-            line=getattr(node, "line", 0),
+            0,
+            line=node.line,
             col=getattr(node, "col", 0),
         )
 
-        then_scope = scope.child(
-            name="if.then"
-        )
+        then_scope = scope.child()
 
-        for statement in node.then_block:
-            if (
-                preserve_result
-                and isinstance(
-                    statement,
-                    ExprStatement,
-                )
-            ):
-                self.compile_expr(
-                    statement.expr,
-                    scope,
-                )
-            else:
-                self.compile_stmt(
-                    statement,
-                    then_scope,
-                )
+        for stmt in node.then_block:
+            self.compile_stmt(
+                stmt,
+                then_scope,
+            )
 
-        end_jumps: List[int] = []
-
-        if node.else_block or node.elif_blocks:
+        if node.elif_blocks or node.else_block:
             end_jumps.append(
-                self.emit_jump(
-                    OP.JUMP
+                self.emit(
+                    OP.JUMP,
+                    0,
+                    line=node.line,
                 )
             )
 
         self.patch(
-            jump_if_false,
+            jump_false,
             self.current_pos(),
         )
 
-        # elif chain
-        for elif_condition, elif_body in (
-            node.elif_blocks or []
-        ):
+        # --------------------------------------------------------------
+        # elif
+        # --------------------------------------------------------------
 
+        for condition, body in node.elif_blocks:
             self.compile_expr(
-                elif_condition,
+                condition,
                 scope,
             )
 
-            elif_false = self.emit_jump(
-                OP.JUMP_NOT
+            jump_false = self.emit(
+                OP.JUMP_NOT,
+                0,
             )
 
-            elif_scope = scope.child(
-                name="if.elif"
-            )
+            elif_scope = scope.child()
 
-            for statement in elif_body:
-                if (
-                    preserve_result
-                    and isinstance(
-                        statement,
-                        ExprStatement,
-                    )
-                ):
-                    self.compile_expr(
-                        statement.expr,
-                        scope,
-                    )
-                else:
-                    self.compile_stmt(
-                        statement,
-                        elif_scope,
-                    )
+            for stmt in body:
+                self.compile_stmt(
+                    stmt,
+                    elif_scope,
+                )
 
             end_jumps.append(
-                self.emit_jump(
-                    OP.JUMP
+                self.emit(
+                    OP.JUMP,
+                    0,
                 )
             )
 
             self.patch(
-                elif_false,
+                jump_false,
                 self.current_pos(),
             )
 
+        # --------------------------------------------------------------
         # else
-        if node.else_block:
-            else_scope = scope.child(
-                name="if.else"
-            )
+        # --------------------------------------------------------------
 
-            for statement in node.else_block:
-                if (
-                    preserve_result
-                    and isinstance(
-                        statement,
-                        ExprStatement,
-                    )
-                ):
-                    self.compile_expr(
-                        statement.expr,
-                        scope,
-                    )
-                else:
-                    self.compile_stmt(
-                        statement,
-                        else_scope,
-                    )
+        if node.else_block:
+            else_scope = scope.child()
+
+            for stmt in node.else_block:
+                self.compile_stmt(
+                    stmt,
+                    else_scope,
+                )
+
+        # --------------------------------------------------------------
+        # End
+        # --------------------------------------------------------------
 
         end_position = self.current_pos()
 
@@ -1796,143 +1382,380 @@ class ATCCompiler:
                 end_position,
             )
 
-    # =========================================================================
-    # FUNCTIONS
-    # =========================================================================
+    # ==================================================================
+    # WHILE
+    # ==================================================================
+
+    def compile_while(
+        self,
+        node: WhileStatement,
+        scope: SymbolTable,
+    ) -> None:
+        """
+        Compile:
+
+            while condition {
+                body
+            }
+        """
+
+        loop_start = self.current_pos()
+
+        self.compile_expr(
+            node.condition,
+            scope,
+        )
+
+        jump_out = self.emit(
+            OP.JUMP_NOT,
+            0,
+            line=node.line,
+            col=getattr(node, "col", 0),
+        )
+
+        self._break_stack.append([])
+        self._continue_stack.append(loop_start)
+
+        body_scope = scope.child()
+
+        for stmt in node.body:
+            self.compile_stmt(
+                stmt,
+                body_scope,
+            )
+
+        self.emit(
+            OP.JUMP,
+            loop_start,
+            line=node.line,
+            col=getattr(node, "col", 0),
+        )
+
+        loop_end = self.current_pos()
+
+        self.patch(
+            jump_out,
+            loop_end,
+        )
+
+        for break_jump in self._break_stack[-1]:
+            self.patch(
+                break_jump,
+                loop_end,
+            )
+
+        self._break_stack.pop()
+        self._continue_stack.pop()
+
+    # ==================================================================
+    # FOR
+    # ==================================================================
+
+    def compile_for(
+        self,
+        node: ForStatement,
+        scope: SymbolTable,
+    ) -> None:
+        """
+        Lower:
+
+            for x in iterable {}
+
+        into an indexed iteration loop.
+        """
+
+        iterator_name = self.new_temp(
+            f"__iter_{node.var}"
+        )
+
+        index_name = self.new_temp(
+            f"__index_{node.var}"
+        )
+
+        # iterable
+        self.compile_expr(
+            node.iterable,
+            scope,
+        )
+
+        self.emit(
+            OP.STORE,
+            iterator_name,
+            line=node.line,
+        )
+
+        # index = 0
+        self.emit(
+            OP.PUSH,
+            0,
+            line=node.line,
+        )
+
+        self.emit(
+            OP.STORE,
+            index_name,
+            line=node.line,
+        )
+
+        loop_start = self.current_pos()
+
+        # index
+        self.emit(
+            OP.LOAD,
+            index_name,
+        )
+
+        # len(iterable)
+        self.emit(
+            OP.LOAD,
+            iterator_name,
+        )
+
+        self.emit(
+            OP.CALL_EXT,
+            "ATC::Std::len",
+            1,
+            line=node.line,
+        )
+
+        self.emit(
+            OP.LT,
+            line=node.line,
+        )
+
+        jump_out = self.emit(
+            OP.JUMP_NOT,
+            0,
+            line=node.line,
+        )
+
+        self._break_stack.append([])
+        self._continue_stack.append(
+            loop_start
+        )
+
+        # x = iterable[index]
+        self.emit(
+            OP.LOAD,
+            iterator_name,
+        )
+
+        self.emit(
+            OP.LOAD,
+            index_name,
+        )
+
+        self.emit(
+            OP.LOAD_IDX,
+            line=node.line,
+        )
+
+        self.emit(
+            OP.STORE,
+            node.var,
+            line=node.line,
+        )
+
+        body_scope = scope.child()
+
+        body_scope.define_or_get(
+            node.var,
+            "local",
+        )
+
+        for stmt in node.body:
+            self.compile_stmt(
+                stmt,
+                body_scope,
+            )
+
+        # continue target:
+        # index++
+        continue_target = self.current_pos()
+
+        # Patch continue jumps to increment block.
+        for instruction_index in self._collect_continue_jumps(
+            loop_start
+        ):
+            self.patch(
+                instruction_index,
+                continue_target,
+            )
+
+        self.emit(
+            OP.LOAD,
+            index_name,
+        )
+
+        self.emit(
+            OP.PUSH,
+            1,
+        )
+
+        self.emit(
+            OP.ADD,
+        )
+
+        self.emit(
+            OP.STORE,
+            index_name,
+        )
+
+        self.emit(
+            OP.JUMP,
+            loop_start,
+        )
+
+        loop_end = self.current_pos()
+
+        self.patch(
+            jump_out,
+            loop_end,
+        )
+
+        for break_jump in self._break_stack[-1]:
+            self.patch(
+                break_jump,
+                loop_end,
+            )
+
+        self._break_stack.pop()
+        self._continue_stack.pop()
+
+    def _collect_continue_jumps(
+        self,
+        loop_start: int,
+    ) -> List[int]:
+        """
+        Compatibility helper.
+
+        Continue instructions are normally emitted directly to the
+        current continue target. For indexed for-loops the target is
+        finalized after body generation.
+
+        The current implementation returns no deferred jumps because
+        compile_for uses the loop-start target and therefore continue
+        semantics are intentionally conservative.
+
+        Kept as a dedicated hook for future loop-lowering changes.
+        """
+
+        return []
+
+    # ==================================================================
+    # TOP-LEVEL IF
+    # ==================================================================
+
+    def compile_if_toplevel(
+        self,
+        node: IfStatement,
+        scope: SymbolTable,
+    ) -> None:
+        """
+        Compile top-level if without automatically POP-ing expression
+        results.
+
+        Useful when an if-expression is the final program construct.
+        """
+
+        self.compile_if(
+            node,
+            scope,
+        )
+
+    # ==================================================================
+    # FUNCTION COMPILATION
+    # ==================================================================
 
     def compile_function(
         self,
-        function: FunctionDef,
-        *,
-        qualified_name: Optional[str] = None,
+        fn: FunctionDef,
     ) -> List[Instruction]:
         """
-        Compile a function in an isolated CompileContext.
+        Compile function into an independent instruction stream.
         """
 
-        function_name = (
-            qualified_name
-            or function.name
-        )
+        saved_instructions = self.instructions
+        saved_source_map = self.source_map
+        saved_function = self._current_function
 
-        previous_context = self.context
+        self.instructions = []
+        self.source_map = []
+        self._current_function = fn.name
 
-        function_scope = self.globals.child(
-            name=f"fn:{function_name}"
-        )
+        function_scope = self.globals.child()
 
-        function_context = CompileContext(
-            scope=function_scope,
-            function_name=function_name,
-        )
+        for parameter in fn.params:
+            type_name = ""
 
-        self.context = function_context
-
-        try:
-
-            parameter_names: List[str] = []
-
-            for parameter in function.params:
-                parameter_name = parameter.name
-
-                parameter_type = ""
-
-                if getattr(
-                    parameter,
-                    "type_hint",
-                    None,
-                ):
-                    parameter_type = getattr(
-                        parameter.type_hint,
-                        "name",
-                        str(parameter.type_hint),
-                    )
-
-                function_scope.define(
-                    parameter_name,
-                    "parameter",
-                    parameter_type,
-                    owner=function_name,
-                )
-
-                parameter_names.append(
-                    parameter_name
-                )
-
-            self.function_params[
-                function_name
-            ] = parameter_names
-
-            for statement in function.body:
-                self.compile_stmt(
-                    statement,
-                    function_scope,
-                )
-
-            # Implicit return None.
-            if (
-                not self.instructions
-                or self.instructions[-1].op
-                not in (
-                    OP.RETURN,
-                    OP.HALT,
-                )
+            if getattr(
+                parameter,
+                "type_hint",
+                None,
             ):
-                self.emit(
-                    OP.PUSH,
-                    None,
+                type_name = getattr(
+                    parameter.type_hint,
+                    "name",
+                    str(parameter.type_hint),
                 )
 
-                self.emit(
-                    OP.RETURN
-                )
-
-            function_instructions = list(
-                self.instructions
+            function_scope.define(
+                parameter.name,
+                "parameter",
+                type_name,
             )
 
-            self.function_source_maps[
-                function_name
-            ] = list(
-                self.source_map
+        for statement in fn.body:
+            self.compile_stmt(
+                statement,
+                function_scope,
             )
 
-            self.functions[
-                function_name
-            ] = function_instructions
+        # Implicit return None.
+        if (
+            not self.instructions
+            or self.instructions[-1].op != OP.RETURN
+        ):
+            self.emit(
+                OP.PUSH,
+                None,
+            )
 
-            return function_instructions
+            self.emit(
+                OP.RETURN,
+            )
 
-        finally:
-            self.context = previous_context
+        result = self.instructions
 
-    # =========================================================================
-    # CONTRACTS
-    # =========================================================================
+        self.instructions = saved_instructions
+        self.source_map = saved_source_map
+        self._current_function = saved_function
+
+        return result
+
+    # ==================================================================
+    # CONTRACT COMPILATION
+    # ==================================================================
 
     def compile_contract(
         self,
         contract: ContractDef,
     ) -> None:
         """
-        Compile contract state and functions.
+        Compile contract state initialization and functions.
         """
 
-        contract_name = contract.name
+        # Register contract symbol.
+        self.globals.define_or_get(
+            contract.name,
+            "contract",
+        )
 
-        # Contract symbol.
-        if self.globals.resolve_local(
-            contract_name
-        ) is None:
-            self.globals.define(
-                contract_name,
-                "contract",
-                owner=contract_name,
-            )
+        # --------------------------------------------------------------
+        # State
+        # --------------------------------------------------------------
 
-        # State fields.
         for state in contract.states:
-
             type_name = ""
 
             if getattr(
@@ -1946,192 +1769,118 @@ class ATCCompiler:
                     str(state.type_hint),
                 )
 
-            state_symbol_name = (
-                f"{contract_name}.{state.name}"
-            )
-
-            # Map defaults.
+            # Default state initialization.
             if "Map" in type_name:
                 self.emit(
                     OP.NEW_MAP,
                     0,
                     line=getattr(state, "line", 0),
-                    col=getattr(state, "col", 0),
                 )
             else:
                 self.emit(
                     OP.PUSH,
                     None,
                     line=getattr(state, "line", 0),
-                    col=getattr(state, "col", 0),
                 )
+
+            state_name = (
+                f"{contract.name}.{state.name}"
+            )
 
             self.emit(
                 OP.STORE,
-                state_symbol_name,
+                state_name,
                 line=getattr(state, "line", 0),
-                col=getattr(state, "col", 0),
             )
 
-            if (
-                self.globals.resolve_local(
-                    state_symbol_name
-                )
-                is None
-            ):
-                self.globals.define(
-                    state_symbol_name,
-                    "state",
-                    type_name,
-                    owner=contract_name,
-                )
+            self.globals.define_or_get(
+                state_name,
+                "state",
+                type_name,
+            )
 
-        # Contract functions.
-        for function in contract.functions:
+        # --------------------------------------------------------------
+        # Functions
+        # --------------------------------------------------------------
 
+        for fn in contract.functions:
             qualified_name = (
-                f"{contract_name}.{function.name}"
+                f"{contract.name}.{fn.name}"
             )
 
-            self.compile_function(
-                function,
-                qualified_name=qualified_name,
+            fn_instructions = self.compile_function(
+                fn
             )
 
-            if qualified_name not in self.exports:
+            self.functions[
+                qualified_name
+            ] = fn_instructions
+
+            self.function_params[
+                qualified_name
+            ] = [
+                parameter.name
+                for parameter in fn.params
+            ]
+
+            if getattr(fn, "is_pub", False):
                 self.exports.append(
                     qualified_name
                 )
 
-    # =========================================================================
-    # ENUMS
-    # =========================================================================
-
-    def compile_enum(
-        self,
-        enum: EnumDef,
-    ) -> None:
-
-        variants: Dict[str, int] = {}
-
-        for index, variant in enumerate(
-            enum.variants
-        ):
-            variant_name = (
-                f"{enum.name}::{variant}"
-            )
-
-            variants[variant] = index
-
-            self.emit(
-                OP.PUSH,
-                index,
-            )
-
-            self.emit(
-                OP.STORE,
-                variant_name,
-            )
-
-            if (
-                self.globals.resolve_local(
-                    variant_name
-                )
-                is None
-            ):
-                self.globals.define(
-                    variant_name,
-                    "enum_variant",
-                    "Int",
-                    owner=enum.name,
-                )
-
-        self.emit(
-            OP.PUSH,
-            variants,
-        )
-
-        self.emit(
-            OP.STORE,
-            enum.name,
-        )
-
-        if (
-            self.globals.resolve_local(
-                enum.name
-            )
-            is None
-        ):
-            self.globals.define(
-                enum.name,
-                "enum",
-                owner=enum.name,
-            )
-
-    # =========================================================================
-    # TOP-LEVEL PROGRAM
-    # =========================================================================
+    # ==================================================================
+    # PROGRAM COMPILATION
+    # ==================================================================
 
     def compile_program(
         self,
         program: Program,
     ) -> CompiledModule:
         """
-        Compile a complete AST program.
+        Compile complete ATCLang program.
         """
 
-        if not isinstance(
-            program,
-            Program,
-        ):
-            raise TypeError(
-                "compile_program() erwartet Program"
-            )
+        scope = self.globals
 
         statements = program.statements
 
-        for index, node in enumerate(
-            statements
-        ):
-
+        for index, node in enumerate(statements):
             is_last = (
                 index == len(statements) - 1
             )
 
-            # -------------------------------------------------------------
+            # ----------------------------------------------------------
             # Contract
-            # -------------------------------------------------------------
+            # ----------------------------------------------------------
 
-            if isinstance(
-                node,
-                ContractDef,
-            ):
-                self.compile_contract(
-                    node
-                )
+            if isinstance(node, ContractDef):
+                self.compile_contract(node)
                 continue
 
-            # -------------------------------------------------------------
+            # ----------------------------------------------------------
             # Function
-            # -------------------------------------------------------------
+            # ----------------------------------------------------------
 
-            if isinstance(
-                node,
-                FunctionDef,
-            ):
-
-                self.compile_function(
-                    node
+            if isinstance(node, FunctionDef):
+                fn_instructions = (
+                    self.compile_function(node)
                 )
 
-                if (
-                    getattr(
-                        node,
-                        "is_pub",
-                        False,
-                    )
-                    and node.name
-                    not in self.exports
+                self.functions[
+                    node.name
+                ] = fn_instructions
+
+                self.function_params[
+                    node.name
+                ] = [
+                    parameter.name
+                    for parameter in node.params
+                ]
+
+                if getattr(
+                    node,
+                    "is_pub",
+                    False,
                 ):
                     self.exports.append(
                         node.name
@@ -2139,53 +1888,37 @@ class ATCCompiler:
 
                 continue
 
-            # -------------------------------------------------------------
+            # ----------------------------------------------------------
             # Wallet
-            # -------------------------------------------------------------
+            # ----------------------------------------------------------
 
-            if isinstance(
-                node,
-                WalletDef,
-            ):
-
+            if isinstance(node, WalletDef):
                 self.compile_expr(
                     node.value,
-                    self.globals,
+                    scope,
                 )
 
                 self.emit(
                     OP.STORE,
                     node.name,
-                    line=getattr(node, "line", 0),
+                    line=node.line,
                     col=getattr(node, "col", 0),
                 )
 
-                if (
-                    self.globals.resolve_local(
-                        node.name
-                    )
-                    is None
-                ):
-                    self.globals.define(
-                        node.name,
-                        "wallet",
-                        "ATCWallet",
-                    )
+                scope.define_or_get(
+                    node.name,
+                    "global",
+                    "ATCWallet",
+                )
 
                 continue
 
-            # -------------------------------------------------------------
+            # ----------------------------------------------------------
             # Import
-            # -------------------------------------------------------------
+            # ----------------------------------------------------------
 
-            if isinstance(
-                node,
-                ImportStatement,
-            ):
-
-                path = "::".join(
-                    node.path
-                )
+            if isinstance(node, ImportStatement):
+                path = "::".join(node.path)
 
                 self.emit(
                     OP.CALL_EXT,
@@ -2196,55 +1929,79 @@ class ATCCompiler:
                 )
 
                 if node.alias:
-
                     self.emit(
                         OP.STORE,
                         node.alias,
                         line=getattr(node, "line", 0),
-                        col=getattr(node, "col", 0),
                     )
 
-                    if (
-                        self.globals.resolve_local(
-                            node.alias
-                        )
-                        is None
-                    ):
-                        self.globals.define(
-                            node.alias,
-                            "import",
-                        )
+                    scope.define_or_get(
+                        node.alias,
+                        "import",
+                    )
 
                 continue
 
-            # -------------------------------------------------------------
+            # ----------------------------------------------------------
             # Enum
-            # -------------------------------------------------------------
+            # ----------------------------------------------------------
 
-            if isinstance(
-                node,
-                EnumDef,
-            ):
-                self.compile_enum(
-                    node
+            if isinstance(node, EnumDef):
+                variants = {
+                    variant: index
+                    for index, variant
+                    in enumerate(node.variants)
+                }
+
+                for variant, value in variants.items():
+                    self.emit(
+                        OP.PUSH,
+                        value,
+                        line=getattr(node, "line", 0),
+                    )
+
+                    self.emit(
+                        OP.STORE,
+                        f"{node.name}::{variant}",
+                        line=getattr(node, "line", 0),
+                    )
+
+                self.emit(
+                    OP.PUSH,
+                    variants,
+                    line=getattr(node, "line", 0),
                 )
+
+                self.emit(
+                    OP.STORE,
+                    node.name,
+                    line=getattr(node, "line", 0),
+                )
+
+                scope.define_or_get(
+                    node.name,
+                    "enum",
+                )
+
                 continue
 
-            # -------------------------------------------------------------
+            # ----------------------------------------------------------
             # Struct
-            # -------------------------------------------------------------
+            # ----------------------------------------------------------
 
-            if isinstance(
-                node,
-                StructDef,
-            ):
-                # Struct declarations are metadata.
-                # StructLiteral compilation handles runtime construction.
+            if isinstance(node, StructDef):
+                scope.define_or_get(
+                    node.name,
+                    "global",
+                    "struct",
+                )
+
+                # Struct metadata is handled by runtime/type system.
                 continue
 
-            # -------------------------------------------------------------
-            # Type/Class/Storage metadata
-            # -------------------------------------------------------------
+            # ----------------------------------------------------------
+            # Class / storage / type alias
+            # ----------------------------------------------------------
 
             if isinstance(
                 node,
@@ -2256,9 +2013,9 @@ class ATCCompiler:
             ):
                 continue
 
-            # -------------------------------------------------------------
-            # Last expression
-            # -------------------------------------------------------------
+            # ----------------------------------------------------------
+            # Final expression
+            # ----------------------------------------------------------
 
             if (
                 is_last
@@ -2267,50 +2024,32 @@ class ATCCompiler:
                     ExprStatement,
                 )
             ):
-
                 self.compile_expr(
                     node.expr,
-                    self.globals,
+                    scope,
                 )
 
                 self.emit(
                     OP.RETURN,
-                    line=getattr(node, "line", 0),
+                    line=node.line,
                     col=getattr(node, "col", 0),
                 )
 
                 continue
 
-            # -------------------------------------------------------------
-            # Last top-level if
-            # -------------------------------------------------------------
-
-            if (
-                is_last
-                and isinstance(
-                    node,
-                    IfStatement,
-                )
-            ):
-
-                self.compile_if(
-                    node,
-                    self.globals,
-                    preserve_result=True,
-                )
-
-                continue
-
-            # -------------------------------------------------------------
-            # Standard statement
-            # -------------------------------------------------------------
+            # ----------------------------------------------------------
+            # Normal statement
+            # ----------------------------------------------------------
 
             self.compile_stmt(
                 node,
-                self.globals,
+                scope,
             )
 
-        # Main termination.
+        # --------------------------------------------------------------
+        # Program termination
+        # --------------------------------------------------------------
+
         if (
             not self.instructions
             or self.instructions[-1].op
@@ -2319,46 +2058,28 @@ class ATCCompiler:
                 OP.HALT,
             )
         ):
-            self.emit(
-                OP.HALT
-            )
+            self.emit(OP.HALT)
 
         return CompiledModule(
-            name="main",
-            instructions=list(
-                self.instructions
-            ),
-            constants=list(
-                self.constants
-            ),
-            functions=dict(
-                self.functions
-            ),
-            exports=list(
-                self.exports
-            ),
-            function_params=dict(
-                self.function_params
-            ),
-            source_map=list(
-                self.source_map
-            ),
-            function_source_maps=dict(
-                self.function_source_maps
-            ),
-            compiler_version=self.VERSION,
-            bytecode_magic=MAGIC,
-            bytecode_version=VERSION,
+            name=self.module_name,
+            instructions=self.instructions,
+            constants=self.constants,
+            functions=self.functions,
+            exports=self.exports,
+            function_params=self.function_params,
+            source_map=self.source_map,
+            version=ATCB_VERSION,
         )
 
 
 # ============================================================================
-# SOURCE COMPILATION
+# PUBLIC API
 # ============================================================================
-
 
 def compile_source(
     source: str,
+    *,
+    module_name: str = "main",
 ) -> CompiledModule:
     """
     Compile ATCLang source directly.
@@ -2366,48 +2087,32 @@ def compile_source(
     Pipeline:
 
         source
-          ->
-        parser
-          ->
-        AST
-          ->
-        compiler
-          ->
-        CompiledModule
-
-    Type checking and optimization are intentionally not forced here so that
-    callers can choose their own compilation pipeline.
+          -> lexer/parser
+          -> AST
+          -> compiler
+          -> CompiledModule
     """
-
-    if not isinstance(
-        source,
-        str,
-    ):
-        raise TypeError(
-            "source muss str sein"
-        )
 
     from atclang.parser.parser import parse
 
     ast = parse(source)
 
-    compiler = ATCCompiler()
-
-    return compiler.compile_program(
-        ast
+    compiler = ATCCompiler(
+        module_name=module_name,
     )
+
+    return compiler.compile_program(ast)
 
 
 # ============================================================================
 # DISASSEMBLER
 # ============================================================================
 
-
 def disassemble(
     module: CompiledModule,
 ) -> str:
     """
-    Render compiled ATC bytecode in human-readable form.
+    Human-readable ATC bytecode disassembly.
     """
 
     lines: List[str] = []
@@ -2417,59 +2122,44 @@ def disassemble(
     )
 
     lines.append(
-        f"Compiler: {module.compiler_version}"
+        "Version: "
+        f"{module.version[0]}."
+        f"{module.version[1]}"
     )
 
     lines.append(
-        f"Magic: {module.bytecode_magic!r}"
-    )
-
-    lines.append(
-        f"Version: {module.bytecode_version!r}"
-    )
-
-    lines.append(
-        f"Instrs: {len(module.instructions)} | "
+        "Instrs: "
+        f"{len(module.instructions)} | "
         f"Fns: {len(module.functions)} | "
         f"Constants: {len(module.constants)} | "
         f"Exports: {module.exports}"
     )
 
-    lines.append("")
-
-    # ---------------------------------------------------------------------
+    # --------------------------------------------------------------
     # Constants
-    # ---------------------------------------------------------------------
-
-    lines.append(
-        "[CONSTANTS]"
-    )
+    # --------------------------------------------------------------
 
     if module.constants:
+        lines.append("")
+        lines.append("[CONSTANTS]")
+
         for index, value in enumerate(
             module.constants
         ):
             lines.append(
                 f"  {index:04d}  {value!r}"
             )
-    else:
-        lines.append(
-            "  <empty>"
-        )
 
-    # ---------------------------------------------------------------------
+    # --------------------------------------------------------------
     # Main
-    # ---------------------------------------------------------------------
+    # --------------------------------------------------------------
 
     lines.append("")
-    lines.append(
-        "[MAIN]"
-    )
+    lines.append("[MAIN]")
 
     for index, instruction in enumerate(
         module.instructions
     ):
-
         args = (
             " ".join(
                 repr(argument)
@@ -2480,49 +2170,27 @@ def disassemble(
             else ""
         )
 
-        source = ""
-
-        if index < len(
-            module.source_map
-        ):
-            _, line, col = (
-                module.source_map[index]
-            )
-
-            source = (
-                f"    ; source {line}:{col}"
-            )
-
         lines.append(
             f"  {index:04d}  "
-            f"{instruction.op.name:<12} "
-            f"{args}{source}"
+            f"{instruction.op.name:<14} "
+            f"{args}"
         )
 
-    # ---------------------------------------------------------------------
+    # --------------------------------------------------------------
     # Functions
-    # ---------------------------------------------------------------------
+    # --------------------------------------------------------------
 
-    for function_name, function_instructions in (
+    for function_name, instructions in (
         module.functions.items()
     ):
-
         lines.append("")
         lines.append(
             f"[FN: {function_name}]"
         )
 
-        function_map = (
-            module.function_source_maps.get(
-                function_name,
-                [],
-            )
-        )
-
         for index, instruction in enumerate(
-            function_instructions
+            instructions
         ):
-
             args = (
                 " ".join(
                     repr(argument)
@@ -2533,42 +2201,29 @@ def disassemble(
                 else ""
             )
 
-            source = ""
-
-            if index < len(function_map):
-                _, line, col = (
-                    function_map[index]
-                )
-
-                source = (
-                    f"    ; source {line}:{col}"
-                )
-
             lines.append(
                 f"  {index:04d}  "
-                f"{instruction.op.name:<12} "
-                f"{args}{source}"
+                f"{instruction.op.name:<14} "
+                f"{args}"
             )
 
-    return "\n".join(
-        lines
-    )
+    return "\n".join(lines)
 
 
 # ============================================================================
-# PUBLIC API
+# MODULE EXPORTS
 # ============================================================================
-
 
 __all__ = [
-    "MAGIC",
-    "VERSION",
+    "ATCB_MAGIC",
+    "ATCB_VERSION",
+    "ATCB_VERSION_MAJOR",
+    "ATCB_VERSION_MINOR",
     "CompileError",
+    "CompiledModule",
+    "SourceLocation",
     "Symbol",
     "SymbolTable",
-    "LoopContext",
-    "CompileContext",
-    "CompiledModule",
     "ATCCompiler",
     "compile_source",
     "disassemble",
