@@ -1,558 +1,1208 @@
-# Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
-"""
-ATCLang Optimizer — Constant Folding & Dead Code Elimination.
-ATC-92 | Sprint 2.1
+# Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems.
+# All Rights Reserved.
 
-Optimierungen:
-1. Constant Folding: const x = 2 + 3 → const x = 5
-2. Constant Propagation: const a = 5; let b = a + 1 → let b = 6
-3. Dead Code Elimination: unreachable code after return/break/continue
-4. Dead Store Elimination: let x = 1; x = 2 → let x = 2 (if x not read between)
-5. Jump Threading: JUMP to JUMP → JUMP to final target
-6. Algebraic Simplification: x * 1 → x, x + 0 → x, x * 0 → 0
 """
-from typing import List, Dict, Set, Optional, Any
+ATCLang Optimizer
+=================
+
+ATC-92 | Compiler Optimization Pipeline
+
+Der Optimizer arbeitet auf zwei Ebenen:
+
+    Source
+      ↓
+    AST Optimizer
+      ├── Constant Folding
+      ├── Constant Propagation
+      ├── Algebraic Simplification
+      └── Dead Code Elimination
+      ↓
+    Compiler
+      ↓
+    ATC Bytecode
+      ↓
+    Bytecode Optimizer
+      ├── Jump Threading
+      ├── Reachability Analysis
+      └── Peephole Optimization
+
+Designziele:
+
+- deterministische Transformationen
+- keine Änderung beobachtbarer Semantik
+- keine Optimierung über Seiteneffekte hinweg
+- scope-sichere Constant Propagation
+- keine Annahme über VM-interne Implementierungsdetails
+- kompatibel mit der modularisierten compiler/-Struktur
+
+Optimization Levels:
+
+    0 = disabled
+    1 = constant folding + safe dead code elimination
+    2 = + constant propagation + algebraic simplification
+    3 = + bytecode peephole + jump threading
+"""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from atclang.parser.ast_nodes import (
-    ASTNode, Program, IntLiteral, FloatLiteral, StringLiteral, BoolLiteral,
-    NullLiteral, Identifier, BinaryOp, UnaryOp, Assignment, IndexAccess,
-    DotAccess, NamespaceAccess, FunctionCall, TypeAnnotation,
-    LetStatement, ReturnStatement, EmitStatement, RequireStatement,
-    IfStatement, ForStatement, WhileStatement, BreakStatement,
-    ContinueStatement, ExprStatement,
-    Parameter, FunctionDef, StateField, EventDef, ErrorDef,
-    ContractDef, WalletDef, ImportStatement, StructDef, EnumDef,
+    ASTNode,
+    Program,
+
+    IntLiteral,
+    FloatLiteral,
+    StringLiteral,
+    BoolLiteral,
+    NullLiteral,
+
+    Identifier,
+    BinaryOp,
+    UnaryOp,
+    Assignment,
+    IndexAccess,
+    DotAccess,
+    NamespaceAccess,
+    FunctionCall,
+    TernaryExpr,
+    CastExpr,
+    TupleExpr,
+    ListLiteral,
+    MapLiteral,
+    StructLiteral,
+
+    LetStatement,
+    ReturnStatement,
+    EmitStatement,
+    RequireStatement,
+    IfStatement,
+    ForStatement,
+    WhileStatement,
+    BreakStatement,
+    ContinueStatement,
+    ExprStatement,
+
+    FunctionDef,
+    ContractDef,
+    WalletDef,
+    ImportStatement,
+    EnumDef,
+    StructDef,
+    ClassDef,
+    StorageBlock,
+    TypeAliasDef,
+    StateField,
 )
-from atclang.vm.atcvm import OP, Instruction
+
+from atclang.vm.atcvm import Instruction, OP
 
 
-class ATCOptimizer:
-    """ATCLang AST + Bytecode Optimizer."""
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
 
-    def __init__(self, level: int = 1):
-        """
-        Optimization level:
-        0 = None
-        1 = Constant folding + dead code (default)
-        2 = + Constant propagation + algebraic simplification
-        """
-        self.level = level
-        self.stats = {
-            "constants_folded": 0,
-            "dead_code_removed": 0,
-            "dead_stores_removed": 0,
-            "jumps_threaded": 0,
-            "algebraic_simplified": 0,
-            "constants_propagated": 0,
+@dataclass(frozen=True)
+class OptimizerConfig:
+    """
+    Optimizer configuration.
+
+    level:
+        0 = disabled
+        1 = conservative
+        2 = aggressive AST
+        3 = AST + bytecode
+    """
+
+    level: int = 1
+    constant_folding: bool = True
+    constant_propagation: bool = True
+    algebraic_simplification: bool = True
+    dead_code_elimination: bool = True
+    jump_threading: bool = True
+    peephole: bool = True
+
+    def normalized(self) -> "OptimizerConfig":
+        level = max(0, min(3, self.level))
+
+        if level == 0:
+            return OptimizerConfig(
+                level=0,
+                constant_folding=False,
+                constant_propagation=False,
+                algebraic_simplification=False,
+                dead_code_elimination=False,
+                jump_threading=False,
+                peephole=False,
+            )
+
+        if level == 1:
+            return OptimizerConfig(
+                level=1,
+                constant_folding=self.constant_folding,
+                constant_propagation=False,
+                algebraic_simplification=False,
+                dead_code_elimination=self.dead_code_elimination,
+                jump_threading=False,
+                peephole=False,
+            )
+
+        if level == 2:
+            return OptimizerConfig(
+                level=2,
+                constant_folding=self.constant_folding,
+                constant_propagation=self.constant_propagation,
+                algebraic_simplification=self.algebraic_simplification,
+                dead_code_elimination=self.dead_code_elimination,
+                jump_threading=False,
+                peephole=False,
+            )
+
+        return OptimizerConfig(
+            level=3,
+            constant_folding=self.constant_folding,
+            constant_propagation=self.constant_propagation,
+            algebraic_simplification=self.algebraic_simplification,
+            dead_code_elimination=self.dead_code_elimination,
+            jump_threading=self.jump_threading,
+            peephole=self.peephole,
+        )
+
+
+# ============================================================================
+# STATISTICS
+# ============================================================================
+
+@dataclass
+class OptimizationStats:
+    constants_folded: int = 0
+    constants_propagated: int = 0
+    algebraic_simplified: int = 0
+    dead_code_removed: int = 0
+    dead_stores_removed: int = 0
+    jumps_threaded: int = 0
+    peephole_optimizations: int = 0
+
+    def as_dict(self) -> Dict[str, int]:
+        return {
+            "constants_folded": self.constants_folded,
+            "constants_propagated": self.constants_propagated,
+            "algebraic_simplified": self.algebraic_simplified,
+            "dead_code_removed": self.dead_code_removed,
+            "dead_stores_removed": self.dead_stores_removed,
+            "jumps_threaded": self.jumps_threaded,
+            "peephole_optimizations": self.peephole_optimizations,
         }
 
-    # ════════════════════════════════════════════════════
-    # AST Optimization (pre-compile)
-    # ════════════════════════════════════════════════════
+    def reset(self) -> None:
+        self.constants_folded = 0
+        self.constants_propagated = 0
+        self.algebraic_simplified = 0
+        self.dead_code_removed = 0
+        self.dead_stores_removed = 0
+        self.jumps_threaded = 0
+        self.peephole_optimizations = 0
+
+
+# ============================================================================
+# CONSTANT INFORMATION
+# ============================================================================
+
+_UNKNOWN = object()
+
+
+@dataclass
+class ConstantInfo:
+    value: Any
+    immutable: bool = True
+
+
+# ============================================================================
+# OPTIMIZER
+# ============================================================================
+
+class ATCOptimizer:
+    """
+    ATCLang AST + bytecode optimizer.
+
+    The optimizer is deliberately conservative around:
+
+    - function calls
+    - external calls
+    - assignments
+    - state fields
+    - imports
+    - dynamic access
+    - contract boundaries
+
+    This is critical for smart-contract semantics.
+    """
+
+    VERSION = "0.3.0"
+
+    def __init__(
+        self,
+        level: int = 1,
+        config: Optional[OptimizerConfig] = None,
+    ):
+        if config is None:
+            config = OptimizerConfig(level=level)
+
+        self.config = config.normalized()
+        self.level = self.config.level
+        self.stats = OptimizationStats()
+
+    # ========================================================================
+    # PUBLIC API
+    # ========================================================================
 
     def optimize_ast(self, program: Program) -> Program:
-        """Optimize AST before compilation."""
+        """
+        Optimize an AST in-place and return it.
+
+        The AST remains structurally compatible with the parser.
+        """
+
         if self.level == 0:
             return program
 
-        # First pass: collect constants
-        constants: Dict[str, Any] = {}
-        for stmt in program.statements:
-            if isinstance(stmt, LetStatement) and stmt.is_const:
-                val = self._try_eval(stmt.value, constants)
-                if val is not None:
-                    constants[stmt.name] = val
+        constants: Dict[str, ConstantInfo] = {}
 
-        # Second pass: fold constants and eliminate dead code
-        new_stmts: List[ASTNode] = []
-        for stmt in program.statements:
-            optimized = self._opt_stmt(stmt, constants)
-            if optimized is not None:
-                new_stmts.append(optimized)
+        program.statements = self._opt_block(
+            program.statements,
+            constants,
+            top_level=True,
+        )
 
-        program.statements = new_stmts
         return program
 
-    def _opt_stmt(self, node: ASTNode, constants: Dict[str, Any]) -> Optional[ASTNode]:
-        """Optimize a single statement. Returns None if dead code."""
+    def optimize_bytecode(
+        self,
+        instructions: List[Instruction],
+    ) -> List[Instruction]:
+        """
+        Optimize one bytecode instruction stream.
+
+        Jump targets are reindexed after reachability pruning.
+        """
+
+        if self.level < 3 or not instructions:
+            return instructions
+
+        result = list(instructions)
+
+        if self.config.jump_threading:
+            result = self._thread_jumps(result)
+
+        if self.config.dead_code_elimination:
+            result = self._remove_unreachable(result)
+
+        if self.config.peephole:
+            result = self._peephole(result)
+
+        return result
+
+    def get_stats(self) -> Dict[str, int]:
+        return self.stats.as_dict()
+
+    def reset_stats(self) -> None:
+        self.stats.reset()
+
+    # ========================================================================
+    # AST BLOCKS
+    # ========================================================================
+
+    def _opt_block(
+        self,
+        block: List[ASTNode],
+        constants: Dict[str, ConstantInfo],
+        *,
+        top_level: bool = False,
+    ) -> List[ASTNode]:
+
+        result: List[ASTNode] = []
+
+        local_constants = dict(constants)
+
+        for stmt in block:
+            optimized = self._opt_stmt(stmt, local_constants)
+
+            if optimized is None:
+                self.stats.dead_code_removed += 1
+                continue
+
+            if isinstance(optimized, list):
+                result.extend(optimized)
+            else:
+                result.append(optimized)
+
+            if self.config.dead_code_elimination:
+                if self._terminates_flow(optimized):
+                    remaining = len(block) - len(result)
+
+                    if remaining > 0:
+                        self.stats.dead_code_removed += remaining
+
+                    break
+
+        return result
+
+    def _terminates_flow(self, node: ASTNode) -> bool:
+        return isinstance(
+            node,
+            (
+                ReturnStatement,
+                BreakStatement,
+                ContinueStatement,
+            ),
+        )
+
+    # ========================================================================
+    # STATEMENTS
+    # ========================================================================
+
+    def _opt_stmt(
+        self,
+        node: ASTNode,
+        constants: Dict[str, ConstantInfo],
+    ) -> Optional[ASTNode]:
+
+        # --------------------------------------------------------------------
+        # LET
+        # --------------------------------------------------------------------
 
         if isinstance(node, LetStatement):
-            # Constant propagation
-            if self.level >= 2 and node.is_const:
-                val = self._try_eval(node.value, constants)
-                if val is not None:
-                    constants[node.name] = val
-                    self.stats["constants_propagated"] += 1
 
-            # Fold expression
-            node.value = self._opt_expr(node.value, constants)
+            if node.value is not None:
+                node.value = self._opt_expr(
+                    node.value,
+                    constants,
+                )
+
+                value = self._evaluate_constant(
+                    node.value,
+                    constants,
+                )
+
+                if node.is_const and value is not _UNKNOWN:
+                    constants[node.name] = ConstantInfo(value)
+
+                elif node.name in constants:
+                    del constants[node.name]
+
             return node
+
+        # --------------------------------------------------------------------
+        # RETURN
+        # --------------------------------------------------------------------
 
         if isinstance(node, ReturnStatement):
-            if node.value:
-                node.value = self._opt_expr(node.value, constants)
-            return node
 
-        if isinstance(node, IfStatement):
-            node.condition = self._opt_expr(node.condition, constants)
-
-            # If condition is always true → keep only then block
-            cond_val = self._try_eval(node.condition, constants)
-            if cond_val is not None:
-                if cond_val is True:
-                    self.stats["dead_code_removed"] += 1
-                    # Return first statement of then_block (wrapped)
-                    return self._opt_block(node.then_block, constants)
-                elif cond_val is False:
-                    self.stats["dead_code_removed"] += 1
-                    if node.else_block:
-                        return self._opt_block(
-                            node.else_block if isinstance(node.else_block, list) else [node.else_block],
-                            constants
-                        )
-                    return None  # Dead code
-
-            node.then_block = self._opt_block(node.then_block, constants)
-            if node.elif_blocks:
-                new_elif = []
-                for cond, block in node.elif_blocks:
-                    cond = self._opt_expr(cond, constants)
-                    block = self._opt_block(block, constants)
-                    new_elif.append((cond, block))
-                node.elif_blocks = new_elif
-            if node.else_block:
-                node.else_block = self._opt_block(
-                    node.else_block if isinstance(node.else_block, list) else [node.else_block],
-                    constants
+            if node.value is not None:
+                node.value = self._opt_expr(
+                    node.value,
+                    constants,
                 )
+
             return node
 
-        if isinstance(node, WhileStatement):
-            node.condition = self._opt_expr(node.condition, constants)
-            cond_val = self._try_eval(node.condition, constants)
-            if cond_val is False:
-                self.stats["dead_code_removed"] += 1
-                return None  # while false → dead code
-            node.body = self._opt_block(node.body, constants)
+        # --------------------------------------------------------------------
+        # ASSIGNMENT STATEMENT
+        # --------------------------------------------------------------------
+
+        if isinstance(node, Assignment):
+
+            node.value = self._opt_expr(
+                node.value,
+                constants,
+            )
+
+            self._invalidate_assignment_constants(
+                node,
+                constants,
+            )
+
             return node
 
-        if isinstance(node, ForStatement):
-            node.iterable = self._opt_expr(node.iterable, constants)
-            node.body = self._opt_block(node.body, constants)
-            return node
-
-        if isinstance(node, RequireStatement):
-            node.condition = self._opt_expr(node.condition, constants)
-            if node.message:
-                node.message = self._opt_expr(node.message, constants)
-            return node
-
-        if isinstance(node, EmitStatement):
-            node.args = [self._opt_expr(a, constants) for a in node.args]
-            return node
+        # --------------------------------------------------------------------
+        # EXPRESSION
+        # --------------------------------------------------------------------
 
         if isinstance(node, ExprStatement):
-            node.expr = self._opt_expr(node.expr, constants)
+
+            node.expr = self._opt_expr(
+                node.expr,
+                constants,
+            )
+
             return node
+
+        # --------------------------------------------------------------------
+        # REQUIRE
+        # --------------------------------------------------------------------
+
+        if isinstance(node, RequireStatement):
+
+            node.condition = self._opt_expr(
+                node.condition,
+                constants,
+            )
+
+            if node.message is not None:
+                node.message = self._opt_expr(
+                    node.message,
+                    constants,
+                )
+
+            return node
+
+        # --------------------------------------------------------------------
+        # EMIT
+        # --------------------------------------------------------------------
+
+        if isinstance(node, EmitStatement):
+
+            node.args = [
+                self._opt_expr(arg, constants)
+                for arg in node.args
+            ]
+
+            return node
+
+        # --------------------------------------------------------------------
+        # IF
+        # --------------------------------------------------------------------
+
+        if isinstance(node, IfStatement):
+
+            node.condition = self._opt_expr(
+                node.condition,
+                constants,
+            )
+
+            condition = self._evaluate_constant(
+                node.condition,
+                constants,
+            )
+
+            if condition is True:
+                self.stats.dead_code_removed += 1
+
+                return self._opt_block(
+                    node.then_block,
+                    dict(constants),
+                )
+
+            if condition is False and not node.elif_blocks:
+                self.stats.dead_code_removed += 1
+
+                if node.else_block:
+                    return self._opt_block(
+                        self._as_block(node.else_block),
+                        dict(constants),
+                    )
+
+                return None
+
+            node.then_block = self._opt_block(
+                node.then_block,
+                dict(constants),
+            )
+
+            optimized_elifs = []
+
+            for condition_node, body in node.elif_blocks:
+
+                condition_node = self._opt_expr(
+                    condition_node,
+                    constants,
+                )
+
+                body = self._opt_block(
+                    body,
+                    dict(constants),
+                )
+
+                optimized_elifs.append(
+                    (condition_node, body)
+                )
+
+            node.elif_blocks = optimized_elifs
+
+            if node.else_block:
+                node.else_block = self._opt_block(
+                    self._as_block(node.else_block),
+                    dict(constants),
+                )
+
+            return node
+
+        # --------------------------------------------------------------------
+        # WHILE
+        # --------------------------------------------------------------------
+
+        if isinstance(node, WhileStatement):
+
+            node.condition = self._opt_expr(
+                node.condition,
+                constants,
+            )
+
+            condition = self._evaluate_constant(
+                node.condition,
+                constants,
+            )
+
+            if condition is False:
+                self.stats.dead_code_removed += 1
+                return None
+
+            node.body = self._opt_block(
+                node.body,
+                dict(constants),
+            )
+
+            return node
+
+        # --------------------------------------------------------------------
+        # FOR
+        # --------------------------------------------------------------------
+
+        if isinstance(node, ForStatement):
+
+            node.iterable = self._opt_expr(
+                node.iterable,
+                constants,
+            )
+
+            body_constants = dict(constants)
+
+            body_constants.pop(node.var, None)
+
+            node.body = self._opt_block(
+                node.body,
+                body_constants,
+            )
+
+            return node
+
+        # --------------------------------------------------------------------
+        # FUNCTION
+        # --------------------------------------------------------------------
 
         if isinstance(node, FunctionDef):
-            node.body = self._opt_block(node.body, constants)
+
+            # Function scopes must never inherit caller-local constants.
+            function_constants: Dict[str, ConstantInfo] = {}
+
+            for parameter in node.params:
+                function_constants.pop(
+                    parameter.name,
+                    None,
+                )
+
+            node.body = self._opt_block(
+                node.body,
+                function_constants,
+            )
+
             return node
+
+        # --------------------------------------------------------------------
+        # CONTRACT
+        # --------------------------------------------------------------------
 
         if isinstance(node, ContractDef):
-            node.functions = [self._opt_stmt(f, constants) for f in node.functions if f is not None]
+
+            for function in node.functions:
+                self._opt_stmt(
+                    function,
+                    {},
+                )
+
             return node
 
-        if isinstance(node, BreakStatement) or isinstance(node, ContinueStatement):
+        # --------------------------------------------------------------------
+        # OTHER DECLARATIONS
+        # --------------------------------------------------------------------
+
+        if isinstance(
+            node,
+            (
+                WalletDef,
+                ImportStatement,
+                EnumDef,
+                StructDef,
+                ClassDef,
+                StorageBlock,
+                TypeAliasDef,
+                StateField,
+            ),
+        ):
+            return node
+
+        if isinstance(
+            node,
+            (
+                BreakStatement,
+                ContinueStatement,
+            ),
+        ):
             return node
 
         return node
 
-    def _opt_block(self, block: List[ASTNode], constants: Dict[str, Any]) -> List[ASTNode]:
-        """Optimize a block, eliminating dead code after return/break/continue."""
-        result: List[ASTNode] = []
-        for stmt in block:
-            opt = self._opt_stmt(stmt, constants)
-            if opt is not None:
-                result.append(opt)
-                # Dead code after return/break/continue
-                if isinstance(opt, (ReturnStatement, BreakStatement, ContinueStatement)):
-                    removed = len(block) - len(result)
-                    if removed > 0:
-                        self.stats["dead_code_removed"] += removed
-                    break  # Rest is unreachable
-        return result
+    # ========================================================================
+    # EXPRESSIONS
+    # ========================================================================
 
-    def _opt_expr(self, node: ASTNode, constants: Dict[str, Any]) -> ASTNode:
-        """Optimize an expression with constant folding and algebraic simplification."""
+    def _opt_expr(
+        self,
+        node: Optional[ASTNode],
+        constants: Dict[str, ConstantInfo],
+    ) -> Optional[ASTNode]:
 
         if node is None:
+            return None
+
+        # --------------------------------------------------------------------
+        # IDENTIFIER
+        # --------------------------------------------------------------------
+
+        if isinstance(node, Identifier):
+
+            if (
+                self.config.constant_propagation
+                and node.name in constants
+            ):
+                info = constants[node.name]
+
+                self.stats.constants_propagated += 1
+
+                return self._make_literal(
+                    info.value,
+                    getattr(node, "line", 0),
+                    getattr(node, "col", 0),
+                )
+
             return node
 
+        # --------------------------------------------------------------------
+        # BINARY
+        # --------------------------------------------------------------------
+
         if isinstance(node, BinaryOp):
-            left = self._opt_expr(node.left, constants)
-            right = self._opt_expr(node.right, constants)
-            node.left = left
-            node.right = right
 
-            # Constant folding: both sides are literals
-            result = self._try_fold(left, node.op, right)
-            if result is not None:
-                self.stats["constants_folded"] += 1
-                return result
+            node.left = self._opt_expr(
+                node.left,
+                constants,
+            )
 
-            # Algebraic simplification (level 2+)
-            if self.level >= 2:
-                simplified = self._algebraic_simplify(left, node.op, right)
+            # Preserve short-circuit semantics.
+            left_value = self._evaluate_constant(
+                node.left,
+                constants,
+            )
+
+            if node.op in ("&&", "and") and left_value is False:
+                self.stats.constants_folded += 1
+                return BoolLiteral(
+                    False,
+                    node.line,
+                    node.col,
+                )
+
+            if node.op in ("||", "or") and left_value is True:
+                self.stats.constants_folded += 1
+                return BoolLiteral(
+                    True,
+                    node.line,
+                    node.col,
+                )
+
+            node.right = self._opt_expr(
+                node.right,
+                constants,
+            )
+
+            if self.config.constant_folding:
+                folded = self._try_fold(
+                    node.left,
+                    node.op,
+                    node.right,
+                )
+
+                if folded is not None:
+                    self.stats.constants_folded += 1
+                    return folded
+
+            if self.config.algebraic_simplification:
+                simplified = self._algebraic_simplify(
+                    node.left,
+                    node.op,
+                    node.right,
+                )
+
                 if simplified is not None:
-                    self.stats["algebraic_simplified"] += 1
+                    self.stats.algebraic_simplified += 1
                     return simplified
 
             return node
 
+        # --------------------------------------------------------------------
+        # UNARY
+        # --------------------------------------------------------------------
+
         if isinstance(node, UnaryOp):
-            node.operand = self._opt_expr(node.operand, constants)
-            # Constant folding for unary
-            if isinstance(node.operand, IntLiteral):
-                if node.op == "-":
-                    self.stats["constants_folded"] += 1
-                    return IntLiteral(-node.operand.value, node.line, node.col)
-                if node.op == "~":
-                    self.stats["constants_folded"] += 1
-                    return IntLiteral(~node.operand.value, node.line, node.col)
-            if isinstance(node.operand, BoolLiteral):
-                if node.op == "!":
-                    self.stats["constants_folded"] += 1
-                    return BoolLiteral(not node.operand.value, node.line, node.col)
+
+            node.operand = self._opt_expr(
+                node.operand,
+                constants,
+            )
+
+            if self.config.constant_folding:
+
+                value = self._literal_value(
+                    node.operand
+                )
+
+                if value is not _UNKNOWN:
+
+                    try:
+                        if node.op == "-":
+                            self.stats.constants_folded += 1
+                            return self._make_literal(
+                                -value,
+                                node.line,
+                                node.col,
+                            )
+
+                        if node.op == "!":
+                            self.stats.constants_folded += 1
+                            return BoolLiteral(
+                                not bool(value),
+                                node.line,
+                                node.col,
+                            )
+
+                        if node.op == "~":
+                            self.stats.constants_folded += 1
+                            return IntLiteral(
+                                ~value,
+                                node.line,
+                                node.col,
+                            )
+
+                    except (TypeError, ValueError):
+                        pass
+
             return node
 
-        if isinstance(node, Identifier):
-            # Constant propagation
-            if self.level >= 2 and node.name in constants:
-                val = constants[node.name]
-                self.stats["constants_propagated"] += 1
-                return self._make_literal(val, node.line, node.col)
-            return node
+        # --------------------------------------------------------------------
+        # FUNCTION CALL
+        # --------------------------------------------------------------------
 
         if isinstance(node, FunctionCall):
-            node.args = [self._opt_expr(a, constants) for a in node.args]
+
+            node.args = [
+                self._opt_expr(
+                    arg,
+                    constants,
+                )
+                for arg in node.args
+            ]
+
+            # Do not fold calls.
+            # Calls may have observable side effects.
             return node
+
+        # --------------------------------------------------------------------
+        # ASSIGNMENT
+        # --------------------------------------------------------------------
 
         if isinstance(node, Assignment):
-            node.value = self._opt_expr(node.value, constants)
+
+            node.value = self._opt_expr(
+                node.value,
+                constants,
+            )
+
+            self._invalidate_assignment_constants(
+                node,
+                constants,
+            )
+
             return node
+
+        # --------------------------------------------------------------------
+        # INDEX
+        # --------------------------------------------------------------------
 
         if isinstance(node, IndexAccess):
-            node.target = self._opt_expr(node.target, constants)
-            node.index = self._opt_expr(node.index, constants)
+
+            node.target = self._opt_expr(
+                node.target,
+                constants,
+            )
+
+            node.index = self._opt_expr(
+                node.index,
+                constants,
+            )
+
             return node
 
+        # --------------------------------------------------------------------
+        # DOT ACCESS
+        # --------------------------------------------------------------------
+
         if isinstance(node, DotAccess):
-            node.target = self._opt_expr(node.target, constants)
+
+            node.target = self._opt_expr(
+                node.target,
+                constants,
+            )
+
+            return node
+
+        # --------------------------------------------------------------------
+        # TERNARY
+        # --------------------------------------------------------------------
+
+        if isinstance(node, TernaryExpr):
+
+            node.cond = self._opt_expr(
+                node.cond,
+                constants,
+            )
+
+            condition = self._evaluate_constant(
+                node.cond,
+                constants,
+            )
+
+            if condition is True:
+                return self._opt_expr(
+                    node.then_expr,
+                    constants,
+                )
+
+            if condition is False:
+                return self._opt_expr(
+                    node.else_expr,
+                    constants,
+                )
+
+            node.then_expr = self._opt_expr(
+                node.then_expr,
+                constants,
+            )
+
+            node.else_expr = self._opt_expr(
+                node.else_expr,
+                constants,
+            )
+
+            return node
+
+        # --------------------------------------------------------------------
+        # CAST
+        # --------------------------------------------------------------------
+
+        if isinstance(node, CastExpr):
+
+            value = (
+                node.value
+                if hasattr(node, "value")
+                else node.operand
+            )
+
+            value = self._opt_expr(
+                value,
+                constants,
+            )
+
+            if hasattr(node, "value"):
+                node.value = value
+            else:
+                node.operand = value
+
+            return node
+
+        # --------------------------------------------------------------------
+        # COLLECTIONS
+        # --------------------------------------------------------------------
+
+        if isinstance(node, ListLiteral):
+
+            node.elements = [
+                self._opt_expr(
+                    element,
+                    constants,
+                )
+                for element in node.elements
+            ]
+
+            return node
+
+        if isinstance(node, TupleExpr):
+
+            node.elements = [
+                self._opt_expr(
+                    element,
+                    constants,
+                )
+                for element in node.elements
+            ]
+
+            return node
+
+        if isinstance(node, MapLiteral):
+
+            optimized_pairs = []
+
+            for pair in node.pairs:
+
+                if isinstance(pair, tuple):
+                    key, value = pair[:2]
+
+                    optimized_pairs.append(
+                        (
+                            self._opt_expr(value, constants),
+                            self._opt_expr(key, constants),
+                        )
+                    )
+
+                elif isinstance(pair, dict):
+                    key = pair.get("key")
+                    value = pair.get("value")
+
+                    optimized_pairs.append(
+                        {
+                            "key": self._opt_expr(key, constants),
+                            "value": self._opt_expr(value, constants),
+                        }
+                    )
+
+                else:
+                    optimized_pairs.append(pair)
+
+            node.pairs = optimized_pairs
+
+            return node
+
+        if isinstance(node, StructLiteral):
+
+            node.fields = [
+                (
+                    name,
+                    self._opt_expr(value, constants),
+                )
+                for name, value in node.fields
+            ]
+
             return node
 
         return node
 
-    def _try_fold(self, left: ASTNode, op: str, right: ASTNode) -> Optional[ASTNode]:
-        """Try to fold a binary operation on two literals."""
-        lv = self._literal_value(left)
-        rv = self._literal_value(right)
-        if lv is None or rv is None:
-            return None
+    # ========================================================================
+    # CONSTANT EVALUATION
+    # ========================================================================
+
+    def _evaluate_constant(
+        self,
+        node: Optional[ASTNode],
+        constants: Dict[str, ConstantInfo],
+    ) -> Any:
+
+        if node is None:
+            return _UNKNOWN
+
+        value = self._literal_value(node)
+
+        if value is not _UNKNOWN:
+            return value
+
+        if isinstance(node, Identifier):
+            info = constants.get(node.name)
+            return (
+                info.value
+                if info is not None
+                else _UNKNOWN
+            )
+
+        if isinstance(node, UnaryOp):
+
+            operand = self._evaluate_constant(
+                node.operand,
+                constants,
+            )
+
+            if operand is _UNKNOWN:
+                return _UNKNOWN
+
+            try:
+                if node.op == "-":
+                    return -operand
+
+                if node.op == "!":
+                    return not bool(operand)
+
+                if node.op == "~":
+                    return ~operand
+
+            except (TypeError, ValueError):
+                return _UNKNOWN
+
+            return _UNKNOWN
+
+        if isinstance(node, BinaryOp):
+
+            left = self._evaluate_constant(
+                node.left,
+                constants,
+            )
+
+            if node.op in ("&&", "and"):
+                if left is not _UNKNOWN and not bool(left):
+                    return False
+
+            if node.op in ("||", "or"):
+                if left is not _UNKNOWN and bool(left):
+                    return True
+
+            right = self._evaluate_constant(
+                node.right,
+                constants,
+            )
+
+            if left is _UNKNOWN or right is _UNKNOWN:
+                return _UNKNOWN
+
+            return self._evaluate_binary(
+                left,
+                node.op,
+                right,
+            )
+
+        return _UNKNOWN
+
+    def _evaluate_binary(
+        self,
+        left: Any,
+        op: str,
+        right: Any,
+    ) -> Any:
 
         try:
+
             if op == "+":
-                return self._make_literal(lv + rv, left.line, left.col)
-            elif op == "-":
-                return self._make_literal(lv - rv, left.line, left.col)
-            elif op == "*":
-                return self._make_literal(lv * rv, left.line, left.col)
-            elif op == "/":
-                if rv == 0: return None
-                if isinstance(lv, int) and isinstance(rv, int):
-                    return IntLiteral(lv // rv, left.line, left.col)
-                return self._make_literal(lv / rv, left.line, left.col)
-            elif op == "%":
-                if rv == 0: return None
-                return IntLiteral(lv % rv, left.line, left.col)
-            elif op == "**":
-                return IntLiteral(lv ** rv, left.line, left.col)
-            elif op == "==":
-                return BoolLiteral(lv == rv, left.line, left.col)
-            elif op == "!=":
-                return BoolLiteral(lv != rv, left.line, left.col)
-            elif op == "<":
-                return BoolLiteral(lv < rv, left.line, left.col)
-            elif op == ">":
-                return BoolLiteral(lv > rv, left.line, left.col)
-            elif op == "<=":
-                return BoolLiteral(lv <= rv, left.line, left.col)
-            elif op == ">=":
-                return BoolLiteral(lv >= rv, left.line, left.col)
-            elif op == "&&":
-                return BoolLiteral(bool(lv) and bool(rv), left.line, left.col)
-            elif op == "||":
-                return BoolLiteral(bool(lv) or bool(rv), left.line, left.col)
-            elif op == "&":
-                return IntLiteral(lv & rv, left.line, left.col)
-            elif op == "|":
-                return IntLiteral(lv | rv, left.line, left.col)
-            elif op == "^":
-                return IntLiteral(lv ^ rv, left.line, left.col)
-        except (TypeError, OverflowError, ZeroDivisionError):
-            pass
-        return None
+                return left + right
+            if op == "-":
+                return left - right
+            if op == "*":
+                return left * right
 
-    def _algebraic_simplify(self, left: ASTNode, op: str, right: ASTNode) -> Optional[ASTNode]:
-        """Algebraic simplification rules."""
-        # x + 0 → x
-        if op == "+" and self._is_literal_value(right, 0):
-            return left
-        # 0 + x → x
-        if op == "+" and self._is_literal_value(left, 0):
-            return right
-        # x - 0 → x
-        if op == "-" and self._is_literal_value(right, 0):
-            return left
-        # x * 1 → x
-        if op == "*" and self._is_literal_value(right, 1):
-            return left
-        # 1 * x → x
-        if op == "*" and self._is_literal_value(left, 1):
-            return right
-        # x * 0 → 0
-        if op == "*" and (self._is_literal_value(right, 0) or self._is_literal_value(left, 0)):
-            return IntLiteral(0, left.line, left.col)
-        # x / 1 → x
-        if op == "/" and self._is_literal_value(right, 1):
-            return left
-        # x ** 0 → 1
-        if op == "**" and self._is_literal_value(right, 0):
-            return IntLiteral(1, left.line, left.col)
-        # x ** 1 → x
-        if op == "**" and self._is_literal_value(right, 1):
-            return left
-        # x && true → x
-        if op == "&&" and self._is_literal_value(right, True):
-            return left
-        # true && x → x
-        if op == "&&" and self._is_literal_value(left, True):
-            return right
-        # x || false → x
-        if op == "||" and self._is_literal_value(right, False):
-            return left
-        # false || x → x
-        if op == "||" and self._is_literal_value(left, False):
-            return right
-        # x & 0xFF..FF → x (mask with all ones)
-        if op == "&" and self._is_literal_value(right, -1):
-            return left
-        # x | 0 → x
-        if op == "|" and self._is_literal_value(right, 0):
-            return left
-        # x ^ 0 → x
-        if op == "^" and self._is_literal_value(right, 0):
-            return left
-        return None
+            if op == "/":
+                if right == 0:
+                    return _UNKNOWN
 
-    def _try_eval(self, node: ASTNode, constants: Dict[str, Any]) -> Optional[Any]:
-        """Try to evaluate an expression to a Python value."""
-        if isinstance(node, IntLiteral): return node.value
-        if isinstance(node, FloatLiteral): return node.value
-        if isinstance(node, StringLiteral): return node.value
-        if isinstance(node, BoolLiteral): return node.value
-        if isinstance(node, NullLiteral): return None
-        if isinstance(node, Identifier) and node.name in constants:
-            return constants[node.name]
-        if isinstance(node, BinaryOp):
-            lv = self._try_eval(node.left, constants)
-            rv = self._try_eval(node.right, constants)
-            if lv is not None and rv is not None:
-                try:
-                    ops = {"+": lambda a,b: a+b, "-": lambda a,b: a-b, "*": lambda a,b: a*b,
-                           "/": lambda a,b: a//b if isinstance(a,int) and isinstance(b,int) else a/b,
-                           "%": lambda a,b: a%b, "**": lambda a,b: a**b,
-                           "==": lambda a,b: a==b, "!=": lambda a,b: a!=b,
-                           "<": lambda a,b: a<b, ">": lambda a,b: a>b,
-                           "<=": lambda a,b: a<=b, ">=": lambda a,b: a>=b,
-                           "&&": lambda a,b: bool(a) and bool(b),
-                           "||": lambda a,b: bool(a) or bool(b),
-                           "&": lambda a,b: a&b, "|": lambda a,b: a|b, "^": lambda a,b: a^b}
-                    if node.op in ops:
-                        return ops[node.op](lv, rv)
-                except (TypeError, ZeroDivisionError):
-                    pass
-        if isinstance(node, UnaryOp):
-            val = self._try_eval(node.operand, constants)
-            if val is not None:
-                if node.op == "-": return -val
-                if node.op == "!": return not val
-                if node.op == "~": return ~val
-        return None
+                if isinstance(left, int) and isinstance(right, int):
+                    return left // right
 
-    def _literal_value(self, node: ASTNode) -> Optional[Any]:
-        """Extract literal value from AST node."""
-        if isinstance(node, IntLiteral): return node.value
-        if isinstance(node, FloatLiteral): return node.value
-        if isinstance(node, StringLiteral): return node.value
-        if isinstance(node, BoolLiteral): return node.value
-        if isinstance(node, NullLiteral): return None
-        return None
+                return left / right
 
-    def _is_literal_value(self, node: ASTNode, val: Any) -> bool:
-        """Check if node is a literal with a specific value."""
-        return self._literal_value(node) == val
+            if op == "%":
+                if right == 0:
+                    return _UNKNOWN
 
-    def _make_literal(self, val: Any, line: int = 0, col: int = 0) -> ASTNode:
-        """Create a literal AST node from a Python value."""
-        if isinstance(val, bool):
-            return BoolLiteral(val, line, col)
-        if isinstance(val, int):
-            return IntLiteral(val, line, col)
-        if isinstance(val, float):
-            return FloatLiteral(val, line, col)
-        if isinstance(val, str):
-            return StringLiteral(val, line, col)
-        if val is None:
-            return NullLiteral(line, col)
-        return IntLiteral(0, line, col)  # Fallback
+                return left % right
 
-    # ════════════════════════════════════════════════════
-    # Bytecode Optimization (post-compile)
-    # ════════════════════════════════════════════════════
+            if op == "**":
+                return left ** right
 
-    def optimize_bytecode(self, instructions: List[Instruction]) -> List[Instruction]:
-        """Optimize compiled bytecode."""
-        if self.level == 0:
-            return instructions
+            if op == "==":
+                return left == right
 
-        # Pass 1: Jump threading
-        instructions = self._thread_jumps(instructions)
+            if op == "!=":
+                return left != right
 
-        # Pass 2: Remove dead code (unreachable instructions after HALT/RETURN)
-        instructions = self._remove_dead_bytecode(instructions)
+            if op == "<":
+                return left < right
 
-        # Pass 3: Peephole optimization
-        instructions = self._peephole(instructions)
+            if op == ">":
+                return left > right
 
-        return instructions
+            if op == "<=":
+                return left <= right
 
-    def _thread_jumps(self, instructions: List[Instruction]) -> List[Instruction]:
-        """Thread jumps: JUMP to JUMP → JUMP to final target."""
-        changed = True
-        while changed:
-            changed = False
-            for i, inst in enumerate(instructions):
-                if inst.op in (OP.JUMP, OP.JUMP_IF, OP.JUMP_NOT) and inst.args:
-                    target = inst.args[0]
-                    if 0 <= target < len(instructions):
-                        target_inst = instructions[target]
-                        if target_inst.op == OP.JUMP and target_inst.args:
-                            # Thread to final target
-                            inst.args[0] = target_inst.args[0]
-                            self.stats["jumps_threaded"] += 1
-                            changed = True
-        return instructions
+            if op == ">=":
+                return left >= right
 
-    def _remove_dead_bytecode(self, instructions: List[Instruction]) -> List[Instruction]:
-        """Remove instructions that are unreachable after RETURN/HALT."""
-        if not instructions:
-            return instructions
+            if op in ("&&", "and"):
+                return bool(left) and bool(right)
 
-        reachable = set()
-        queue = [0]  # Start from first instruction
+            if op in ("||", "or"):
+                return bool(left) or bool(right)
 
-        while queue:
-            ip = queue.pop(0)
-            if ip in reachable or ip < 0 or ip >= len(instructions):
-                continue
-            reachable.add(ip)
-            inst = instructions[ip]
+            if op == "&":
+                return left & right
 
-            if inst.op in (OP.HALT, OP.RETURN):
-                continue  # No fallthrough
-            elif inst.op == OP.JUMP and inst.args:
-                queue.append(inst.args[0])
-            elif inst.op in (OP.JUMP_IF, OP.JUMP_NOT) and inst.args:
-                queue.append(inst.args[0])  # Jump target
-                queue.append(ip + 1)        # Fallthrough
-            else:
-                queue.append(ip + 1)  # Next instruction
+            if op == "|":
+                return left | right
 
-        # Keep only reachable instructions, reindex jumps
-        old_to_new: Dict[int, int] = {}
-        new_instructions: List[Instruction] = []
-        for i, inst in enumerate(instructions):
-            if i in reachable:
-                old_to_new[i] = len(new_instructions)
-                new_instructions.append(inst)
+            if op == "^":
+                return left ^ right
 
-        # Update jump targets
-        for inst in new_instructions:
-            if inst.op in (OP.JUMP, OP.JUMP_IF, OP.JUMP_NOT) and inst.args:
-                old_target = inst.args[0]
-                if old_target in old_to_new:
-                    inst.args[0] = old_to_new[old_target]
+            if op == "<<":
+                return left << right
 
-        removed = len(instructions) - len(new_instructions)
-        if removed > 0:
-            self.stats["dead_code_removed"] += removed
+            if op == ">>":
+                return left >> right
 
-        return new_instructions
+        except (
+            TypeError,
+            ValueError,
+            OverflowError,
+            ZeroDivisionError,
+        ):
+            return _UNKNOWN
 
-    def _peephole(self, instructions: List[Instruction]) -> List[Instruction]:
-        """Peephole optimizations on bytecode."""
-        if len(instructions) < 2:
-            return instructions
+        return _UNKNOWN
 
-        result: List[Instruction] = []
-        i = 0
-        while i < len(instructions):
-            inst = instructions[i]
+    # ========================================================================
+    # FOLDING
+    # ========================================================================
 
-            # POP after PUSH → remove both (dead code)
-            if (i + 1 < len(instructions) and
-                inst.op == OP.PUSH and
-                instructions[i + 1].op == OP.POP):
-                self.stats["dead_code_removed"] += 2
-                i += 2
-                continue
+    def _try_fold(
+        self,
+        left: ASTNode,
+        op: str,
+        right: ASTNode,
+    ) -> Optional[ASTNode]:
 
-            # PUSH 0 + ADD → NOP (x + 0 = x)
-            if (i + 1 < len(instructions) and
-                inst.op == OP.PUSH and inst.args == [0] and
-                instructions[i + 1].op == OP.ADD):
-                self.stats["algebraic_simplified"] += 1
-                i += 2
-                continue
+        lv = self._literal_value(left)
+        rv = self._literal_value(right)
 
-            # PUSH 1 + MUL → NOP (x * 1 = x)
-            if (i + 1 < len(instructions) and
-                inst.op == OP.PUSH and inst.args == [1] and
-                instructions[i + 1].op == OP.MUL):
-                self.stats["algebraic_simplified"] += 1
-                i += 2
-                continue
+        if lv is _UNKNOWN or rv is _UNKNOWN:
+            return None
 
-            # Two consecutive NOPs → one NOP
-            if (inst.op == OP.NOP and
-                i + 1 < len(instructions) and
-                instructions[i + 1].op == OP.NOP):
-                i += 1
-                continue
+        result = self._evaluate_binary(
+            lv,
+            op,
+            rv,
+        )
 
-            result.append(inst)
-            i += 1
+        if result is _UNKNOWN:
+            return None
 
-        return result
+        return self._make_literal(
+            result,
+            getattr(left, "line", 0),
+            getattr(left, "col", 0),
+        )
 
-    # ════════════════════════════════════════════════════
-    # Reporting
-    # ════════════════════════════════════════════════════
-
-    def get_stats(self) -> Dict[str, int]:
-        return self.stats
-
-    def reset_stats(self):
-        self.stats = {k: 0 for k in self.stats}
+    # ========================================================================
+    # ALGEBRAIC SIMPLIFICATION
+    # =================================================================
