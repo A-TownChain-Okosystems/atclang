@@ -57,3 +57,36 @@ Entfernte Inhalte: bewahrt im Wiki-Vault (a-townchain-os-docs/docs/archive/monor
 3. specs/ normativ ausformulieren (VERSION.toml-Skelett steht)
 4. Conformance-Fixtures verbindlich (hello.atc → expected.ast → expected.ir → expected.atcb → expected.artifact)
 5. Meta-Doku aus src/atclang/ an 1.0-Positionen (docs/, root) verschieben
+
+
+---
+
+## Re-Audit 06.09.2026 (Commit 044604f) — GATE: YELLOW
+
+Architektur 8.5/10 · Implementierung 5.5/10 · Production/Consensus-Readiness
+noch nicht gegeben. Phase 1 bestaetigt. Ab jetzt: VERTIKALE Subsystem-
+Implementierung mit Conformance-Absicherung — kein weiterer grosser Rebuild.
+
+**R-01 (Legacy-Artefakte im Tree: modules/atc-atclang/__pycache__,
+tests/__pycache__/*.pyc) — beseitigt; .gitignore um __pycache__/, *.py[cod],
+.pytest_cache/ erweitert.**
+
+## Priorisierte Phase-2-Roadmap (VERBINDLICH)
+
+- **P0:** (1) Hygiene ERLEDIGT · (2) Semantics · (3) ATC-IR · (4) IR-Verifier · (5) Bytecode-Verifier
+- **P1:** (6) Artifact-Format · (7) Artifact-Validator · (8) ABI · (9) Capability-Security · (10) Profiles
+- **P2:** (11) Contracts · (12) Host-Boundary · (13) Package-System · (14) CLI
+- **P3:** (15) Conformance-Fixtures · (16) Determinism-Suite · (17) Gas-Tests · (18) Fuzzing · (19) Differential-Testing
+
+## Normative Verschärfungen (aus dem Re-Audit)
+
+1. **Bytecode-Verifier = harte Trust-Boundary:** prueft Opcode-/Operand-Validity,
+   Stack-Safety, Control-Flow, Jump-Targets, Limits, Determinismus, Resource-
+   Bounds. Compiler-Output ist NIEMALS Vertrauensanker.
+2. **Capability-Policy-Matrix** (Contract/Application/System/Unrestricted) als
+   Enforcement-Pflicht: Netzwerk, Filesystem, Clock, Randomness, Threads,
+   Process-Spawn im Contract-Kontext VERBOTEN; deterministische Arithmetik
+   Pflicht; Storage/Ausgaben kontrolliert und geprüft.
+3. **Sprach-Phasenbild:** Phase 1 Python (Compiler+VM+Runtime) · Phase 2
+   Python-Compiler + Rust-ATVM/Verifier/Consensus-Runtime · Phase 3 Rust-
+   Compiler-Stack — Python bleibt als SDK/Tooling/Referenz.
