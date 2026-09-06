@@ -87,6 +87,22 @@ tests/__pycache__/*.pyc) — beseitigt; .gitignore um __pycache__/, *.py[cod],
    Enforcement-Pflicht: Netzwerk, Filesystem, Clock, Randomness, Threads,
    Process-Spawn im Contract-Kontext VERBOTEN; deterministische Arithmetik
    Pflicht; Storage/Ausgaben kontrolliert und geprüft.
-3. **Sprach-Phasenbild:** Phase 1 Python (Compiler+VM+Runtime) · Phase 2
-   Python-Compiler + Rust-ATVM/Verifier/Consensus-Runtime · Phase 3 Rust-
-   Compiler-Stack — Python bleibt als SDK/Tooling/Referenz.
+3. **Sprachstrategie (AD-021, VERBINDLICH): ATCLang = Rust-first, Python = Referenz.**
+   Rust kanonisch/Produktion: Compiler (Lexer/Parser/AST/Semantics/ATC-IR/
+   Optimizer/Codegen), Bytecode-Verifier, ATVM, Runtime, ABI/Artifact-Validator,
+   Security/Sandbox, CLI. Python: Referenz-Implementierung (bestehender Code
+   bleibt — KEIN Wegwerfen), SDK, Test-/Fuzzing-Tooling, AI-Integration.
+   Phasen: (1) Python-Referenz weiterentwickeln (Sprachentwicklung) ·
+   (2) Rust-Kernkomponenten: atclang-core/-ir/-bytecode/-verifier/-vm/
+   -runtime/-abi · (3) Rust = kanonische Produktionsimplementierung.
+   **DUAL-STACK-DIFFERENTIAL-MODELL:** Rust- und Python-Stacks muessen fuer
+   identische Programme identische ASTs, IR, Bytecode und State-Transitions
+   erzeugen — Differential Testing ist damit verbindliches Conformance-
+   Kriterium (Roadmap-Item 19 aufgewertet). Begruendung: ATCLang ist keine
+   Skriptsprache — Smart Contracts erfordern Memory Safety, Determinismus,
+   Geschwindigkeit, geringe Runtime-Overheads, sichere Concurrency,
+   Ressourcen-Kontrolle und eine harte Host/VM-Security-Boundary.
+
+**Aurora AI (AD-021):** Rust Core (Model Manager, Scheduler, Hardware-
+Abstraction, Security, IPC, Plugin-Runtime) + Python AI-Layer (PyTorch/ONNX/
+LLM, ROCm). ATCLang -> Rust-first; Aurora -> Rust-Core + Python-AI-Layer.
