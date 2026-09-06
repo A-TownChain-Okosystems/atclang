@@ -1,0 +1,12 @@
+[package]
+name = "atc_stdlib"
+version = "0.1.0"
+edition = "2021"
+description = "Userspace Standard Library — String, Collections, I/O, errno, malloc"
+authors = ["Michael Wroblewski"]
+license = "ALL RIGHTS RESERVED"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]

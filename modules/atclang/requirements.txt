@@ -1,0 +1,4 @@
+# atclang — Dependencies
+# Teil des A-TownChain Ökosystems
+
+pytest>=8.0

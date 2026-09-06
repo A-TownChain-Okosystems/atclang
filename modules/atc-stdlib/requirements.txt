@@ -1,0 +1,2 @@
+# ATCLang Standard Library — no external dependencies
+# Pure Python implementation

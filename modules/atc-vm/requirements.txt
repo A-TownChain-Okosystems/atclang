@@ -1,0 +1,2 @@
+# ATC Virtual Machine — no external dependencies
+# Pure Python stack-based VM
