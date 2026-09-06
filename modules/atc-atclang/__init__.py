@@ -8,4 +8,4 @@ ATCLANG_VERSION = "0.3.0"
 from atclang.lexer.lexer import ATCLexer, Token, TT, tokenize
 from atclang.parser.parser import ATCParser, parse
 from atclang.compiler.compiler import ATCCompiler, compile_source, disassemble
-from .vm.atcvm import ATCVM, OP, Instruction
+from atclang.vm.atcvm import ATCVM, OP, Instruction
