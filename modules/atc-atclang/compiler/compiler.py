@@ -11,7 +11,7 @@ import os
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Tuple
 from atclang.parser.ast_nodes import *
-from atclang.vm.atcvm import Instruction, OP
+from ..vm.atcvm import Instruction, OP
 
 
 # ══════════════════════════════════════════════════════════
