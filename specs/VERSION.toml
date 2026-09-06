@@ -1,0 +1,13 @@
+# ATCLang 1.0.0 — Versionsskelett (normativ, wird in Phase 2 ausformuliert)
+[language]
+version = "1.0.0"
+status = "SPEC-DRAFT"
+
+[bytecode]
+version = "1.0.0"
+
+[abi]
+version = "1.0.0"
+
+[artifact]
+version = "1.0.0"

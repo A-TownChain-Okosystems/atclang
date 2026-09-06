@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "atclang"
+version = "1.0.0a1"
+description = "ATCLang — proprietäre System- und Contract-Sprache der A-TownChain"
+requires-python = ">=3.10"
+license = { text = "All Rights Reserved — A-TownChain-Okosystems" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
