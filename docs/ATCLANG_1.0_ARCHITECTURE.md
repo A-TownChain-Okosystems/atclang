@@ -2,6 +2,11 @@
 
 **Status:** ARCHITECTURE FREEZE: GO (Design, 06.09.2026) · Repository: Phase-1-Konsolidierung umgesetzt (EINE Implementierung je Verantwortlichkeit) · Phase 2: Subsystem-Implementierungen + Conformance.
 
+> **BASELINE v1.0 (AD-022):** Die verbindliche Zielarchitektur ist Rust-first —
+> siehe [ATCLANG_BASELINE_V1.md](ATCLANG_BASELINE_V1.md) (21-Crate-Layout,
+> Gates G0-G19, ATCA-Artifact, Differential Testing). Dieses Dokument hier
+> beschreibt die PYTHON-REFERENZ-IMPLEMENTierung (src/atclang/) gemaess Baseline.
+
 ## Kanonische Struktur
 
     atclang/
