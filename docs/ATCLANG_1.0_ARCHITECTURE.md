@@ -111,3 +111,13 @@ tests/__pycache__/*.pyc) — beseitigt; .gitignore um __pycache__/, *.py[cod],
 **Aurora AI (AD-021):** Rust Core (Model Manager, Scheduler, Hardware-
 Abstraction, Security, IPC, Plugin-Runtime) + Python AI-Layer (PyTorch/ONNX/
 LLM, ROCm). ATCLang -> Rust-first; Aurora -> Rust-Core + Python-AI-Layer.
+## Gate-Status (07.09.2026)
+
+- G0 (Architecture Freeze): PASSED
+- G1 (Language Specification): **PASSED 07.09.2026** — specs/language/SPEC.md
+  (63 Tokens, 76 Keywords, 84 Typ-Bezeichner, 31 ATC-Namespaces, 28
+  Parser-Produktionen als EBNF mit Praezedenztabelle und normativem
+  Compound-Desugar, 50 AST-Knoten, Semantik-Regeln, 13 Builtins,
+  45 Fehler-Klassen; maschinenlesbar: specs/language/registry.json).
+  Normativitaet: SPEC folgt Referenz-Implementierung; Abweichung = Fehler.
+- Naechstes Gate: G2 (Semantics / Spec-Extraktion Verhaltensregeln)
