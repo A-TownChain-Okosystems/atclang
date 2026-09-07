@@ -91,6 +91,7 @@ class ATCParser:
                 else:
                     self.expect(TT.GT)
             return node
+        return node
 
     # ── Expressions ───────────────────────────────────────
     def parse_expr(self) -> ASTNode:

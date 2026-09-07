@@ -2079,6 +2079,7 @@ def compile_source(
     source: str,
     *,
     module_name: str = "main",
+    semantic_check: bool = True,
 ) -> CompiledModule:
     """
     Compile ATCLang source directly.
@@ -2088,6 +2089,7 @@ def compile_source(
         source
           -> lexer/parser
           -> AST
+          -> TypeChecker (G2, semantisches Gate — Verifier entscheidet)
           -> compiler
           -> CompiledModule
     """
@@ -2095,6 +2097,11 @@ def compile_source(
     from atclang.frontend.parser.parser import parse
 
     ast = parse(source)
+
+    if semantic_check:
+        from atclang.semantics.type_checker import TypeChecker
+
+        TypeChecker().check(ast)
 
     compiler = ATCCompiler(
         module_name=module_name,

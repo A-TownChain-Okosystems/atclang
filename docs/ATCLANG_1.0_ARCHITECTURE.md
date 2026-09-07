@@ -120,4 +120,4 @@ LLM, ROCm). ATCLang -> Rust-first; Aurora -> Rust-Core + Python-AI-Layer.
   Compound-Desugar, 50 AST-Knoten, Semantik-Regeln, 13 Builtins,
   45 Fehler-Klassen; maschinenlesbar: specs/language/registry.json).
   Normativitaet: SPEC folgt Referenz-Implementierung; Abweichung = Fehler.
-- Naechstes Gate: G2 (Semantics / Spec-Extraktion Verhaltensregeln)
+- G2 (Semantics) ERLEDIGT 07.09.2026: TypeChecker-Subsystem src/atclang/semantics/ (SEM-001…012, 13 Builtins, strict + report) + specs/semantics/{SPEC.md,registry.json} + semantisches Gate in compile_source + Parser-Fix parse_type (Annotationen blieben bisher unbenutzt/None). Naechstes Gate: G3 (ATC-IR)

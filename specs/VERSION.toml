@@ -11,3 +11,10 @@ version = "1.0.0"
 
 [artifact]
 version = "1.0.0"
+
+[semantics_spec]
+gate = "G2"
+title = "Semantics / Verhaltensregeln"
+version = "1.0.0"
+status = "accepted"
+date = "2026-09-07"

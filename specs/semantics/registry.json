@@ -1,0 +1,168 @@
+{
+  "gate": "G2",
+  "version": "1.0.0",
+  "normative_source": "specs/semantics/SPEC.md",
+  "types": {
+    "primitives_checked": [
+      "int",
+      "float",
+      "string",
+      "bool",
+      "list",
+      "map",
+      "void"
+    ],
+    "other_types": "any (u8, u64, u128, Address, Vec, Map<...>, ...)"
+  },
+  "builtins": {
+    "print": {
+      "params": [
+        "any"
+      ],
+      "result": "void"
+    },
+    "len": {
+      "params": [
+        "any"
+      ],
+      "result": "int"
+    },
+    "range": {
+      "params": [
+        "int"
+      ],
+      "result": "list"
+    },
+    "sha256": {
+      "params": [
+        "any"
+      ],
+      "result": "string"
+    },
+    "int": {
+      "params": [
+        "any"
+      ],
+      "result": "int"
+    },
+    "float": {
+      "params": [
+        "any"
+      ],
+      "result": "float"
+    },
+    "str": {
+      "params": [
+        "any"
+      ],
+      "result": "string"
+    },
+    "bool": {
+      "params": [
+        "any"
+      ],
+      "result": "bool"
+    },
+    "abs": {
+      "params": [
+        "int"
+      ],
+      "result": "int"
+    },
+    "min": {
+      "params": [
+        "int",
+        "int"
+      ],
+      "result": "int"
+    },
+    "max": {
+      "params": [
+        "int",
+        "int"
+      ],
+      "result": "int"
+    },
+    "push": {
+      "params": [
+        "list",
+        "any"
+      ],
+      "result": "void"
+    },
+    "pop": {
+      "params": [
+        "list"
+      ],
+      "result": "any"
+    }
+  },
+  "rules": [
+    {
+      "id": "SEM-001",
+      "error": "DuplicateSymbolError",
+      "description": "Doppelte Definition im selben Scope (Variablen, Funktionen, Contract-Mitglieder, Top-Level)"
+    },
+    {
+      "id": "SEM-002",
+      "error": "UndefinedSymbolError",
+      "description": "Unbekanntes Symbol in Ausdrucksposition"
+    },
+    {
+      "id": "SEM-003",
+      "error": "BreakOutsideLoopError",
+      "description": "break ausserhalb einer Loop"
+    },
+    {
+      "id": "SEM-004",
+      "error": "ContinueOutsideLoopError",
+      "description": "continue ausserhalb einer Loop"
+    },
+    {
+      "id": "SEM-005",
+      "error": "InvalidReturnError",
+      "description": "return ausserhalb einer Funktion"
+    },
+    {
+      "id": "SEM-006",
+      "error": "TypeMismatchError",
+      "description": "let-Annotation passt nicht zum Initialisierungstyp (int->float erlaubt)"
+    },
+    {
+      "id": "SEM-007",
+      "error": "TypeMismatchError",
+      "description": "Rueckgabetyp passt nicht zum deklarierten Funktionstyp"
+    },
+    {
+      "id": "SEM-008",
+      "error": "InvalidCallError",
+      "description": "Built-in-Aritaet falsch"
+    },
+    {
+      "id": "SEM-009",
+      "error": "TypeMismatchError",
+      "description": "Built-in-Argumenttyp definitiv unpassend"
+    },
+    {
+      "id": "SEM-010",
+      "error": "DuplicateParameterError",
+      "description": "Doppelter Funktionsparameter"
+    },
+    {
+      "id": "SEM-011",
+      "error": "TypeMismatchError",
+      "description": "Ausdrucks-Operatoren zwischen inkompatiblen Primitiven"
+    },
+    {
+      "id": "SEM-012",
+      "error": "TypeMismatchError",
+      "description": "Bedingung ist kein bool-faehiger Typ (string/list/map/null)"
+    }
+  ],
+  "api": {
+    "check_and_report": "AST -> List[SemanticDiagnostic] (nicht-werfend)",
+    "check": "AST -> raise CompileError-Subklasse (strict)",
+    "analyze_source": "Quelltext -> Diagnosen"
+  },
+  "conservative": "Unbekannte Typen und unbekannte Bezeichner-Aufrufe (Stdlib/Runtime) werden nicht angefochten (T_ANY) — keine False Positives gegenueber der Referenz."
+}
