@@ -1,7 +1,7 @@
 # ATCLang 1.0.0 — Versionsskelett (normativ, wird in Phase 2 ausformuliert)
 [language]
 version = "1.0.0"
-status = "SPEC-DRAFT"
+status = "G1-PASSED (2026-09-07, specs/language/SPEC.md + registry.json)"
 
 [bytecode]
 version = "1.0.0"

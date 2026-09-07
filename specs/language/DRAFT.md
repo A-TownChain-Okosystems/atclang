@@ -1,3 +1,5 @@
-# specs/language — G1-Entwurf
+# Language Spec — DRAFT (superseded)
 
-Wird aus der Python-Referenz-Implementierung (src/atclang/) extrahiert — Migrationspfad AD-022, Schritt "specification extraction".
+Dieser Entwurf wurde am 07.09.2026 durch die vollstaendige
+G1-Spezifikation ersetzt: [SPEC.md](SPEC.md) — maschinenlesbares Extrakt:
+[registry.json](registry.json). Gate G1 (AD-022): PASSED.
