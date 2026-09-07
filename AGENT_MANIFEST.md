@@ -1,5 +1,5 @@
 # AGENT_MANIFEST.md
-> Letzte Aktualisierung: 2026-09-07 16:45 UTC | Aurora Master Sync v3.1.2 | 23-Repo-Stand (AD-016–AD-039) | Rollout auf alle 23 Repos
+> Letzte Aktualisierung: 2026-09-07 16:45 UTC | Aurora Master Sync v3.1.3 | 23-Repo-Stand (AD-016–AD-039) | Rollout auf alle 23 Repos
 
 ## Repositories (23 aktive — AD-016 + AD-024 + atc-standards)
 ### Kern-Plattform (9)
@@ -21,7 +21,7 @@
 | [genesis-chronicles](https://github.com/A-TownChain-Okosystems/genesis-chronicles) | P1 | NFT-Game „Genesis Chronicles" (ex-shivamon, AD-025) | ✅ restauriert |
 | [atc-contracts](https://github.com/A-TownChain-Okosystems/atc-contracts) | P0 | Smart-Contract-Standards + .atc-Referenzverträge | ✅ restauriert |
 | [atc-sdk](https://github.com/A-TownChain-Okosystems/atc-sdk) | P0 | Developer Platform | ✅ restauriert |
-| [atc-wallet](https://github.com/A-TownChain-Okosystems/atc-wallet) | P0 | Wallet (ATC+32-Adressen, BIP44 m/44'/9000') | ✅ restauriert |
+| [atc-wallet](https://github.com/A-TownChain-Okosystems/atc-wallet) | P0 | Wallet (ATC+32-Adressen, BIP44 m/44'/658467', AD-042) | ✅ restauriert |
 | [atc-explorer](https://github.com/A-TownChain-Okosystems/atc-explorer) | P1 | Block Explorer (TypeScript) | ✅ restauriert |
 | [atc-indexer](https://github.com/A-TownChain-Okosystems/atc-indexer) | P1 | Indexing/Analytics | ✅ restauriert |
 | [atc-interop](https://github.com/A-TownChain-Okosystems/atc-interop) | P1 | Bridges (ATC-09) | ✅ restauriert |
