@@ -1,0 +1,12 @@
+compliance:
+  standard: ATC-STD-201
+  version: "1.0.1"
+  level: R4
+  gates:
+    structure: pass
+    documentation: pass
+    security: pass
+    ci: pass
+    architecture: pass
+  last_audit: "2026-09-07"
+  auditor: atc-repo-audit v0.1.0

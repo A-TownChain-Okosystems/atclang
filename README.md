@@ -10,3 +10,22 @@ ATCLang ist die proprietäre System- und Contract-Sprache der A-TownChain: Lexer
     python -c "from atclang.compiler.compiler import compile_source; compile_source('let x = 1;')"
 
 Architekturzentren: src/ (Implementierung) · specs/ (normativ) · docs/ (erklärend) · tests/ (mit Fixtures) · examples/ · tools/. Keine zweite VM, keine zweite Stdlib, kein zweiter Parser.
+
+---
+
+## ATC Compliance & Governance (ATC-STD-201 / 202 / 203)
+
+**ATC COMPLIANCE: R4** — auditiert am 2026-09-07 (atc-repo-audit; R-Level aus `.atc/repository.yaml`).
+Architekturentscheidungen: zentral im [DECISIONS_REGISTER](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs/blob/main/docs/DECISIONS_REGISTER.md) (AD-Nummern verbindlich; lokale Entscheidungen in `docs/decisions/`).
+
+- **Purpose:** ATCLang — die proprietare Sprache des Oekosystems (Lexer, Parser, Compiler, ATVM).
+- **Scope:** Layer L0, Domain language — atclang als CORE in der 23-Repo-Landschaft (AD-024/026).
+- **Architecture:** Rust-First-Baseline (AD-022): Compiler→ATC-IR→Verifier→ATVM; Python als Referenz fuer Differential Testing. G1 Language Specification bestanden (07.09.), naechstes Gate G2 Semantics.
+- **Features:** 63 Tokens, 76 Keywords, 28 Parser-Produktionen, 50 AST-Knoten, 9 Stdlib-Module; specs/language/SPEC.md + registry.json.
+- **Installation:** Modul-Build je Sprache (rust); Integration via Monorepo-Workspace (a-townchain-os, sync_modules.py).
+- **Development:** Conventional Commits; Governance-Regeln aus atc-standards; Naming gemaess ATC-STD-000 §7.
+- **Testing:** pytest-Pipeline; Differential Testing Rust-vs-Python als verbindliches Conformance-Kriterium (AD-021/022).
+- **Security:** SECURITY.md; S-Klasse S4; ATC-STD-203 Release-Gates; Emergency-Prozess ATC-STD-000 §32.
+- **Roadmap:** Einordnung in die Lauffaehigkeits-Roadmap M1-M8 (AD-027) und Bauhierarchie L0-L7 (AD-026).
+- **Version:** CHANGELOG.md; SemVer; Releases als ATC-REL-X.Y.Z.
+- **License:** Proprietaer — All Rights Reserved, Michael Wroblewski / ShivaCore / A-TownChain-Okosystems (ATC-LIC/ATS-LIC).

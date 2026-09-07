@@ -1,0 +1,21 @@
+standard: ATC-STD-201
+standard_version: "1.0.1"
+repository:
+  name: atclang
+  classification: CORE
+  maturity: R4
+  status: development
+project:
+  organization: A-TownChain-Okosystems
+  domain: language
+  component: language
+language:
+  primary: rust
+license:
+  type: proprietary
+security:
+  criticality: critical
+api:
+  stability: experimental
+protocol:
+  compatibility: required
