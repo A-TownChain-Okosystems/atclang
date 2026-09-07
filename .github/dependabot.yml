@@ -1,0 +1,8 @@
+# Dependabot-Konfiguration — AUD-2026-0002 F-025 (ATC-STD-203 Security)
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "src/atclang"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
