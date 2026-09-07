@@ -1,7 +1,7 @@
 # AGENT_MANIFEST.md
-> Letzte Aktualisierung: 2026-09-07 17:45 UTC | Aurora Master Sync v3.1.4 | 24-Repo-Stand (AD-016–AD-043) | Rollout auf alle 24 Repos
+> Letzte Aktualisierung: 2026-09-07 18:15 UTC | Aurora Master Sync v3.1.5 | 25-Repo-Stand (AD-016–AD-044) | Rollout auf alle 25 Repos
 
-## Repositories (24 aktive — AD-016 + AD-024 + atc-standards + AD-043)
+## Repositories (25 aktive — AD-016 + AD-024 + atc-standards + AD-043/044)
 ### Kern-Plattform (9)
 | Repo | Rolle | Zustand (07.09.2026) |
 |------|-------|---------------------|
@@ -9,6 +9,7 @@
 | [atc-standards](https://github.com/A-TownChain-Okosystems/atc-standards) | **KANONISCHE Standards-Heimat** (AD-030): ATC-STD-000…203 + ATC-STD-300 (DTC), Registry, Validator | ✅ ATC-STD-000 v1.1.0 APPROVED |
 | [atclang](https://github.com/A-TownChain-Okosystems/atclang) | ATCLang 1.0 (Rust-first, AD-021/022), Gates G0-G19 | ✅ G1+G2 bestanden, Suite 126/126 (Python-Baseline; Rust-first G0 ausstehend) |
 | [atc-vm](https://github.com/A-TownChain-Okosystems/atc-vm) | A-TownChain Virtual Machine — verifizierte Bytecode-Ausfuehrung (AD-043) | 🆕 R1-Skeleton (07.09.) |
+| [atc-algorithm](https://github.com/A-TownChain-Okosystems/atc-algorithm) | ATC-Algorithmus — Hybrid Consensus PoH+PoS+PoW (AD-044) | 🆕 R1-Skeleton (07.09.) |
 | [a-townchain-os](https://github.com/A-TownChain-Okosystems/a-townchain-os) | Monorepo — NUR Integration (AD-017: `scripts/sync_modules.py`) | ✅ 731/731 Workspace-Tests |
 | [atc-shivacore](https://github.com/A-TownChain-Okosystems/atc-shivacore) | ShivaCore Microkernel (AD-012/013) + Service-Space (AD-028) | ✅ 674/674 Tests, Boot L0-L10 (M2-Gate erfüllt) |
 | [a-townchain](https://github.com/A-TownChain-Okosystems/a-townchain) | Blockchain-Produkt (Chain-ID 658467), ShivaConsensus | ✅ vault-restauriert (6 Module) |
