@@ -333,10 +333,13 @@ def _require_exact_int(
     minimum: Optional[int] = None,
     maximum: Optional[int] = None,
 ) -> None:
-    if type(value) is not int:
+    if isinstance(value, bool) or not isinstance(value, int):
         raise BytecodeValidationError(
             f"{name} must be an integer."
         )
+
+    # IntEnum-Members (z.B. SectionType) sind gueltige Integer-Werte
+    value = int(value)
 
     if minimum is not None and value < minimum:
         raise BytecodeValidationError(

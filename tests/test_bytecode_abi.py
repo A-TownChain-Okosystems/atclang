@@ -108,7 +108,7 @@ def make_module() -> CompiledModule:
         compiler_version="ATCLang Compiler 1.0",
         entry_point="main",
         bytecode_version=BYTECODE_VERSION,
-        constant_pool=[],
+        constants=[],
         instructions=[],
         functions={},
         function_params={},
@@ -525,11 +525,11 @@ def test_constant_type_ids_are_explicit() -> None:
 
 
 def test_null_constant_encoding() -> None:
-    from atclang.compiler.constants import Constant
+    from atclang.compiler.constants import Constant, ConstantType
 
     constant = Constant(
         index=0,
-        type="NULL",
+        type=ConstantType.NULL,
         value=None,
     )
 
@@ -542,11 +542,11 @@ def test_null_constant_encoding() -> None:
 
 
 def test_bool_constant_encoding() -> None:
-    from atclang.compiler.constants import Constant
+    from atclang.compiler.constants import Constant, ConstantType
 
     constant = Constant(
         index=3,
-        type="BOOL",
+        type=ConstantType.BOOL,
         value=True,
     )
 
@@ -560,11 +560,11 @@ def test_bool_constant_encoding() -> None:
 
 
 def test_integer_constant_encoding() -> None:
-    from atclang.compiler.constants import Constant
+    from atclang.compiler.constants import Constant, ConstantType
 
     constant = Constant(
         index=1,
-        type="INT",
+        type=ConstantType.INT,
         value=-42,
     )
 
@@ -576,11 +576,11 @@ def test_integer_constant_encoding() -> None:
 
 
 def test_float_constant_encoding() -> None:
-    from atclang.compiler.constants import Constant
+    from atclang.compiler.constants import Constant, ConstantType
 
     constant = Constant(
         index=2,
-        type="FLOAT",
+        type=ConstantType.FLOAT,
         value=3.5,
     )
 
@@ -592,11 +592,11 @@ def test_float_constant_encoding() -> None:
 
 
 def test_string_constant_encoding() -> None:
-    from atclang.compiler.constants import Constant
+    from atclang.compiler.constants import Constant, ConstantType
 
     constant = Constant(
         index=4,
-        type="STRING",
+        type=ConstantType.STRING,
         value="hello",
     )
 
@@ -608,11 +608,11 @@ def test_string_constant_encoding() -> None:
 
 
 def test_bytes_constant_encoding() -> None:
-    from atclang.compiler.constants import Constant
+    from atclang.compiler.constants import Constant, ConstantType
 
     constant = Constant(
         index=5,
-        type="BYTES",
+        type=ConstantType.BYTES,
         value=b"\x01\x02",
     )
 
