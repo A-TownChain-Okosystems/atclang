@@ -1,7 +1,7 @@
 # AGENT_MANIFEST.md
-> Letzte Aktualisierung: 2026-09-07 18:40 UTC | Aurora Master Sync v3.1.6 | 26-Repo-Stand (AD-016–AD-045) | Rollout auf alle 26 Repos
+> Letzte Aktualisierung: 2026-09-07 18:55 UTC | Aurora Master Sync v3.1.7 | 26-Repo-Stand (AD-016–AD-046) | Rollout auf alle 26 Repos
 
-## Repositories (26 aktive — AD-016 + AD-024 + atc-standards + AD-043/044/045)
+## Repositories (26 aktive — AD-016 + AD-024 + atc-standards + AD-043/044/045 + SCR-0005/AD-046)
 ### Kern-Plattform (9)
 | Repo | Rolle | Zustand (07.09.2026) |
 |------|-------|---------------------|
@@ -13,7 +13,7 @@
 | [atc-zkp](https://github.com/A-TownChain-Okosystems/atc-zkp) | ATC ZKP-Layer — Zero-Knowledge Proof Layer, Verifikationsschicht L1↔Apps (AD-045, ATC-STD-ZKP-001…010) | 🆕 R1-Skeleton (07.09.) |
 | [a-townchain-os](https://github.com/A-TownChain-Okosystems/a-townchain-os) | Monorepo — NUR Integration (AD-017: `scripts/sync_modules.py`) | ✅ 731/731 Workspace-Tests |
 | [atc-shivacore](https://github.com/A-TownChain-Okosystems/atc-shivacore) | ShivaCore Microkernel (AD-012/013) + Service-Space (AD-028) | ✅ 674/674 Tests, Boot L0-L10 (M2-Gate erfüllt) |
-| [a-townchain](https://github.com/A-TownChain-Okosystems/a-townchain) | Blockchain-Produkt (Chain-ID 658467), ShivaConsensus | ✅ vault-restauriert (6 Module) |
+| [a-townchain](https://github.com/A-TownChain-Okosystems/a-townchain) | Chain-Protokoll & Bibliothek (SCR-0005 A/AD-046): State, Tx, Orchestrierung; Chain-ID 658467 | ✅ vault-restauriert (6 Module) |
 | [globus-os](https://github.com/A-TownChain-Okosystems/globus-os) | OS-Produkt (Userspace auf ShivaCore) | ✅ vault-restauriert (10 Module) |
 | [aurora-ai](https://github.com/A-TownChain-Okosystems/aurora-ai) | AI-Produkt: Rust Core + Python AI-Layer (AD-021) | ✅ vault-restauriert (6 Module) |
 | [genesis-engine](https://github.com/A-TownChain-Okosystems/genesis-engine) | Game-Engine-Produkt (L6) | ✅ vault-restauriert |
@@ -29,7 +29,7 @@
 | [atc-indexer](https://github.com/A-TownChain-Okosystems/atc-indexer) | P1 | Indexing/Analytics | ✅ restauriert |
 | [atc-interop](https://github.com/A-TownChain-Okosystems/atc-interop) | P1 | Bridges (ATC-09) | ✅ restauriert |
 | [atc-marketplace](https://github.com/A-TownChain-Okosystems/atc-marketplace) | P2 | NFT/Asset-Marktplatz | ✅ restauriert |
-| [atc-node](https://github.com/A-TownChain-Okosystems/atc-node) | P0 | Full Node (M6) | 🔲 Skelett (Kernel-Fundament) |
+| [atc-node](https://github.com/A-TownChain-Okosystems/atc-node) | P0, S4 | Full-Node-Binary & Runtime (SCR-0005 A/AD-046): baut auf a-townchain + atc-algorithm + atc-vm auf | 🔲 Skelett (R1) |
 | [atc-storage](https://github.com/A-TownChain-Okosystems/atc-storage) | P2 | Storage-Schicht (ContentCap-Fundament) | 🔲 Skelett |
 | [atc-compute](https://github.com/A-TownChain-Okosystems/atc-compute) | P2 | Compute-Schicht | 🔲 Skelett |
 | [atc-oracle](https://github.com/A-TownChain-Okosystems/atc-oracle) | P2 | Oracle (ATC-10) | 🔲 Skelett |
