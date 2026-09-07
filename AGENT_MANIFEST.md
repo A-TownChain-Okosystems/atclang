@@ -36,7 +36,7 @@
 | [atc-mining](https://github.com/A-TownChain-Okosystems/atc-mining) | P1 | Mining-Stack | 🔲 Skelett |
 | [atc-launchpad](https://github.com/A-TownChain-Okosystems/atc-launchpad) | P2 | Token/NFT-Launchpad | 🔲 Skelett |
 
-> **Alle 22 Repos (ohne atc-standards): GATE PASS nach ATC-STD-201/202/203
+> **Alle 25 Repos (ohne atc-standards): GATE PASS nach ATC-STD-201/202/203
 > (AD-039, 07.09.)** — governance-ci.yml auditiert jeden Push/PR.
 > **Chain-ID:** 658467 (AD-004 RESOLVED). **Mainnet-Launch: per AD-023 offen.**
 
