@@ -8,6 +8,9 @@
 **Version:** `1.0.0`
 **License:** `Proprietary — A-TownChain-Okosystems`
 
+| ATC COMPLIANCE | ![Status](https://img.shields.io/badge/ATC--201%2F202%2F203-R4_COMPLIANT-00c853) R4 · Repository Governance (ATC-STD-201/202/203) · Audit: atc-repo-audit (CI-gated) |
+|---|---|
+
 ## Overview
 
 ATCLang ist die proprietäre System- und Smart-Contract-Sprache der A-TownChain. Sie umfasst Lexer, Parser (100% Parse-Rate), Type-Checker (Semantik-Gate G2), Compiler, ATVM Bytecode-Interpreter, Runtime-Framework, ABI-Definitionen und eine 9-teilige Standardbibliothek (Chain, Crypto, Math, Primitives, Wallet, IO, Encoding, Collections, String).
