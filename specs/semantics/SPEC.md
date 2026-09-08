@@ -19,9 +19,9 @@ Erzeugung validiert. Es gilt die AD-022-Vertrauensphilosophie: **Compiler
 erzeugt Code — Verifier entscheidet Gueltigkeit.** Der TypeChecker erzeugt
 keinen Code und mutiert nichts: AST rein, Diagnosen raus.
 
-```
+```text
 source → Lexer → Parser → [TypeChecker (G2, hier)] → Compiler → ATVM
-```
+```text
 
 ## 2. Scopes und Symbole
 

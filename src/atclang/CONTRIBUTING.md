@@ -1,6 +1,6 @@
 # Contributing to ATCLang
 
-Bitte zuerst [A-TownChain CONTRIBUTING.md](https://github.com/A-TownChain-Okosystems/a-townchain-os/blob/main/docs/CONTRIBUTING.md) lesen.
+Bitte zuerst [A-TownChain CONTRIBUTING.md](https://github.com/A-TownChain-Okosystems/a-townchain-os/tree/main/docs/CONTRIBUTING.md) lesen.
 
 ## ATCLang-spezifisch
 - Neue Opcodes: in `atclang/vm/atcvm.py` + Tests in `tests/`
@@ -16,4 +16,4 @@ if re.search(r'mein_pattern', stripped):
         HIGH, "ATC-SEC-016", lineno, 0,
         "Titel", "Beschreibung", "Fix-Empfehlung", stripped
     ))
-```
+```text

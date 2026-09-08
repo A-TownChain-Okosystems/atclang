@@ -2,9 +2,9 @@
 
 > ## 🤖 Fuer KI-Agenten — Pflichtlektuere vor jeder Aenderung
 > Governance liegt zentral im Wiki-Repo `a-townchain-os-docs`:
-> 1. [`AGENT_POLICY.md`](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs/blob/main/docs/AGENT_POLICY.md) — verbindliche Regeln, Reality-Check, Konsolidierungsziel
-> 2. [`AGENT_COORDINATION.md`](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs/blob/main/docs/AGENT_COORDINATION.md) — wer arbeitet gerade woran, Todos, Agent-IDs
-> 3. [`DECISIONS_REGISTER.md`](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs/blob/main/docs/DECISIONS_REGISTER.md) — verbindliche Architektur-Entscheidungen
+> 1. [`AGENT_POLICY.md`](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs/tree/main/docs/AGENT_POLICY.md) — verbindliche Regeln, Reality-Check, Konsolidierungsziel
+> 2. [`AGENT_COORDINATION.md`](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs/tree/main/docs/AGENT_COORDINATION.md) — wer arbeitet gerade woran, Todos, Agent-IDs
+> 3. [`DECISIONS_REGISTER.md`](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs/tree/main/docs/DECISIONS_REGISTER.md) — verbindliche Architektur-Entscheidungen
 
 **ATCLang Compiler & Execution Stack (v0.3.0)** — Proprietäre, performante Programmiersprache für das A-TownChain Ökosystem mit nativer Unterstützung für Smart Contracts, Kernel-Services und P2P-Netzwerke. Durchsetzung der **ATC-99 First Policy**.
 
@@ -19,7 +19,7 @@
 
 ATCLang transformiert Quellcode in ATVM-Bytecode und führt diesen in einer isolierten Register/Stack-basierten Virtual Machine aus:
 
-```
+```text
 +------------------+     +------------------+     +------------------+
 | Quellcode (.atc) | --> |   Lexer Engine   | --> | Tokens Stream    |
 +------------------+     +------------------+     +------------------+
@@ -33,7 +33,7 @@ ATCLang transformiert Quellcode in ATVM-Bytecode und führt diesen in einer isol
 +------------------+
 |  ATVM Runtime    | (Execution & State Engine)
 +------------------+
-```
+```text
 
 ---
 
@@ -63,7 +63,7 @@ python3 compiler.py programs/atcos_main.atc
 
 # Oder die VM direkt mit Opcodes starten
 python3 vm.py
-```
+```text
 
 ### 2. Quellcode Beispiel (`example.atc`)
 ```atc
@@ -72,7 +72,7 @@ fn main() {
     let status = check_compliance(system_id);
     print("ATCLang System Status:", status);
 }
-```
+```text
 
 ---
 
@@ -88,7 +88,7 @@ pip install -r requirements.txt
 
 # Tests & Module ausführen
 python3 -m unittest discover -s .
-```
+```text
 
 ---
 

@@ -92,14 +92,14 @@ ATC-Standard-Referenzen der Form `ATC::Hash::sha3(...)` lexieren als ATC_STD.
 
 ### 3.1 Programm
 
-```
+```text
 program    ::= module_decl? statement*
 module_decl::= "module" IDENT
-```
+```text
 
 ### 3.2 Anweisungen
 
-```
+```text
 block      ::= NEWLINE INDENT statement+ DEDENT
 let_stmt   ::= ("let"|"const") IDENT (":" type)? ("=" expr)? (";"?)
 if_stmt    ::= "if" expr block ("elif" expr block)* ("else" block)?
@@ -113,7 +113,7 @@ require    ::= "require" "(" expr ("," STRING)? ")"
 break      ::= "break" ; continue ::= "continue"
 assignment ::= expr ("=" | "+=" | "-=" | "*=" | "/=") expr
 expr_stmt  ::= expr ";"?
-```
+```text
 
 **Normatives Desugar:** Compound-Zuweisung wird vom Parser desugart:
 `x += y` → `Assignment(x, BinaryOp(x, "+", y))` (auch -=, *=, /=). Der AST
@@ -121,13 +121,13 @@ enthaelt KEINE Compound-Knoten.
 
 ### 3.3 Deklarationen
 
-```
+```text
 struct   ::= "struct" IDENT block_field+
 enum     ::= "enum" IDENT NEWLINE INDENT variant+ DEDEND
 class   ::= "class" IDENT (":" IDENT)? block
 contract ::= "contract" IDENT block_contract_body
 function ::= "fn" IDENT "(" params ")" ("->" type)? block
-```
+```text
 
 Contract-Koerper (AST: StorageBlock, StateField, EventDef, ErrorDef,
 FunctionDef): Storage-/State-Deklarationen, Events, Errors und Funktionen.

@@ -21,7 +21,7 @@ contract ShivaToken : ATC-8300 {
         return true
     }
 }
-```
+```text
 
 ## Token-Typen
 - KEYWORD: wallet, contract, fn, state, emit, require, return

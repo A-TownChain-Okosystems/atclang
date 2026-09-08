@@ -25,7 +25,7 @@ atclang/
     ├── atcos_main.atc
     ├── event_bus.atc
     └── kernel.atc
-```
+```text
 
 ## Module Descriptions
 - README.md — Guide to the ATCLang domain-specific smart contract language

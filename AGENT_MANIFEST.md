@@ -57,12 +57,12 @@
   Agent-Aufgaben auf Action/Process-Ebene mit Verifikation.
 
 ## BAUHIERARCHIE (AD-026, verbindlich) & ROADMAP (AD-027, verbindlich)
-```
+```text
 [L0] atclang → [L1] atc-shivacore → [L2] aurora-ai → [L3] a-townchain
  → [L4] globus-os → [L5] 13 Blockchain-Services → [L6] genesis-engine →
  genesis-chronicles → [L7] a-townchain-os (Integration, AD-017)
 [parallel] a-townchain-os-docs (Docs-Hub) · atc-standards (Norm)
-```
+```text
 Lauffähigkeits-Roadmap M1-M8 (jede Stufe = lauffähiges Inkrement):
 M1 Sprache (G1 ✅ → G2 offen) → M2 Kernel (✅ 674/674 + Boot) → M3 KI →
 M4 Blockchain (2 Nodes, 658467, Contract auf ATVM) → M5 OS → M6 Dienste →
