@@ -1,6 +1,6 @@
 ## Org-Regeln (vererbt — Pflicht für jeden Agenten in diesem Repo)
 
-Dieses Repository unterliegt dem **ATC Org-weiten Agent-Governance-System** (SCR-0039):
+Dieses Repository unterliegt dem **ATC Org-weiten Agent-Governance-System** (SCR-0057):
 [.github-Hub](https://github.com/A-TownChain-Okosystems/.github) — Org-AGENTS.md
 (Arbeits-Sequenz + Hierarchie-Kaskade), agent-instructions/00-11,
 ai/policies.yaml (**AP-001..016, normativ**), ai/capabilities.yaml (8 Rollen
