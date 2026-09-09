@@ -1,0 +1,8 @@
+# Repo-lokale Policy-Bindung (ATC-AI-GOV-POLICY-001, Control-Plane-Regel SCR-0063)
+# Vererbt vollstaendig vom .github-Hub (ai/policies.yaml): AP-001..016 Grundsaezte und
+# ATC-POL-001..010 mit MUST/SHOULD/MAY-Modell (PASS/FAIL/WARN/N/A).
+schema_version: "1.0"
+repository: atclang
+binding: "inherit: .github/ai/policies.yaml (Org-SSOT)"
+local_policies: []
+# Repo-spezifische Ergaenzungen nur hier eintragen (verschaerfen erlaubt, schwaechen nie).
