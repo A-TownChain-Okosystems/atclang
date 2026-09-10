@@ -1,0 +1,1 @@
+fn apply(x: u64) { add(x, 1); }
