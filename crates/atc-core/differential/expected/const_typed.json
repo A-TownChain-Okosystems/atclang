@@ -1,0 +1,1 @@
+{"kind":"Program","statements":[{"is_const":true,"kind":"LetStatement","name":"pi","type_hint":{"kind":"TypeAnnotation","name":"u64","params":[]},"value":{"kind":"IntLiteral","value":3}}]}
