@@ -71,3 +71,20 @@ jobs:
           git add .atc/evidence/evidence.yaml
           git commit -m "chore(evidence): bound_commit auto + test_run PASS (SCR-0081) [skip ci]" || echo "nichts zu committen"
           git push || echo "EVIDENCE_PUSH_BLOCKED"
+  rust-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: cargo test (Rust-Canonical-Core, SCR-0083/F-108)
+        run: |
+          set +e
+          FAIL=0
+          while IFS= read -r f; do
+            d="$(dirname "$f")"
+            echo "=== cargo test in $d"
+            if ! (cd "$d" && cargo test --quiet); then
+              echo "cargo test FAILED in $d"; FAIL=1
+            fi
+          done < <(find . -name Cargo.toml -not -path "*/archive/*" -not -path "*/node_modules/*")
+          exit $FAIL
