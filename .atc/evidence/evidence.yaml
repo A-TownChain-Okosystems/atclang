@@ -1,0 +1,29 @@
+# ATC Evidence SSOT — SCR-0080 (Owner-P0-01) — maschinenlesbar und EHRLICH
+# Statusleiter (verbindlich): SPECIFIED -> IMPLEMENTED -> TESTED -> VERIFIED -> AUDITED -> RELEASED
+# Regel: Kein Status-Claim ohne Evidence-Bundle (ATC-STD-REPO-AUDIT-001 / ATC-STD-MILESTONE-001).
+# CLAIMED != PASS · DOCUMENTED != IMPLEMENTED · IMPLEMENTED != VERIFIED
+schema_version: "1.0.0"
+repository: atclang
+generated: "2026-09-10"
+generated_by: "SCR-0080 Enforcement-Welle (Aurora, Owner-P0-Definition 10.09. 12:21)"
+bound_commit: pending   # vom jeweiligen CI-Lauf zu setzen (Test-Suite-Workflow haengt Evidence-Update an)
+maturity_class: A          # A=substanziell B=Rebuild/Produkt C=Plattform/Anwendung
+r_level: null
+implementation:
+  status: substantial        # substantial|partial|skeleton|docs_only
+  summary: "Rust-Canonical-Core + Python-Referenz-Tooling (Rollen-Fix F-097 offen)"
+tests:
+  status: pass_with_evidence       # pass_with_evidence|not_run|not_applicable
+  evidence: "Test-Suite-CI gruen (SCR-0078-verifiziert)"
+security:
+  status: not_audited
+conformance:
+  status: not_verified
+release:
+  status: development
+milestone_claims:
+  rule: "M-Claims nur mit Evidence-Bundle (ATC-STD-MILESTONE-001)"
+  latest_verified: null
+canonical_role:                  # SCR-0080 P0-02: Single-Owner-per-Capability
+  capability: language
+  canonical: true
