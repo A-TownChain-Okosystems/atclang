@@ -2,7 +2,8 @@
 //! AST des Canonical Cores mit kanonischer JSON-Serialisierung.
 //! Die JSON ist BYTGLEICH mit der Python-Referenz-Ausgabe aus
 //! tools/differential/dump_reference.py (json.dumps, sort_keys=True,
-//! compact separators) — das ist der Differential-Kontrakt (SCR-0084).
+//! compact separators) — das ist der Differential-Kontrakt (SCR-0084/0085).
+//! Stage 3: FunctionDef/Parameter/ReturnStatement/ExprStatement (SCR-0085).
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -26,9 +27,32 @@ pub struct LetStmt {
     pub value: Option<Expr>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Param {
+    pub name: String,
+    pub type_hint: TypeHint,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FunctionDef {
+    pub name: String,
+    pub params: Vec<Param>,
+    pub return_type: Option<TypeHint>,
+    pub body: Vec<Stmt>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Stmt {
+    Let(LetStmt),
+    Fn(FunctionDef),
+    Return { value: Option<Expr> },
+    /// Nackter Ausdruck — Referenz wrappt als ExprStatement.
+    Expr(Expr),
+}
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Program {
-    pub statements: Vec<LetStmt>,
+    pub statements: Vec<Stmt>,
 }
 
 fn esc(s: &str) -> String {
@@ -86,6 +110,12 @@ fn expr_json(e: &Expr, out: &mut String) {
     }
 }
 
+fn type_json(t: &TypeHint, out: &mut String) {
+    out.push_str("{\"kind\":\"TypeAnnotation\",\"name\":\"");
+    out.push_str(&esc(&t.name));
+    out.push_str("\",\"params\":[]}");
+}
+
 fn let_json(s: &LetStmt, out: &mut String) {
     out.push_str("{\"is_const\":");
     out.push_str(if s.is_const { "true" } else { "false" });
@@ -94,11 +124,7 @@ fn let_json(s: &LetStmt, out: &mut String) {
     out.push_str("\",\"type_hint\":");
     match &s.type_hint {
         None => out.push_str("null"),
-        Some(t) => {
-            out.push_str("{\"kind\":\"TypeAnnotation\",\"name\":\"");
-            out.push_str(&esc(&t.name));
-            out.push_str("\",\"params\":[]}");
-        }
+        Some(t) => type_json(t, out),
     }
     out.push_str(",\"value\":");
     match &s.value {
@@ -106,6 +132,59 @@ fn let_json(s: &LetStmt, out: &mut String) {
         Some(v) => expr_json(v, out),
     }
     out.push('}');
+}
+
+fn param_json(p: &Param, out: &mut String) {
+    out.push_str("{\"kind\":\"Parameter\",\"name\":\"");
+    out.push_str(&esc(&p.name));
+    out.push_str("\",\"type_hint\":");
+    type_json(&p.type_hint, out);
+    out.push('}');
+}
+
+fn fn_json(f: &FunctionDef, out: &mut String) {
+    out.push_str("{\"body\":[");
+    for (i, s) in f.body.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        stmt_json(s, out);
+    }
+    out.push_str("],\"decorators\":[],\"is_pub\":false,\"kind\":\"FunctionDef\",\"name\":\"");
+    out.push_str(&esc(&f.name));
+    out.push_str("\",\"params\":[");
+    for (i, p) in f.params.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        param_json(p, out);
+    }
+    out.push_str("],\"return_type\":");
+    match &f.return_type {
+        None => out.push_str("null"),
+        Some(t) => type_json(t, out),
+    }
+    out.push('}');
+}
+
+fn stmt_json(s: &Stmt, out: &mut String) {
+    match s {
+        Stmt::Let(l) => let_json(l, out),
+        Stmt::Fn(f) => fn_json(f, out),
+        Stmt::Return { value } => {
+            out.push_str("{\"kind\":\"ReturnStatement\",\"value\":");
+            match value {
+                None => out.push_str("null"),
+                Some(v) => expr_json(v, out),
+            }
+            out.push('}');
+        }
+        Stmt::Expr(e) => {
+            out.push_str("{\"expr\":");
+            expr_json(e, out);
+            out.push_str(",\"kind\":\"ExprStatement\"}");
+        }
+    }
 }
 
 impl Program {
@@ -116,7 +195,7 @@ impl Program {
             if i > 0 {
                 out.push(',');
             }
-            let_json(s, &mut out);
+            stmt_json(s, &mut out);
         }
         out.push_str("]}");
         out
