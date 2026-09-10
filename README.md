@@ -1,19 +1,19 @@
 # ATC ATCLang
 
-> Proprietäre System- und Smart-Contract-Sprache des A-TownChain-Ökosystems mit Compiler, ATVM-Runtime und Standardbibliothek.
+> Apache-2.0e System- und Smart-Contract-Sprache des A-TownChain-Ökosystems mit Compiler, ATVM-Runtime und Standardbibliothek.
 
 **Project:** atclang
 **Organization:** A-TownChain-Okosystems
 **Status:** `development`
 **Version:** `1.0.0`
-**License:** `Proprietary — A-TownChain-Okosystems`
+**License:** `Apache-2.0 — A-TownChain-Okosystems`
 
 | ATC COMPLIANCE | ![Status](https://img.shields.io/badge/ATC--201%2F202%2F203-R4_COMPLIANT-00c853) R4 · Repository Governance (ATC-STD-201/202/203) · Audit: atc-repo-audit (CI-gated) |
 |---|---|
 
 ## Overview
 
-ATCLang ist die proprietäre System- und Smart-Contract-Sprache der A-TownChain. Sie umfasst Lexer, Parser (100% Parse-Rate), Type-Checker (Semantik-Gate G2), Compiler, ATVM Bytecode-Interpreter, Runtime-Framework, ABI-Definitionen und eine 9-teilige Standardbibliothek (Chain, Crypto, Math, Primitives, Wallet, IO, Encoding, Collections, String).
+ATCLang ist die Apache-2.0e System- und Smart-Contract-Sprache der A-TownChain. Sie umfasst Lexer, Parser (100% Parse-Rate), Type-Checker (Semantik-Gate G2), Compiler, ATVM Bytecode-Interpreter, Runtime-Framework, ABI-Definitionen und eine 9-teilige Standardbibliothek (Chain, Crypto, Math, Primitives, Wallet, IO, Encoding, Collections, String).
 
 ATCLang basiert auf dem Rust-Canonical-Core mit Python-Referenz-Tooling (AD-022) und stellt eine eigenständige Layer-L0-Sprachinfrastruktur ohne POSIX-Abhängigkeiten dar.
 
@@ -210,7 +210,7 @@ Beiträge sind willkommen. Bitte lesen Sie vorab `CONTRIBUTING.md` und beachten 
 
 ## License
 
-Proprietary — All Rights Reserved, Michael Wroblewski / ShivaCore / A-TownChain-Okosystems (siehe `LICENSE`).
+Apache-2.0 — Copyright Michael Wroblewski (Org-Einheitslizenz per AD-F-046)..
 
 ## Maintainers
 

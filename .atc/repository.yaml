@@ -12,7 +12,7 @@ project:
 language:
   primary: rust
 license:
-  type: proprietary
+  type: apache-2.0
 security:
   criticality: critical
 api:
