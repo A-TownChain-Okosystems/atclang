@@ -1,6 +1,6 @@
 # AGENT_MANIFEST.md
 > **Registry-Stand (GENERIERT aus `registry/standards.yaml`):** 449 Standards — 400 APPROVED · 37 CANDIDATE · 50 Familien · Stand 2026-09-10 22:43 UTC+2 · SHA-256 `9b25d16136fe…`
-> Letzte Aktualisierung: 2026-09-10 22:45 UTC | Aurora Master Sync v3.1.7 | 27 governed Repos (28 total, ai/org-scope.yaml-SSOT) | Rollout auf alle governed Repos
+> Letzte Aktualisierung: 2026-09-11 00:58 UTC | Aurora Master Sync v3.1.7 | 27 governed Repos (28 total, ai/org-scope.yaml-SSOT) | Rollout auf alle governed Repos
 
 ## ⚖️ Standard-Compliance-Mandat (verbindlich — ATC-AAS-003/AAS-004, AI-DEV-001 §6)
 
@@ -37,7 +37,7 @@
 ### Kern-Plattform (9)
 | Repo | Rolle | Zustand (07.09.2026) |
 |------|-------|---------------------|
-| [a-townchain-os-docs](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs) | **DOCS-HUB** — Wiki, DECISIONS_REGISTER (AD-001…039), Roadmaps, Audits | ✅ aktiv |
+| [a-townchain-os-docs](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs) | **DOCS-HUB** — Wiki (kanonisch: `wiki/kai-os/` — SCR-0090), DECISIONS_REGISTER (AD-001…039), Roadmaps, Audits | ✅ aktiv |
 | [atc-standards](https://github.com/A-TownChain-Okosystems/atc-standards) | **KANONISCHE Standards-Heimat** (AD-030): ATC-STD-000…203 + ATC-STD-300 (DTC), Registry, Validator | ✅ ATC-STD-000 v1.2.0 APPROVED |
 | [atclang](https://github.com/A-TownChain-Okosystems/atclang) | ATCLang 1.0 (Rust-first, AD-021/022), Gates G0-G19 | ✅ G1+G2 bestanden, Suite 126/126 (Python-Baseline; Rust-first G0 ausstehend) |
 | [atc-vm](https://github.com/A-TownChain-Okosystems/atc-vm) | A-TownChain Virtual Machine — verifizierte Bytecode-Ausfuehrung (AD-043) | 🆕 R1-Skeleton (07.09.) |
