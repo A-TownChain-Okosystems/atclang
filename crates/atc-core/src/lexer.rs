@@ -1,17 +1,25 @@
 // Copyright (c) 2026 Michael Wroblewski — Apache-2.0
-//! Lexer-MVP: Tokens fuer eine ATCLang-Teilmenge (let, fn, Literale, Operatoren).
+//! Lexer-MVP: Tokens fuer eine ATCLang-Teilmenge.
+//! Token-Modell am Python-Referenz-Lexer (src/atclang/frontend/lexer/lexer.py)
+//! ausgerichtet (SCR-0084). Hinweis: '=' ist im Referenz-Modell EQ und dient
+//! im let-Kontext als Zuweisung; ':' ist COLON. '%' wird geparst, gehoert aber
+//! NICHT zum Operator-Subset des Referenz-Parsers (Differential-Befund).
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
     Int(u64),
     Ident(String),
     Let,
+    Const,
+    Return,
     Fn,
     Assign,
     Plus,
     Minus,
     Star,
     Slash,
+    Percent,
+    Colon,
     LParen,
     RParen,
     LBrace,
@@ -38,6 +46,8 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
             '-' => tokens.push(Token::Minus),
             '*' => tokens.push(Token::Star),
             '/' => tokens.push(Token::Slash),
+            '%' => tokens.push(Token::Percent),
+            ':' => tokens.push(Token::Colon),
             '(' => tokens.push(Token::LParen),
             ')' => tokens.push(Token::RParen),
             '{' => tokens.push(Token::LBrace),
@@ -69,6 +79,8 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
                 }
                 match ident.as_str() {
                     "let" => tokens.push(Token::Let),
+                    "const" => tokens.push(Token::Const),
+                    "return" => tokens.push(Token::Return),
                     "fn" => tokens.push(Token::Fn),
                     _ => tokens.push(Token::Ident(ident)),
                 }
@@ -98,18 +110,16 @@ mod tests {
     }
 
     #[test]
-    fn fn_signatur() {
-        let ts = tokenize("fn add(a, b) { }").unwrap();
+    fn const_mit_typ() {
+        let ts = tokenize("const pi: u64 = 3;").unwrap();
         assert_eq!(ts, vec![
-            Token::Fn,
-            Token::Ident("add".to_string()),
-            Token::LParen,
-            Token::Ident("a".to_string()),
-            Token::Comma,
-            Token::Ident("b".to_string()),
-            Token::RParen,
-            Token::LBrace,
-            Token::RBrace,
+            Token::Const,
+            Token::Ident("pi".to_string()),
+            Token::Colon,
+            Token::Ident("u64".to_string()),
+            Token::Assign,
+            Token::Int(3),
+            Token::Semi,
             Token::Eof,
         ]);
     }
