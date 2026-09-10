@@ -1,11 +1,12 @@
 // Copyright (c) 2026 Michael Wroblewski — Apache-2.0
-//! Recursive-Descent-Parser — Stage 2 des Canonical Cores (SCR-0084).
+//! Recursive-Descent-Parser — Stage 3 des Canonical Cores (SCR-0085).
 //! Subset exakt nach Python-Referenz (src/atclang/frontend/parser/parser.py):
-//! Programmebene = let/const-Anweisungen; Ausdruecke: + - * / (KEIN % —
-//! Referenz-Befund), unaeres Minus, Klammern, Funktionsaufrufe (Postfix).
-//! Assoziativitaet: links (wie Referenz), Praezedenz: * / vor + -.
+//! Programmebene = let/const/fn; Funktionskoerper = let/return/ExprStatement.
+//! Referenz-Semantiken bewusst uebernommen: Parameter MIT Pflicht-Typ,
+//! 'return' nur ohne Semikolon vor '}' (return; wirft wie Referenz Fehler),
+//! nackte Ausdruecke werden als ExprStatement gewrappt.
 
-use crate::ast::{Expr, LetStmt, Program, TypeHint};
+use crate::ast::{Expr, FunctionDef, LetStmt, Param, Program, Stmt, TypeHint};
 use crate::lexer::{tokenize, Token};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -34,15 +35,28 @@ impl Parser {
     fn program(&mut self) -> Result<Program, ParseError> {
         let mut statements = Vec::new();
         while self.cur() != Token::Eof {
-            if self.cur() == Token::Let || self.cur() == Token::Const {
-                statements.push(self.let_stmt()?);
-            } else {
-                return Err(ParseError {
-                    message: format!("let/const am Top-Level erwartet, fand {:?}", self.cur()),
-                });
-            }
+            let s = match self.cur() {
+                Token::Let | Token::Const => Stmt::Let(self.let_stmt()?),
+                Token::Fn => Stmt::Fn(self.function()?),
+                other => {
+                    return Err(ParseError {
+                        message: format!("let/const/fn am Top-Level erwartet, fand {:?}", other),
+                    })
+                }
+            };
+            statements.push(s);
         }
         Ok(Program { statements })
+    }
+
+    fn simple_type(&mut self) -> Result<TypeHint, ParseError> {
+        match self.cur() {
+            Token::Ident(n) => {
+                self.pos += 1;
+                Ok(TypeHint { name: n })
+            }
+            other => Err(ParseError { message: format!("Typ erwartet, fand {:?}", other) }),
+        }
     }
 
     fn let_stmt(&mut self) -> Result<LetStmt, ParseError> {
@@ -58,15 +72,7 @@ impl Parser {
         let mut type_hint = None;
         if self.cur() == Token::Colon {
             self.pos += 1;
-            match self.cur() {
-                Token::Ident(n) => {
-                    type_hint = Some(TypeHint { name: n });
-                    self.pos += 1;
-                }
-                other => {
-                    return Err(ParseError { message: format!("Typ erwartet, fand {:?}", other) })
-                }
-            }
+            type_hint = Some(self.simple_type()?);
         }
         let mut value = None;
         if self.cur() == Token::Assign {
@@ -77,6 +83,92 @@ impl Parser {
             self.pos += 1;
         }
         Ok(LetStmt { name, is_const, type_hint, value })
+    }
+
+    fn function(&mut self) -> Result<FunctionDef, ParseError> {
+        self.pos += 1; // 'fn'
+        let name = match self.cur() {
+            Token::Ident(n) => n,
+            other => return Err(ParseError { message: format!("Fn-Name erwartet, fand {:?}", other) }),
+        };
+        self.pos += 1;
+        if self.cur() != Token::LParen {
+            return Err(ParseError { message: "'(' erwartet".to_string() });
+        }
+        self.pos += 1;
+        let mut params = Vec::new();
+        while self.cur() != Token::RParen {
+            let pname = match self.cur() {
+                Token::Ident(n) => n,
+                other => {
+                    return Err(ParseError { message: format!("Parametername erwartet, fand {:?}", other) })
+                }
+            };
+            self.pos += 1;
+            if self.cur() != Token::Colon {
+                return Err(ParseError { message: "Parameter-Typ ist Pflicht (': typ'), Referenz-Regel".to_string() });
+            }
+            self.pos += 1;
+            let t = self.simple_type()?;
+            params.push(Param { name: pname, type_hint: t });
+            if self.cur() == Token::Comma {
+                self.pos += 1;
+            } else {
+                break;
+            }
+        }
+        if self.cur() != Token::RParen {
+            return Err(ParseError { message: "')' erwartet".to_string() });
+        }
+        self.pos += 1;
+        let mut return_type = None;
+        if self.cur() == Token::Arrow {
+            self.pos += 1;
+            return_type = Some(self.simple_type()?);
+        }
+        if self.cur() != Token::LBrace {
+            return Err(ParseError { message: "'{' erwartet".to_string() });
+        }
+        self.pos += 1;
+        let body = self.block()?;
+        Ok(FunctionDef { name, params, return_type, body })
+    }
+
+    fn block(&mut self) -> Result<Vec<Stmt>, ParseError> {
+        let mut stmts = Vec::new();
+        while self.cur() != Token::RBrace && self.cur() != Token::Eof {
+            stmts.push(self.statement()?);
+        }
+        if self.cur() != Token::RBrace {
+            return Err(ParseError { message: "'}' erwartet".to_string() });
+        }
+        self.pos += 1;
+        Ok(stmts)
+    }
+
+    fn statement(&mut self) -> Result<Stmt, ParseError> {
+        match self.cur() {
+            Token::Let | Token::Const => Ok(Stmt::Let(self.let_stmt()?)),
+            Token::Return => {
+                self.pos += 1;
+                let value = if self.cur() == Token::RBrace || self.cur() == Token::Eof {
+                    None
+                } else {
+                    Some(self.expr()?)
+                };
+                if self.cur() == Token::Semi {
+                    self.pos += 1;
+                }
+                Ok(Stmt::Return { value })
+            }
+            _ => {
+                let e = self.expr()?;
+                if self.cur() == Token::Semi {
+                    self.pos += 1;
+                }
+                Ok(Stmt::Expr(e))
+            }
+        }
     }
 
     fn expr(&mut self) -> Result<Expr, ParseError> {
@@ -189,7 +281,6 @@ mod tests {
 
     #[test]
     fn praecedenz_und_assoziativitaet() {
-        // 1 + 2 * 3 - 4 / 5
         let p = parse_program("let r = 1 + 2 * 3 - 4 / 5;").unwrap();
         let j = p.to_json();
         assert!(j.contains("\"op\":\"*\""));
@@ -197,17 +288,35 @@ mod tests {
     }
 
     #[test]
-    fn calls_und_unaer() {
-        let p = parse_program("let s = add(1, 2);\nlet n = -5;").unwrap();
+    fn fn_definition_mit_return() {
+        let p = parse_program("fn add(a: u64, b: u64) -> u64 { return a + b; }").unwrap();
         let j = p.to_json();
-        assert!(j.contains("\"kind\":\"FunctionCall\""));
-        assert!(j.contains("\"kind\":\"UnaryOp\""));
+        assert!(j.contains("\"kind\":\"FunctionDef\""));
+        assert!(j.contains("\"kind\":\"ReturnStatement\""));
+        assert!(j.contains("\"kind\":\"Parameter\""));
+        assert!(j.contains("\"return_type\":{\"kind\":\"TypeAnnotation\",\"name\":\"u64\""));
+    }
+
+    #[test]
+    fn fn_body_let_expr_bare_return() {
+        let p = parse_program("fn f(x: u64) { let y = x; add(y, 1); return }").unwrap();
+        let j = p.to_json();
+        assert!(j.contains("\"kind\":\"LetStatement\""));
+        assert!(j.contains("\"kind\":\"ExprStatement\""));
+        assert!(j.contains("\"value\":null"));
+    }
+
+    #[test]
+    fn referenz_semantik_return_mit_semi_vor_klammer() {
+        // Referenz: 'return;' vor '}' wirft Fehler (parse_expr auf ';')
+        assert!(parse_program("fn f() { return; }").is_err());
     }
 
     #[test]
     fn fehlerfaelle() {
         assert!(parse_program("let $ = 1;").is_err());
         assert!(parse_program("let x = ;").is_err());
-        assert!(parse_program("return 42;").is_err()); // Subset: nur let/const am Top-Level
+        assert!(parse_program("return 42;").is_err()); // Subset: nur let/const/fn am Top-Level
+        assert!(parse_program("fn f(a) { }").is_err()); // Parameter-Typ ist Pflicht
     }
 }
