@@ -11,10 +11,10 @@ maturity_class: A          # A=substanziell B=Rebuild/Produkt C=Plattform/Anwend
 r_level: null
 implementation:
   status: partial             # substantial|partial|skeleton|docs_only
-  summary: "Python-Referenz-Tooling substanziell; Rust-Canonical-Core NICHT implementiert (0 Rust-Dateien auf main, F-108)"
+  summary: "Python-Referenz substanziell; Rust-Canonical-Core GESTARTET: Lexer-MVP in crates/atc-core (SCR-0083, F-108); Parser + Differential-Tests folgen"
 tests:
   status: pass_with_evidence       # pass_with_evidence|not_run|not_applicable
-  evidence: "Test-Suite-CI gruen (SCR-0078-verifiziert)"
+  evidence: "cargo test gruen via CI, test_run-Block gebunden (SCR-0083)"
 security:
   status: not_audited
 conformance:
