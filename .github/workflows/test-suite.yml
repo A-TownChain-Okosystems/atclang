@@ -88,3 +88,20 @@ jobs:
             fi
           done < <(find . -name Cargo.toml -not -path "*/archive/*" -not -path "*/node_modules/*")
           exit $FAIL
+  differential:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Expected aus Python-Referenz regenerieren (Drift-Check, SCR-0084)
+        run: |
+          python3 tools/differential/dump_reference.py
+          if ! git diff --exit-code -- crates/atc-core/differential/expected/; then
+            echo "DIVERGENZ: Python-Referenz-Verhalten geaendert — expected/ neu binden"
+            exit 1
+          fi
+      - name: Differential-Test (Rust-Canonical vs. expected)
+        run: cd crates/atc-core && cargo test --quiet
