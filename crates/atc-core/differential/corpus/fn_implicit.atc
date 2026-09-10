@@ -1,0 +1,1 @@
+fn set(x: u64) { let y = x; }
