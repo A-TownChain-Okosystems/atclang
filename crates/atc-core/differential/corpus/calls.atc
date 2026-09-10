@@ -1,0 +1,2 @@
+let s = add(1, 2);
+let t = add(add(1, 2), mul(3, 4));
