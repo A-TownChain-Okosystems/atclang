@@ -45,7 +45,7 @@ jobs:
               || { echo "pytest FAILED in $d"; FAIL=1; }
           done < <(find . -name requirements.txt -not -path "*/archive/*")
           exit $FAIL
-      - name: Evidence-Bindung (SCR-0086: test_run BEI JEDEM LAUF aktualisieren + hartes Push-Gate)
+      - name: Evidence-Bindung (SCR-0086 idempotentes test_run-Update je Lauf + hartes Push-Gate)
         if: success()
         run: |
           python3 - <<'PY'
