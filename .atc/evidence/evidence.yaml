@@ -10,8 +10,8 @@ bound_commit: pending   # vom jeweiligen CI-Lauf zu setzen (Test-Suite-Workflow 
 maturity_class: A          # A=substanziell B=Rebuild/Produkt C=Plattform/Anwendung
 r_level: null
 implementation:
-  status: substantial        # substantial|partial|skeleton|docs_only
-  summary: "Rust-Canonical-Core + Python-Referenz-Tooling (Rollen-Fix F-097 offen)"
+  status: partial             # substantial|partial|skeleton|docs_only
+  summary: "Python-Referenz-Tooling substanziell; Rust-Canonical-Core NICHT implementiert (0 Rust-Dateien auf main, F-108)"
 tests:
   status: pass_with_evidence       # pass_with_evidence|not_run|not_applicable
   evidence: "Test-Suite-CI gruen (SCR-0078-verifiziert)"
