@@ -1,5 +1,5 @@
 # ARCHITECTURE.md — atclang
-> Copyright © Michael Wroblewski / A-TownChain-Okosystems. All Rights Reserved.
+> Copyright © Michael Wroblewski / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 
 ## File Tree
 ```tree

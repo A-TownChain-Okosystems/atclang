@@ -45,7 +45,7 @@
 **Datei:** `atclang/main.atc`
 **Zeilen:** 180
 **Typ:** .atc
-**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 **Funktionen/Structs:** struct Route, struct CircuitState, init, register_default_routes, register_route, route_request, check_rate_limit, is_circuit_open (+4 weitere)
 
 **Status:** 🟢 IMPLEMENTIERT
@@ -57,7 +57,7 @@
 **Datei:** `compiler.py`
 **Zeilen:** 102
 **Typ:** .py
-**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 **Funktionen/Structs:** summary, __init__, define, resolve, child, __init__, error
 
 **Status:** 🟢 IMPLEMENTIERT
@@ -69,7 +69,7 @@
 **Datei:** `compiler/compiler.py`
 **Zeilen:** 626
 **Typ:** .py
-**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 **Funktionen/Structs:** summary, __init__, define, resolve, child, __init__, error, emit (+12 weitere)
 
 **Status:** 🟢 IMPLEMENTIERT
@@ -81,7 +81,7 @@
 **Datei:** `compiler/optimizer.py`
 **Zeilen:** 558
 **Typ:** .py
-**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 **Funktionen/Structs:** __init__, optimize_ast, _opt_stmt, _opt_block, _opt_expr, _try_fold, _algebraic_simplify, _try_eval (+9 weitere)
 
 **Status:** 🟢 IMPLEMENTIERT
@@ -93,7 +93,7 @@
 **Datei:** `compiler/type_checker.py`
 **Zeilen:** 507
 **Typ:** .py
-**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 **Funktionen/Structs:** __init__, __eq__, __repr__, __hash__, __init__, __repr__, __repr__, __init__ (+25 weitere)
 
 **Status:** 🟢 IMPLEMENTIERT
@@ -105,7 +105,7 @@
 **Datei:** `lexer.py`
 **Zeilen:** 115
 **Typ:** .py
-**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 **Funktionen/Structs:** —
 
 **Status:** 🟢 IMPLEMENTIERT
@@ -117,7 +117,7 @@
 **Datei:** `lexer/lexer.py`
 **Zeilen:** 563
 **Typ:** .py
-**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 **Funktionen/Structs:** __repr__, __init__, __init__, current, peek, advance, match, add (+10 weitere)
 
 **Status:** 🟢 IMPLEMENTIERT
@@ -129,7 +129,7 @@
 **Datei:** `parser.py`
 **Zeilen:** 95
 **Typ:** .py
-**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 **Funktionen/Structs:** __init__, error, current, peek, advance, check, expect, match (+5 weitere)
 
 **Status:** 🟢 IMPLEMENTIERT
@@ -141,7 +141,7 @@
 **Datei:** `parser/ast_nodes.py`
 **Zeilen:** 392
 **Typ:** .py
-**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 **Funktionen/Structs:** __init__, __repr__, children, __init__, __repr__, children, __init__, __repr__ (+13 weitere)
 
 **Status:** 🟢 IMPLEMENTIERT
@@ -153,7 +153,7 @@
 **Datei:** `parser/parser.py`
 **Zeilen:** 399
 **Typ:** .py
-**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 **Funktionen/Structs:** __init__, error, current, peek, advance, check, expect, match (+22 weitere)
 
 **Status:** 🟢 IMPLEMENTIERT
@@ -165,7 +165,7 @@
 **Datei:** `programs/atc8300.atc`
 **Zeilen:** 96
 **Typ:** .atc
-**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 **Funktionen/Structs:** init, name, symbol, decimals, total_supply, balance_of, transfer, approve (+6 weitere)
 
 **Status:** 🟢 IMPLEMENTIERT
@@ -177,7 +177,7 @@
 **Datei:** `programs/atcos_main.atc`
 **Zeilen:** 9
 **Typ:** .atc
-**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 **Funktionen/Structs:** —
 
 **Status:** 🔄 STUB
@@ -189,7 +189,7 @@
 **Datei:** `programs/event_bus.atc`
 **Zeilen:** 75
 **Typ:** .atc
-**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 **Funktionen/Structs:** struct EventEntry, subscribe, unsubscribe, emit, recent, stats, clear
 
 **Status:** 🟢 IMPLEMENTIERT
@@ -201,7 +201,7 @@
 **Datei:** `programs/kernel.atc`
 **Zeilen:** 148
 **Typ:** .atc
-**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 **Funktionen/Structs:** struct Process, start, stop, spawn, kill, get_process, list_processes, status (+3 weitere)
 
 **Status:** 🟢 IMPLEMENTIERT
@@ -213,7 +213,7 @@
 **Datei:** `programs/shivamon.atc`
 **Zeilen:** 162
 **Typ:** .atc
-**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 **Funktionen/Structs:** struct ShivamonStats, struct Shivamon, init, mint, transfer, level_up, owner_of, tokens_of (+2 weitere)
 
 **Status:** 🟢 IMPLEMENTIERT
@@ -225,7 +225,7 @@
 **Datei:** `runtime/driver_framework.py`
 **Zeilen:** 506
 **Typ:** .py
-**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 **Funktionen/Structs:** __init__, register_driver, init_driver, activate_driver, unload_driver, get_driver_info, list_drivers_by_class, enumerate_device (+21 weitere)
 
 **Status:** 🟢 IMPLEMENTIERT
@@ -237,7 +237,7 @@
 **Datei:** `runtime/kernel_runtime.py`
 **Zeilen:** 625
 **Typ:** .py
-**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
+**Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 **Funktionen/Structs:** summary, __init__, load_file, load_source, load_directory, call, contract.functions.get, contract.functions.get (+34 weitere)
 
 **Status:** 🟢 IMPLEMENTIERT
