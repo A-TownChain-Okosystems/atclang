@@ -1,12 +1,44 @@
 # AGENT_MANIFEST.md
-> Letzte Aktualisierung: 2026-09-07 18:55 UTC | Aurora Master Sync v3.1.7 | 26-Repo-Stand (AD-016–AD-046) | Rollout auf alle 26 Repos
+> **Registry-Stand (GENERIERT aus `registry/standards.yaml`):** 449 Standards — 400 APPROVED · 37 CANDIDATE · 50 Familien · Stand 2026-09-10 22:43 UTC+2 · SHA-256 `9b25d16136fe…`
+> Letzte Aktualisierung: 2026-09-10 22:45 UTC | Aurora Master Sync v3.1.7 | 27 governed Repos (28 total, ai/org-scope.yaml-SSOT) | Rollout auf alle governed Repos
+
+## ⚖️ Standard-Compliance-Mandat (verbindlich — ATC-AAS-003/AAS-004, AI-DEV-001 §6)
+
+> **Der zuständige Agent MUSS sämtliche Standards dieser Registry einhalten
+> und umsetzen.** Keine Ausnahmen, keine Teilannahme.
+
+1. **Vollmandat mit Anwendbarkeit:** Registry-Standards sind für den Agenten verbindlich, gestuft nach Anwendbarkeit (ATC-STD-IMPLEMENTATION-001 §1): MANDATORY (immer), CONDITIONAL (wenn Bedingung eintritt, z.B. Domain/Sprache/Classification), REFERENCE (orientierend), NOT_APPLICABLE (mit Begründung). MANDATORY-Standards ohne Ausnahme einhalten —
+   im vollen Umfang, nicht nur im Auszug. Aktuell 103: Verfassung ATC-STD-000
+   v1.2.0, AI-DEV-001..012, ATC-AAS-001..025, ATC-ENT-001..015,
+   ATC-STD-100/201-204/300, BUG-001..004, NET-001..008, ZKP-001..010,
+   README-001, MD-001 und SC-001..020 (alle §9-APPROVED 07.09. — README-001
+   20:36, SC-Framework 21:00, MD-001 21:05 UTC+2; normativ in Kraft).
+2. **Dynamische Bindung:** Die Registry (`registry/standards.yaml`) ist SSOT
+   (ATC-STD-000 §19). Jeder neue APPROVED-Standard ist ab Freigabe automatisch
+   verbindlich — ohne dass dieses Manifest geändert werden MUSS. Die
+   maschinenlesbare Konkretisierung führt `.github/ai/agent.yaml`
+   (`required_standards`), geprüft durch CI.
+3. **Umsetzungspflicht:** Einhalten genügt nicht — der Agent setzt die
+   Standards aktiv um (Repo-Manifeste, AGENTS.md, Audit-Records, Tests,
+   CI-Gates, Findings nach BUG-001..004, Interface-Test-Suiten nach
+   ATC-STD-204 §9).
+4. **Konfliktregel:** Bei Konflikten gilt die Rangfolge der Verfassung
+   (ATC-STD-000 §9): Verfassung > ATC-ENT > ATC-AAS > AI-DEV > Domänen-
+   Standards. Konflikte MUSS der Agent als Finding (BUG-001, Severity nach
+   BUG-002) dokumentieren, nicht stillschweigend auflösen.
+5. **Nachweis:** Jede Agenten-Aktion wird über AUD-Records (AI-DEV-009,
+   `.github/ai/audit/`) und Evidenz (AAS-010) nachgewiesen. Verstöße gegen
+   dieses Mandat sind selbst findings-pflichtig (S1).
+6. **CI-Enforcement:** `check_agent_manifest.py` prüft bei jedem Push, dass
+   das Repo-Manifest alle Registry-Standards referenziert und dieses Mandat
+   vorhanden ist. Gate-Verstoß = Build-FAIL.
 
 ## Repositories (26 aktive — AD-016 + AD-024 + atc-standards + AD-043/044/045 + SCR-0005/AD-046)
 ### Kern-Plattform (9)
 | Repo | Rolle | Zustand (07.09.2026) |
 |------|-------|---------------------|
 | [a-townchain-os-docs](https://github.com/A-TownChain-Okosystems/a-townchain-os-docs) | **DOCS-HUB** — Wiki, DECISIONS_REGISTER (AD-001…039), Roadmaps, Audits | ✅ aktiv |
-| [atc-standards](https://github.com/A-TownChain-Okosystems/atc-standards) | **KANONISCHE Standards-Heimat** (AD-030): ATC-STD-000…203 + ATC-STD-300 (DTC), Registry, Validator | ✅ ATC-STD-000 v1.1.0 APPROVED |
+| [atc-standards](https://github.com/A-TownChain-Okosystems/atc-standards) | **KANONISCHE Standards-Heimat** (AD-030): ATC-STD-000…203 + ATC-STD-300 (DTC), Registry, Validator | ✅ ATC-STD-000 v1.2.0 APPROVED |
 | [atclang](https://github.com/A-TownChain-Okosystems/atclang) | ATCLang 1.0 (Rust-first, AD-021/022), Gates G0-G19 | ✅ G1+G2 bestanden, Suite 126/126 (Python-Baseline; Rust-first G0 ausstehend) |
 | [atc-vm](https://github.com/A-TownChain-Okosystems/atc-vm) | A-TownChain Virtual Machine — verifizierte Bytecode-Ausfuehrung (AD-043) | 🆕 R1-Skeleton (07.09.) |
 | [atc-algorithm](https://github.com/A-TownChain-Okosystems/atc-algorithm) | ATC-Algorithmus — Hybrid Consensus PoH+PoS+PoW (AD-044) | 🆕 R1-Skeleton (07.09.) |
@@ -41,6 +73,19 @@
 > **Chain-ID:** 658467 (AD-004 RESOLVED). **Mainnet-Launch: per AD-023 offen.**
 
 ## GOVERNANCE-STAND (AD-034–AD-039, 07.09.2026)
+
+> **UPDATE 08.09.2026 (SCR-0035):** Die nachfolgenden AD-034–AD-039-Zeilen
+> beschreiben den HISTORISCHEN Stand vom 07.09.2026 und sind als Archiv zu
+> lesen. Aktueller Ist-Zustand: **ATC-STD-000 v1.2.0 APPROVED** (§9-freigegeben
+> 07.09. 23:48 UTC+2, SCR-0019), ATC-AAS-001..025 APPROVED, Registry 387/387
+> Standards APPROVED. **Einzige verbindliche Versions-/Status-Quelle ist
+> registry/standards.yaml (SSOT, Validator S-14/S-19-erzwungen)** — alle
+> Versionsangaben in Historie-/Narrativ-Abschnitten sind Archiv und nicht
+> normativ. Dies wurde durch einen externen Fremd-Audit-Fund (P0-001, als
+> SSOT-Konflikt fehlinterpretiert) veranlasst und ist im Abgleich in
+> docs/AUD-2026-0003_ORG_MASTER_AUDIT.md §6 dokumentiert.
+
+--- (Archiv 07.09.2026 —)
 - **ATC-STD-000 Verfassung** (36 Abschnitte, §7 Naming Convention 7.1-7.11):
   v1.0.0 **CANDIDATE** — Review-Chain 3/3 PASS (Technical/Security/
   Architecture), Approval **BLOCKED beim Owner** (APPROVE/REQUEST CHANGES/
@@ -62,7 +107,7 @@
  → [L4] globus-os → [L5] 13 Blockchain-Services → [L6] genesis-engine →
  genesis-chronicles → [L7] a-townchain-os (Integration, AD-017)
 [parallel] a-townchain-os-docs (Docs-Hub) · atc-standards (Norm)
-```text
+```
 Lauffähigkeits-Roadmap M1-M8 (jede Stufe = lauffähiges Inkrement):
 M1 Sprache (G1 ✅ → G2 offen) → M2 Kernel (✅ 674/674 + Boot) → M3 KI →
 M4 Blockchain (2 Nodes, 658467, Contract auf ATVM) → M5 OS → M6 Dienste →
