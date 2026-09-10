@@ -39,6 +39,22 @@ def node_to_obj(n):
         }
     if cn == "Program":
         return {"kind": "Program", "statements": [node_to_obj(s) for s in n.statements]}
+    if cn == "ReturnStatement":
+        return {"kind": "ReturnStatement", "value": None if n.value is None else node_to_obj(n.value)}
+    if cn == "Parameter":
+        return {"kind": "Parameter", "name": n.name, "type_hint": node_to_obj(n.type_hint)}
+    if cn == "FunctionDef":
+        return {
+            "body": [node_to_obj(s) for s in n.body],
+            "decorators": list(n.decorators),
+            "is_pub": bool(n.is_pub),
+            "kind": "FunctionDef",
+            "name": n.name,
+            "params": [node_to_obj(x) for x in n.params],
+            "return_type": None if n.return_type is None else node_to_obj(n.return_type),
+        }
+    if cn == "ExprStatement":
+        return {"expr": node_to_obj(n.expr), "kind": "ExprStatement"}
     raise SystemExit(f"unerwarteter AST-Knoten im Subset: {cn} — Subset erweitern")
 
 
