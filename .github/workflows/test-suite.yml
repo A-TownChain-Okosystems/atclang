@@ -45,32 +45,36 @@ jobs:
               || { echo "pytest FAILED in $d"; FAIL=1; }
           done < <(find . -name requirements.txt -not -path "*/archive/*")
           exit $FAIL
-      - name: Evidence-Bindung (SCR-0081, bound_commit + test_run)
+      - name: Evidence-Bindung (SCR-0086: test_run BEI JEDEM LAUF aktualisieren + hartes Push-Gate)
         if: success()
         run: |
           python3 - <<'PY'
-          import os, datetime
+          import os, datetime, re
           sha = os.environ["GITHUB_SHA"]
           rid = os.environ["GITHUB_RUN_ID"]
+          wf  = os.environ.get("GITHUB_WORKFLOW", "ATC Test Suite")
+          ts  = datetime.datetime.now(datetime.timezone.utc).isoformat()
           p = ".atc/evidence/evidence.yaml"
           t = open(p, encoding="utf-8").read()
-          t = t.replace("bound_commit: pending", "bound_commit: " + sha)
-          if "test_run:" not in t:
-              t = t.rstrip() + "\n"
-              t += "test_run:\n"
-              t += "  workflow: " + os.environ.get("GITHUB_WORKFLOW", "ATC Test Suite") + "\n"
-              t += "  run_id: " + rid + "\n"
-              t += "  commit: " + sha + "\n"
-              t += "  timestamp: " + datetime.datetime.now(datetime.timezone.utc).isoformat() + "\n"
-              t += "  result: PASS\n"
-              t += "  runner: github-actions\n"
-              open(p, "w", encoding="utf-8").write(t)
+          t = re.sub(r"bound_commit: [^\n]*", "bound_commit: " + sha, t)
+          block = ("test_run:\n"
+                   "  workflow: " + wf + "\n"
+                   "  run_id: " + rid + "\n"
+                   "  commit: " + sha + "\n"
+                   "  timestamp: " + ts + "\n"
+                   "  result: PASS\n"
+                   "  runner: github-actions\n")
+          if re.search(r"(?m)^test_run:\n(?:  [^\n]*\n)+", t):
+              t = re.sub(r"(?m)^test_run:\n(?:  [^\n]*\n)+", block, t)
+          else:
+              t = t.rstrip() + "\n" + block
+          open(p, "w", encoding="utf-8").write(t)
           PY
           git config user.name "Aurora-Bot"
           git config user.email "aurora@base44.ai"
           git add .atc/evidence/evidence.yaml
-          git commit -m "chore(evidence): bound_commit auto + test_run PASS (SCR-0081) [skip ci]" || echo "nichts zu committen"
-          git push || echo "EVIDENCE_PUSH_BLOCKED"
+          git commit -m "chore(evidence): bound_commit + test_run aktualisiert (SCR-0086) [skip ci]" || echo "nichts zu committen"
+          git push
   rust-core:
     runs-on: ubuntu-latest
     steps:
