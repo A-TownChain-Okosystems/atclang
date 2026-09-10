@@ -1,9 +1,9 @@
 // Copyright (c) 2026 Michael Wroblewski — Apache-2.0
 //! Lexer-MVP: Tokens fuer eine ATCLang-Teilmenge.
 //! Token-Modell am Python-Referenz-Lexer (src/atclang/frontend/lexer/lexer.py)
-//! ausgerichtet (SCR-0084). Hinweis: '=' ist im Referenz-Modell EQ und dient
-//! im let-Kontext als Zuweisung; ':' ist COLON. '%' wird geparst, gehoert aber
-//! NICHT zum Operator-Subset des Referenz-Parsers (Differential-Befund).
+//! ausgerichtet (SCR-0084/0085). Hinweis: '=' ist im Referenz-Modell EQ und dient
+//! im let-Kontext als Zuweisung; ':' ist COLON; '->' ist ARROW (Return-Type).
+//! '%' wird geparst, gehoert aber NICHT zum Operator-Subset des Referenz-Parsers.
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
@@ -16,6 +16,7 @@ pub enum Token {
     Assign,
     Plus,
     Minus,
+    Arrow,
     Star,
     Slash,
     Percent,
@@ -43,7 +44,14 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
             ' ' | '\t' | '\n' | '\r' => {}
             '=' => tokens.push(Token::Assign),
             '+' => tokens.push(Token::Plus),
-            '-' => tokens.push(Token::Minus),
+            '-' => {
+                if chars.peek().map_or(false, |&(_, c)| c == '>') {
+                    chars.next();
+                    tokens.push(Token::Arrow);
+                } else {
+                    tokens.push(Token::Minus);
+                }
+            }
             '*' => tokens.push(Token::Star),
             '/' => tokens.push(Token::Slash),
             '%' => tokens.push(Token::Percent),
@@ -110,18 +118,29 @@ mod tests {
     }
 
     #[test]
-    fn const_mit_typ() {
-        let ts = tokenize("const pi: u64 = 3;").unwrap();
+    fn fn_signatur_mit_arrow() {
+        let ts = tokenize("fn add(a: u64) -> u64 { }").unwrap();
         assert_eq!(ts, vec![
-            Token::Const,
-            Token::Ident("pi".to_string()),
+            Token::Fn,
+            Token::Ident("add".to_string()),
+            Token::LParen,
+            Token::Ident("a".to_string()),
             Token::Colon,
             Token::Ident("u64".to_string()),
-            Token::Assign,
-            Token::Int(3),
-            Token::Semi,
+            Token::RParen,
+            Token::Arrow,
+            Token::Ident("u64".to_string()),
+            Token::LBrace,
+            Token::RBrace,
             Token::Eof,
         ]);
+    }
+
+    #[test]
+    fn minus_nicht_arrow() {
+        let ts = tokenize("let n = -5;").unwrap();
+        assert_eq!(ts[3], Token::Minus);
+        assert_eq!(ts[4], Token::Int(5));
     }
 
     #[test]
