@@ -1,0 +1,4 @@
+# CODEOWNERS — ATC-GOV SCR-0093 (Owner-Audit 11.09.2026 P0-6)
+# Critical-Repositories erfordern Human-Review. Agenten (ShivaCoreDev) sind
+# Executor/Auditor/Maintainer — NIE Approver (ATC-STD-003 par.9).
+* @A-TownChain
