@@ -1,0 +1,21 @@
+# ATC Standards Profile-Bindung (ATC-STD-LIB-001 sec.8, SCR-0101) — verbindlicher Compliance-Vertrag.
+# SSOT-Kaskade: atc-standards/registry/repositories.yaml + atc-standards/profiles/ > diese Datei. Manuelle Abweichung = Drift.
+criticality: C1
+domain: language
+domain_extension: 'pending (fachliche Standards je Domain via SCR — ehrlich: Kernprofil
+  v1.0)'
+layer: L0
+profile: atclang
+profile_source: atc-standards/profiles/atclang.yaml
+registry_id: ATC-REPO-LANG-001
+required_standards:
+- ATC-STD-000
+- ATC-STD-003
+- ATC-STD-012
+- ATC-STD-016
+- ATC-STD-017
+- ATC-STD-018
+- ATC-STD-019
+- ATC-STD-201
+- ATC-STD-202
+version: 1.0.0
