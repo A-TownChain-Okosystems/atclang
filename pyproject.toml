@@ -8,6 +8,10 @@ version = "1.0.0a1"
 description = "ATCLang — proprietäre System- und Contract-Sprache der A-TownChain"
 requires-python = ">=3.10"
 license = { text = "All Rights Reserved — A-TownChain-Okosystems" }
+dependencies = [
+    "semver>=3.0.0",
+]
+
 
 [tool.setuptools.packages.find]
 where = ["src"]

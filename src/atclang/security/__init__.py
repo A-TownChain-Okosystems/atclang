@@ -1,1 +1,4 @@
-"""ATCLang 1.0 Subsystem-Platzhalter. Spezifikation: docs/ATCLANG_1.0_ARCHITECTURE.md. Implementierung: Phase 2 des Rebuilds."""
+"""ATCLang Security — statische Analyse und Konsens-Determinismus-Gate (Gate G2+)."""
+from .static_analysis import SecurityGate, Finding, Severity
+
+__all__ = ["SecurityGate", "Finding", "Severity"]

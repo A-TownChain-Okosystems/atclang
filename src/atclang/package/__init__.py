@@ -1,1 +1,4 @@
-"""ATCLang 1.0 Subsystem-Platzhalter. Spezifikation: docs/ATCLANG_1.0_ARCHITECTURE.md. Implementierung: Phase 2 des Rebuilds."""
+"""ATCLang Package-System — atcpkg-Manifest (Abhaengigkeiten und Entry-Points)."""
+from .manifest import PackageManifest, PackageError
+
+__all__ = ["PackageManifest", "PackageError"]

@@ -1,1 +1,4 @@
-"""ATCLang 1.0 Subsystem-Platzhalter. Spezifikation: docs/ATCLANG_1.0_ARCHITECTURE.md. Implementierung: Phase 2 des Rebuilds."""
+"""ATCLang IR — normalisierte JSON-Zwischendarstellung (Tooling-Basis)."""
+from .json_ir import to_json_ir, IRValidationError, validate_ir, ir_hash
+
+__all__ = ["to_json_ir", "IRValidationError", "validate_ir", "ir_hash"]
