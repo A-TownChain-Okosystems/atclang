@@ -317,7 +317,13 @@ class ATCParser:
             self.advance()
             while self.check(TT.DCOLON):
                 self.advance()
-                if self.current().type == TT.KEYWORD and self.current().value in ('new', 'delete', 'deploy', 'call'):
+                if self.current().type == TT.KEYWORD:
+                    # FIX (12.09.2026): Jedes Keyword ist als Namespace-Member
+                    # zulaessig — Methodennamen wie transfer/mint/burn sind
+                    # reservierte Woerter. Bisher nur new/delete/deploy/call,
+                    # dadurch zerfiel ATCoin::transfer(...) in zwei Statements
+                    # (silent wrong semantics). Praezedenz: parse_postfix
+                    # akzeptiert Keywords bereits als Feldnamen nach '.'.
                     parts.append(self.advance().value)
                 elif self.check(TT.IDENT) or self.check(TT.ATC_STD):
                     parts.append(self.advance().value)
@@ -332,7 +338,8 @@ class ATCParser:
             self.advance()
             while self.check(TT.DCOLON):
                 self.advance()
-                if self.current().type == TT.KEYWORD and self.current().value in ('new', 'delete', 'deploy', 'call'):
+                if self.current().type == TT.KEYWORD:
+                    # FIX (12.09.2026): alle Keywords als Member (siehe ATC_STD-Zweig)
                     parts.append(self.advance().value)
                 elif self.check(TT.IDENT) or self.check(TT.TYPE) or self.check(TT.ATC_STD):
                     parts.append(self.advance().value)
