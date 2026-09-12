@@ -180,7 +180,7 @@ Vertiefende Dokumentation befindet sich in folgenden Verzeichnissen:
 
 ## Governance
 
-Dieses Repository unterliegt den Governance-Regeln der A-TownChain-Organisation (ATC-STD-000 v1.2.0, ATC-ENT-001..015). Architektur- und Sicherheitsänderungen erfordern eine Formal-Freigabe des Owners.
+Dieses Repository unterliegt den Governance-Regeln der A-TownChain-Organisation (ATC-STD-000 v1.3.0, ATC-ENT-001..015). Architektur- und Sicherheitsänderungen erfordern eine Formal-Freigabe des Owners.
 
 ## Standards & Compliance
 
@@ -188,7 +188,7 @@ Dieses Repository erfüllt die folgenden A-TownChain-Standards:
 
 | Standard | Version | Compliance |
 |---|---:|---|
-| ATC-STD-000 | 1.2.0 | ✅ |
+| ATC-STD-000 | 1.3.0 | ✅ |
 | ATC-STD-201 | 1.0.0 | ✅ |
 | ATC-STD-202 | 1.1.0 | ✅ |
 | ATC-STD-203 | 1.0.0 | ✅ |
