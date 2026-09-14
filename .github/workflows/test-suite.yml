@@ -1,10 +1,14 @@
 name: ATC Test Suite
+
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
+
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   npm-tests:
@@ -45,36 +49,6 @@ jobs:
               || { echo "pytest FAILED in $d"; FAIL=1; }
           done < <(find . -name requirements.txt -not -path "*/archive/*")
           exit $FAIL
-      - name: Evidence-Bindung (SCR-0086 idempotentes test_run-Update je Lauf + hartes Push-Gate)
-        if: success()
-        run: |
-          python3 - <<'PY'
-          import os, datetime, re
-          sha = os.environ["GITHUB_SHA"]
-          rid = os.environ["GITHUB_RUN_ID"]
-          wf  = os.environ.get("GITHUB_WORKFLOW", "ATC Test Suite")
-          ts  = datetime.datetime.now(datetime.timezone.utc).isoformat()
-          p = ".atc/evidence/evidence.yaml"
-          t = open(p, encoding="utf-8").read()
-          t = re.sub(r"bound_commit: [^\n]*", "bound_commit: " + sha, t)
-          block = ("test_run:\n"
-                   "  workflow: " + wf + "\n"
-                   "  run_id: " + rid + "\n"
-                   "  commit: " + sha + "\n"
-                   "  timestamp: " + ts + "\n"
-                   "  result: PASS\n"
-                   "  runner: github-actions\n")
-          if re.search(r"(?m)^test_run:\n(?:  [^\n]*\n)+", t):
-              t = re.sub(r"(?m)^test_run:\n(?:  [^\n]*\n)+", block, t)
-          else:
-              t = t.rstrip() + "\n" + block
-          open(p, "w", encoding="utf-8").write(t)
-          PY
-          git config user.name "Aurora-Bot"
-          git config user.email "aurora@base44.ai"
-          git add .atc/evidence/evidence.yaml
-          git commit -m "chore(evidence): bound_commit + test_run aktualisiert (SCR-0086) [skip ci]" || echo "nichts zu committen"
-          git push
   rust-core:
     runs-on: ubuntu-latest
     steps:
@@ -109,3 +83,33 @@ jobs:
           fi
       - name: Differential-Test (Rust-Canonical vs. expected)
         run: cd crates/atc-core && cargo test --quiet
+  evidence:
+    needs: [npm-tests, pytest, rust-core, differential]
+    if: success()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build immutable evidence artifact
+        run: |
+          mkdir -p evidence
+          python3 - <<'PY'
+          import os, datetime, re
+          sha = os.environ["GITHUB_SHA"]
+          rid = os.environ["GITHUB_RUN_ID"]
+          wf = os.environ.get("GITHUB_WORKFLOW", "ATC Test Suite")
+          ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+          t = open(".atc/evidence/evidence.yaml", encoding="utf-8").read()
+          t = re.sub(r"bound_commit: [^\n]*", "bound_commit: " + sha, t)
+          block = ("test_run:\n  workflow: " + wf + "\n  run_id: " + rid + "\n  commit: " + sha + "\n  timestamp: " + ts + "\n  result: PASS\n  runner: github-actions\n")
+          if re.search(r"(?m)^test_run:\n(?:  [^\n]*\n)+", t):
+              t = re.sub(r"(?m)^test_run:\n(?:  [^\n]*\n)+", block, t)
+          else:
+              t = t.rstrip() + "\n" + block
+          open("evidence/evidence.yaml", "w", encoding="utf-8").write(t)
+          PY
+      - name: Upload immutable evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: atclang-evidence-${{ github.sha }}
+          path: evidence/evidence.yaml
+          if-no-files-found: error
