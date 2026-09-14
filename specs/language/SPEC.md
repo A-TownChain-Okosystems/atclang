@@ -95,7 +95,7 @@ ATC-Standard-Referenzen der Form `ATC::Hash::sha3(...)` lexieren als ATC_STD.
 ```text
 program    ::= module_decl? statement*
 module_decl::= "module" IDENT
-```text
+```
 
 ### 3.2 Anweisungen
 
@@ -105,7 +105,7 @@ let_stmt   ::= ("let"|"const") IDENT (":" type)? ("=" expr)? (";"?)
 if_stmt    ::= "if" expr block ("elif" expr block)* ("else" block)?
 while_stmt ::= "while" expr block
 for_stmt   ::= "for" IDENT "in" expr block
-match_stmt ::= "match" expr NEWLINE INDENT case_clause+ DEDEND
+match_stmt ::= "match" expr NEWLINE INDENT case_clause+ DEDENT
 case       ::= "case" pattern "=>" block
 return     ::= "return" expr?
 emit       ::= "emit" call_expr
@@ -113,7 +113,7 @@ require    ::= "require" "(" expr ("," STRING)? ")"
 break      ::= "break" ; continue ::= "continue"
 assignment ::= expr ("=" | "+=" | "-=" | "*=" | "/=") expr
 expr_stmt  ::= expr ";"?
-```text
+```
 
 **Normatives Desugar:** Compound-Zuweisung wird vom Parser desugart:
 `x += y` → `Assignment(x, BinaryOp(x, "+", y))` (auch -=, *=, /=). Der AST
@@ -123,11 +123,11 @@ enthaelt KEINE Compound-Knoten.
 
 ```text
 struct   ::= "struct" IDENT block_field+
-enum     ::= "enum" IDENT NEWLINE INDENT variant+ DEDEND
+enum     ::= "enum" IDENT NEWLINE INDENT variant+ DEDENT
 class   ::= "class" IDENT (":" IDENT)? block
 contract ::= "contract" IDENT block_contract_body
 function ::= "fn" IDENT "(" params ")" ("->" type)? block
-```text
+```
 
 Contract-Koerper (AST: StorageBlock, StateField, EventDef, ErrorDef,
 FunctionDef): Storage-/State-Deklarationen, Events, Errors und Funktionen.
@@ -137,7 +137,7 @@ Wallet-Deklarationen erzeugen WalletDef (parallele Struktur zu ContractDef).
 
 | Stufe | Produktion | Operatoren |
 |---|---|---|
-| 1 (niedrigst) | parse_logical | `\|\|`, `&&` |
+| 1 (niedrigst) | parse_logical | `\\|\\|`, `&&` |
 | 2 | parse_comparison | `==`, `!=`, `<`, `>`, `<=`, `>=` |
 | 3 | parse_addition | `+`, `-` |
 | 4 | parse_multiplication | `*`, `/`, `%` |
@@ -150,7 +150,7 @@ BoolLiteral, NullLiteral, ListLiteral `[...]`, MapLiteral `{...}`, Match-Expr,
 Lambda, Identifier, Klammerausdruck. Potenz `**`, Ranges `..`/`..=`, Slices und
 Ternaries existieren als AST-Knoten (RangeExpr, SliceExpr, TernaryExpr).
 
-## 4. AST-Referenz (50 Knoten, Quelle: frontend/parser/ast_nodes.py)
+## 4. AST-Referenz (49 Knoten)
 
 Basisklasse ASTNode (line, col). Knoten:
 
@@ -203,7 +203,6 @@ Basisklasse ASTNode (line, col). Knoten:
 - UnaryOp
 - WalletDef
 - WhileStatement
-- X
 
 ## 5. Semantik (Quelle: compiler/type_checker.py)
 
@@ -235,20 +234,6 @@ und Scope-Kette (`child(...)`). Innere Scopes sehen ausseren; Shadowing erlaubt.
 | `push` | [T_LIST, T_ANY] | T_VOID |
 | `pop` | [T_LIST] | T_ANY |
 
-### 5.4 Standardbibliothek (9 Module)
-
-| Modul | Klassen |
-|---|---|
-| stdlib/math.py | ATCMath |
-| stdlib/collections.py | ATCCollections |
-| stdlib/string.py | ATCString |
-| stdlib/crypto.py | ATCCrypto |
-| stdlib/chain.py | ATCChain |
-| stdlib/encoding.py | ATCEncoding |
-| stdlib/io.py | ATCIO |
-| stdlib/primitives.py | ATCAddress, ATCHash, ATCSignature, ATCTransaktion, ATCBlockHeader, ATCPrimitives |
-| stdlib/wallet.py | ATCWallet |
-
 ## 6. Fehlermodell (Quelle: compiler/errors.py, 45 Klassen)
 
 CompileError-Hierarchie mit CompileErrorCode: ArgumentCountError, BreakOutsideLoopError, CompileBytecodeError, CompileContractError, CompileControlFlowError, CompileError, CompileErrorCode, CompileFunctionError, CompileInternalError, CompileNameError, CompileSyntaxError, CompileTypeError, CompilerDiagnostic, ConstantPoolError, ConstantPoolOverflowError, ContinueOutsideLoopError, DuplicateParameterError, DuplicateSymbolError, ErrorSeverity, InvalidASTError, InvalidBytecodeError, InvalidCallError, InvalidCastError, InvalidConstantError, InvalidContractError, InvalidErrorDefinitionError, InvalidEventError, InvalidFunctionError, InvalidGenericError, InvalidJumpError, InvalidOpcodeError, InvalidOperandError, InvalidOperationError, InvalidOptimizationError, InvalidReturnError, InvalidScopeError, InvalidStateError, InvalidStorageError, OptimizationError, SourceLocation, SourceSpan, TypeMismatchError, UndefinedSymbolError, UnknownTypeError, UnreachableCodeError
@@ -271,7 +256,7 @@ LexError (lexer.py) und Parse-Fehler tragen Zeile:Spalte.
 - [x] Token-Inventar vollstaendig (63 Tokens, 2.1)
 - [x] Schluesselwoerter und Typ-Bezeichner vollstaendig (2.3, 2.4)
 - [x] EBNF ueber alle 28 Parser-Produktionen, inkl. Desugar-Regeln (3.x)
-- [x] AST-Referenz ueber 50 Knoten (4)
+- [x] AST-Referenz ueber 49 Knoten (4)
 - [x] Semantik-Regeln und Builtins aus type_checker (5)
 - [x] Fehlermodell vollstaendig (6)
 - [x] Maschinenlesbares Extrakt registry.json fuer Conformance-/Differential-Tooling
