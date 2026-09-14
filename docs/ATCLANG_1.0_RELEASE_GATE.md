@@ -14,7 +14,7 @@ This document is the machine-reviewable release gate for ATCLang 1.0.0. A versio
 | G0 | Repository baseline/build | PASS (documented) |
 | G1 | Normative language specification | PASS |
 | G2 | Semantic/type-checking specification | PASS |
-| G3 | Canonical IR, bytecode emission and verification | OPEN |
+| G3 | Canonical IR, bytecode emission and verification | PARTIAL — ATCB-1 baseline implemented |
 | G4 | ATVM integration and execution conformance | OPEN |
 | G5 | Standard library and host API completion | OPEN |
 | G6 | ABI specification and compatibility tests | OPEN |
@@ -50,6 +50,12 @@ ATCLang source
 ```
 
 Rust is the canonical execution/chain-facing implementation boundary. Python reference tooling may be used for development and differential testing, but it MUST NOT be treated as consensus authority.
+
+## Current implementation evidence
+
+The Rust canonical core now contains an ATCB-1 bytecode container, deterministic opcode encoding, and a structural bytecode verifier. The normative baseline is `specs/bytecode/ATCB-1.md`.
+
+This closes no production gate by itself. The verifier is intentionally limited to structural stack/local/function checks; control-flow, type safety, ABI, storage, gas/resource accounting, host capabilities and ATVM execution remain separate gates.
 
 ## Evidence required for GO
 
