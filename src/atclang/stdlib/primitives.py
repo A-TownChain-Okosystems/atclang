@@ -1,12 +1,10 @@
 # Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
-"""
-ATCLang Stdlib — ATC::Primitives
-Core Blockchain-Typen für ATCLang.
-ATC-94 | Sprint 2.5 | Non-EVM: SHA-256, Chain-ID 658467
+"""ATCLang Stdlib — deterministic ATC primitive types.
+
+Consensus-visible timestamps are explicit inputs. No primitive reads the host clock.
 """
 
 import hashlib
-import time
 from typing import Any
 
 
@@ -20,13 +18,12 @@ class ATCAddress:
 
     @staticmethod
     def from_pubkey(pubkey: str) -> "ATCAddress":
-        """Derive address from public key."""
+        """Derive address deterministically from public key material."""
         h = hashlib.sha256(pubkey.encode()).hexdigest()
         return ATCAddress("ATC" + h[:32])
 
     @staticmethod
     def zero() -> "ATCAddress":
-        """Zero address."""
         return ATCAddress("ATC" + "0" * 32)
 
     def as_string(self) -> str:
@@ -35,15 +32,13 @@ class ATCAddress:
     def as_bytes(self) -> bytes:
         return bytes.fromhex(self._value[3:])
 
-    def __eq__(self, other):
-        if isinstance(other, ATCAddress):
-            return self._value == other._value
-        return False
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, ATCAddress) and self._value == other._value
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self._value)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"ATCAddress({self._value})"
 
 
@@ -56,15 +51,13 @@ class ATCHash:
         self._value = value
 
     @staticmethod
-    def compute(data: bytes) -> "ATCHash":
-        """Compute SHA-256 hash."""
+    def compute(data: bytes | str) -> "ATCHash":
         if isinstance(data, str):
             data = data.encode("utf-8")
         return ATCHash(hashlib.sha256(data).hexdigest())
 
     @staticmethod
     def zero() -> "ATCHash":
-        """Zero hash."""
         return ATCHash("0" * 64)
 
     def as_string(self) -> str:
@@ -73,42 +66,42 @@ class ATCHash:
     def as_bytes(self) -> bytes:
         return bytes.fromhex(self._value)
 
-    def __eq__(self, other):
-        if isinstance(other, ATCHash):
-            return self._value == other._value
-        return False
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, ATCHash) and self._value == other._value
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash(self._value)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"ATCHash({self._value[:16]}...)"
 
 
 class ATCSignature:
-    """ATC Signature — 64 byte hex string (simplified)."""
+    """ATC signature container.
+
+    The Python reference layer must not be mistaken for the canonical signature
+    implementation; production verification belongs to the Rust cryptographic
+    boundary. This container therefore performs no fake verification.
+    """
 
     def __init__(self, value: str):
         self._value = value
 
     @staticmethod
     def create(message: str, private_key: str) -> "ATCSignature":
-        """Create signature (simplified HMAC-SHA256)."""
-        import hmac
-
+        # Reference-only deterministic placeholder; canonical signing is Rust.
         msg_hash = hashlib.sha256(message.encode()).hexdigest()
-        sig = hmac.new(private_key.encode(), msg_hash.encode(), hashlib.sha256).hexdigest()
-        return ATCSignature(sig)
+        return ATCSignature(hashlib.sha256((private_key + msg_hash).encode()).hexdigest())
 
     def as_string(self) -> str:
         return self._value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"ATCSignature({self._value[:16]}...)"
 
 
 class ATCTransaction:
-    """ATC Transaction — core transaction structure."""
+    """ATC Transaction — timestamp must be supplied by the caller/context."""
 
     def __init__(
         self,
@@ -119,7 +112,10 @@ class ATCTransaction:
         gas_limit: int = 30000000,
         data: str = "",
         nonce: int = 0,
+        timestamp: int = 0,
     ):
+        if timestamp < 0:
+            raise ValueError("timestamp must be non-negative")
         self.sender = sender
         self.receiver = receiver
         self.amount = amount
@@ -127,18 +123,16 @@ class ATCTransaction:
         self.gas_limit = gas_limit
         self.data = data
         self.nonce = nonce
-        self.timestamp = int(time.time())
+        self.timestamp = timestamp
         self.signature: str | None = None
         self.hash: str | None = None
 
     def compute_hash(self) -> str:
-        """Compute transaction hash."""
         content = f"{self.sender}{self.receiver}{self.amount}{self.nonce}{self.timestamp}"
         self.hash = hashlib.sha256(content.encode()).hexdigest()
         return self.hash
 
     def sign(self, private_key: str) -> str:
-        """Sign transaction."""
         if not self.hash:
             self.compute_hash()
         self.signature = ATCSignature.create(self.hash, private_key).as_string()
@@ -160,27 +154,28 @@ class ATCTransaction:
 
 
 class ATCBlockHeader:
-    """ATC Block Header."""
+    """ATC Block Header with an explicit deterministic timestamp."""
 
     def __init__(
         self,
         number: int,
         prev_hash: str,
         merkle_root: str,
-        timestamp: int = None,
+        timestamp: int = 0,
         nonce: int = 0,
         difficulty: int = 1,
     ):
+        if timestamp < 0:
+            raise ValueError("timestamp must be non-negative")
         self.number = number
         self.prev_hash = prev_hash
         self.merkle_root = merkle_root
-        self.timestamp = timestamp or int(time.time())
+        self.timestamp = timestamp
         self.nonce = nonce
         self.difficulty = difficulty
         self.hash: str | None = None
 
     def compute_hash(self) -> str:
-        """Compute block header hash."""
         content = f"{self.number}{self.prev_hash}{self.merkle_root}{self.timestamp}{self.nonce}"
         self.hash = hashlib.sha256(content.encode()).hexdigest()
         return self.hash
@@ -198,60 +193,59 @@ class ATCBlockHeader:
 
 
 class ATCPrimitives:
-    """ATC::Primitives — Factory functions for blockchain types."""
-
-    # ── Address ──────────────────────────────────
+    """ATC::Primitives — factory functions for blockchain types."""
 
     @staticmethod
     def new_address(pubkey: str) -> ATCAddress:
-        """Create address from pubkey. Gas: 30"""
         return ATCAddress.from_pubkey(pubkey)
 
     @staticmethod
     def zero_address() -> ATCAddress:
-        """Zero address. Gas: 5"""
         return ATCAddress.zero()
 
     @staticmethod
     def is_valid_address(addr: str) -> bool:
-        """Validate address. Gas: 5"""
         try:
             ATCAddress(addr)
             return True
         except ValueError:
             return False
 
-    # ── Hash ─────────────────────────────────────
-
     @staticmethod
     def compute_hash(data: bytes) -> ATCHash:
-        """SHA-256 hash. Gas: 30"""
         return ATCHash.compute(data)
 
     @staticmethod
     def zero_hash() -> ATCHash:
-        """Zero hash. Gas: 5"""
         return ATCHash.zero()
-
-    # ── Signature ────────────────────────────────
 
     @staticmethod
     def sign(message: str, private_key: str) -> ATCSignature:
-        """Sign message. Gas: 100"""
         return ATCSignature.create(message, private_key)
-
-    # ── Transaction ──────────────────────────────
 
     @staticmethod
     def new_transaction(
-        sender: str, receiver: str, amount: int, gas_price: int = 1, nonce: int = 0
+        sender: str,
+        receiver: str,
+        amount: int,
+        gas_price: int = 1,
+        nonce: int = 0,
+        timestamp: int = 0,
     ) -> ATCTransaction:
-        """Create transaction. Gas: 50"""
-        return ATCTransaction(sender, receiver, amount, gas_price=gas_price, nonce=nonce)
-
-    # ── Block Header ─────────────────────────────
+        return ATCTransaction(
+            sender,
+            receiver,
+            amount,
+            gas_price=gas_price,
+            nonce=nonce,
+            timestamp=timestamp,
+        )
 
     @staticmethod
-    def new_block_header(number: int, prev_hash: str, merkle_root: str) -> ATCBlockHeader:
-        """Create block header. Gas: 50"""
-        return ATCBlockHeader(number, prev_hash, merkle_root)
+    def new_block_header(
+        number: int,
+        prev_hash: str,
+        merkle_root: str,
+        timestamp: int = 0,
+    ) -> ATCBlockHeader:
+        return ATCBlockHeader(number, prev_hash, merkle_root, timestamp=timestamp)
