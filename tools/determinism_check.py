@@ -53,8 +53,7 @@ def scan_sources(root, lang):
             path = os.path.join(dirpath, fn)
             relative_path = _relative(path, root)
             # The scanner's own pattern table necessarily contains examples of
-            # forbidden APIs. It is tooling, not consensus/runtime code, and must
-            # never be reported as a product-code finding.
+            # forbidden APIs. It is tooling, not consensus/runtime code.
             if relative_path in SKIP_FILES:
                 continue
             try:
@@ -62,9 +61,7 @@ def scan_sources(root, lang):
                     for i, line in enumerate(f, 1):
                         for pat, desc in PATTERNS[lang]:
                             if re.search(pat, line):
-                                findings.append(
-                                    f"{relative_path}:{i}: {desc}: {line.strip()[:80]}"
-                                )
+                                findings.append(f"{relative_path}:{i}: {desc}: {line.strip()[:80]}")
             except (OSError, UnicodeDecodeError):
                 continue
     return findings
@@ -79,9 +76,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--lang", choices=["rust", "python"], required=True)
     ap.add_argument("--test-cmd", default=None)
-    ap.add_argument(
-        "--skip-tests", action="store_true", help="nur Quellcode-Scan (nicht empfohlen)"
-    )
+    ap.add_argument("--skip-tests", action="store_true", help="nur Quellcode-Scan (nicht empfohlen)")
     args = ap.parse_args()
 
     root = os.getcwd()
@@ -108,14 +103,10 @@ def main():
         rc2, out2 = run_tests(cmd, root)
         if rc1 != 0 or rc2 != 0:
             ok = False
-            print(
-                f"  FINDING: Tests schlagen fehl (rc={rc1}/{rc2}) — Determinismus nicht pruefbar (Fail Closed)"
-            )
+            print(f"  FINDING: Tests schlagen fehl (rc={rc1}/{rc2}) — Determinismus nicht pruefbar (Fail Closed)")
         elif out1 != out2:
             ok = False
-            print(
-                "  FINDING: Testausgaben unterscheiden sich zwischen Lauf 1 und Lauf 2 — nichtdeterministisch!"
-            )
+            print("  FINDING: Testausgaben unterscheiden sich zwischen Lauf 1 und Lauf 2 — nichtdeterministisch!")
         else:
             print("  OK: zwei identische Testlaeufe (Evidenz per Byte-Vergleich)")
 
