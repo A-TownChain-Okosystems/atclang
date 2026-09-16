@@ -1,8 +1,8 @@
 # ATCLang CI / Standards Enforcement Audit — 2026-09-16
 
-**Status:** `IN PROGRESS` / production release remains blocked by existing P1 security findings.
+**Status:** `IN PROGRESS` / production release remains blocked by P1 security findings and incomplete current GitHub evidence.
 
-**Audit mode:** repository source/static audit plus implementation of a fail-closed CI audit gate. Runtime/Actions evidence is not asserted here until a current workflow run proves it.
+**Audit mode:** repository source/static audit plus implementation of a fail-closed CI audit gate. GitHub Actions evidence is reported only when a current run proves it.
 
 ## 1. Scope
 
@@ -19,7 +19,7 @@ The audit covers:
 
 ## 2. Normative architecture
 
-The repository declares Rust as the production/canonical language in `.atc/repository.yaml`. The architecture baseline defines Rust as canonical for compiler, verifier, ATVM, runtime, ABI/artifact validation, security/sandbox and CLI, while Python is the reference implementation, SDK and test/fuzzing layer. The same baseline defines the bytecode verifier as a hard trust boundary and requires differential agreement between Rust and Python stacks.
+The repository declares Rust as the production/canonical language in `.atc/repository.yaml`. The architecture baseline defines Rust as canonical for compiler, verifier, ATVM, runtime, ABI/artifact validation, security/sandbox and CLI, while Python is the reference implementation, SDK and test/fuzzing layer. The bytecode verifier is a hard trust boundary and differential agreement between Rust and Python stacks is required.
 
 This architecture is retained. It is the lowest-risk boundary for consensus-critical software because production execution does not depend on a dynamically typed reference implementation.
 
@@ -38,9 +38,11 @@ The gate is fail-closed and checks:
 7. executable `STUB` markers in the VM;
 8. architecture enforcement statements;
 9. stale file-register entries;
-10. TODO/FIXME/XXX markers in executable source.
+10. TODO/FIXME/XXX markers in executable source;
+11. suspicious executable supply-chain/runtime primitives;
+12. immutable SHA pinning of GitHub Actions.
 
-The static security job independently rejects the currently known false-security primitives. Therefore the new CI gate is expected to fail on the current branch until the P1 implementation findings are actually removed. This is intentional: **a security gate that passes while known security stubs remain would violate fail-closed governance.**
+The gate is intentionally not an immunity claim. It proves only the controls encoded in CI and fails when known unsafe implementation patterns remain.
 
 ## 4. Findings
 
@@ -106,11 +108,22 @@ The static security job independently rejects the currently known false-security
 - **Finding:** the Rust-first boundary is documented but must be demonstrated by executable production-entrypoint enforcement.
 - **Closure:** integration test proving production artifacts/execution resolve to Rust and cannot silently dispatch to the Python VM.
 
+### F-20260916-ATCLANG-008
+- **Class:** P1
+- **Category:** Determinism / consensus safety
+- **Family:** Execution context / host capability boundary
+- **Tags:** `P1 determinism consensus wall-clock execution-context fail-closed`
+- **Finding:** the repository contained host-clock fallbacks in `HostContext`, `ATCChain` and blockchain primitives, while the determinism gate also detected clock access in the reference VM/runtime.
+- **Remediation implemented:** `HostContext` no longer imports or reads the host clock; `ATCChain.block_timestamp` now requires explicit block state; transaction and block-header timestamps are explicit inputs with deterministic defaults. Regression tests were added for reproducibility and missing authenticated block timestamps.
+- **Residual blocker:** the Python VM still contains direct wall-clock usage and an executable `STUB` marker. Therefore F-008 is **not closed**; the remaining VM/runtime boundary must be removed or made explicitly fail-closed before release.
+- **Impact:** accidental consensus execution through the reference VM could diverge between nodes.
+- **Closure:** remove/fail-closed all remaining consensus-reachable wall-clock sources, prove the production entrypoint cannot reach them, and obtain a current green determinism workflow run.
+
 ## 5. Consistency findings
 
-`FILE_REGISTER.md` is generated metadata and currently omits newer CI/audit files visible in the Git tree. This is classified as documentation/registry drift rather than a runtime security defect. The new audit reports it as a warning so the register can be regenerated from the authoritative Git tree.
+`FILE_REGISTER.md` is generated metadata and currently omits newer CI/audit files visible in the Git tree. This is documentation/registry drift rather than a runtime security defect. The audit reports it as a warning so the register can be regenerated from the authoritative Git tree.
 
-The repository status says G1/G2 are complete while the roadmap still lists G3/G4/G5 and security/mainnet gates as incomplete. This is internally coherent: language/semantics completion does not imply compiler-backend, VM integration, security audit or production readiness.
+The repository status says language/semantics work is complete while the roadmap still lists backend, VM integration, security audit and production gates as incomplete. This is internally coherent: language/semantics completion does not imply compiler-backend, VM integration, security audit or production readiness.
 
 ## 6. File format / language assessment
 
@@ -121,13 +134,15 @@ The repository status says G1/G2 are complete while the roadmap still lists G3/G
 - Python: correct for reference implementation, SDK, tests and fuzzing.
 - Rust: required as the canonical production implementation for consensus-critical execution and security boundaries.
 
-No broad file-format migration is justified by this audit; unnecessary migration would increase change surface without increasing assurance.
+No broad file-format migration is justified; unnecessary migration would increase change surface without increasing assurance.
 
 ## 7. Security assurance boundary
 
-The audit does **not** claim immunity from malware, supply-chain compromise, memory corruption, zero-days, or all possible runtime attacks. Security assurance is evidence-based and scoped to the checks actually performed.
+The audit does **not** claim immunity from malware, supply-chain compromise, memory corruption, zero-days, or all possible runtime attacks. Protection is established only for a defined threat class when the relevant control, negative test and current CI evidence all exist.
 
-For the currently known P1 findings, protection is **not established** until the implementation changes and negative/integration tests close the findings.
+Current controls provide concrete resistance against several defined classes: immutable GitHub Action references reduce tag/ref substitution risk; CodeQL and dependency review provide static/dependency analysis; fail-closed governance blocks known unsafe reference primitives; deterministic gates block detected wall-clock/RNG sources; and the architecture keeps Python outside the canonical production trust boundary. None of these proves immunity to arbitrary future malware or unknown vulnerabilities.
+
+For F-001 through F-008, complete protection is **not established** until implementation changes and current evidence close the findings.
 
 ## 8. Closure evidence required
 
@@ -144,6 +159,6 @@ A finding may only be marked closed after:
 
 ## 9. Vision → implementation traceability
 
-`Vision → Concept → Components → Code → Test → Evidence` is now represented by the repository architecture/specification hierarchy, source tree, test suite, differential gate, governance audit and evidence artifact. The missing assurance is not documentation of intent; it is closure of the known P1 implementation findings and current runtime evidence.
+`Vision → Concept → Components → Code → Test → Evidence` is represented by the repository architecture/specification hierarchy, source tree, test suite, differential gate, governance audit and evidence artifacts. The remaining assurance gap is closure of the known P1 implementation findings and current runtime evidence, not documentation of intent alone.
 
 **Production readiness:** `NOT ESTABLISHED`.
