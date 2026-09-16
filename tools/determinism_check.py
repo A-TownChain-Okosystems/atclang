@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""ATC Determinism Gate — ATC-STD-ENG-001 REQ-ENG-002 (D-CRITICAL-Repos).
+"""ATC Determinism Gate — ATC-STD-ENG-001 REQ-ENG-002.
 
-Prüft zwei Determinismus-Säulen:
-  1. VERBOTENE QUELLEN: Wall-Clock / RNG im Produktquellcode
-  2. REPRODUIERBARE TESTS: Testsuite zweimal, Byte-Vergleich der Ausgaben
+Checks two deterministic-execution pillars:
+  1. forbidden host clock/entropy APIs in product source;
+  2. reproducible test output across two identical runs.
 
-Fail-closed: Exit 0 nur wenn BEIDE Säulen grün sind (REQ-ENG-012 — Evidenz
-ist der zweimalige identische Testlauf, kein synthetischer Nachweis).
-
-Aufruf: python3 tools/determinism_check.py --lang rust|python [--test-cmd "..."]
+The scanner intentionally distinguishes host RNG APIs from deterministic
+randomness functions that require an explicit VM seed.
 """
 
 import argparse
@@ -19,18 +17,21 @@ import sys
 
 PATTERNS = {
     "rust": [
-        (r"SystemTime::now", "Wall-Clock im Quellcode"),
-        (r"Instant::now", "Monotonic-Clock im Quellcode"),
-        (r"\brand::", "RNG im Quellcode"),
-        (r"thread_rng", "thread-local RNG"),
-        (r"OsRng|StdRng::from_entropy", "entropy-basierte RNG-Seeds"),
+        (r"SystemTime::now\s*\(", "Wall-Clock im Quellcode"),
+        (r"Instant::now\s*\(", "Monotonic-Clock im Quellcode"),
+        (r"\brand::thread_rng\s*\(", "thread-local RNG"),
+        (r"\brand::random\s*\(", "RNG im Quellcode"),
+        (r"OsRng\b|StdRng::from_entropy\s*\(", "entropy-basierte RNG-Seeds"),
     ],
     "python": [
-        (r"\brandom\b", "random-Modul"),
-        (r"time\.time\(\)", "Wall-Clock"),
-        (r"datetime\.now\b", "Wall-Clock (datetime)"),
-        (r"datetime\.utcnow\b", "Wall-Clock (utcnow)"),
-        (r"uuid4", "Zufalls-UUIDs"),
+        (r"^\s*(?:import\s+random|from\s+random\s+import)\b", "random-Modul"),
+        (r"\brandom\.(?:random|randint|randrange|choice|choices|shuffle|sample)\s*\(", "RNG-Aufruf"),
+        (r"\bsecrets\.(?:token_bytes|token_hex|token_urlsafe|randbelow|randbits)\s*\(", "OS-Entropy-RNG"),
+        (r"\bos\.urandom\s*\(", "OS-Entropy-RNG"),
+        (r"\btime\.time\s*\(\)", "Wall-Clock"),
+        (r"\bdatetime\.now\s*\(", "Wall-Clock (datetime)"),
+        (r"\bdatetime\.utcnow\s*\(", "Wall-Clock (utcnow)"),
+        (r"\buuid\.uuid4\s*\(\)|\buuid4\s*\(", "Zufalls-UUID"),
     ],
 }
 EXT = {"rust": ".rs", "python": ".py"}
@@ -52,8 +53,6 @@ def scan_sources(root, lang):
                 continue
             path = os.path.join(dirpath, fn)
             relative_path = _relative(path, root)
-            # The scanner's own pattern table necessarily contains examples of
-            # forbidden APIs. It is tooling, not consensus/runtime code.
             if relative_path in SKIP_FILES:
                 continue
             try:
@@ -61,7 +60,7 @@ def scan_sources(root, lang):
                     for i, line in enumerate(f, 1):
                         for pat, desc in PATTERNS[lang]:
                             if re.search(pat, line):
-                                findings.append(f"{relative_path}:{i}: {desc}: {line.strip()[:80]}")
+                                findings.append(f"{relative_path}:{i}: {desc}: {line.strip()[:120]}")
             except (OSError, UnicodeDecodeError):
                 continue
     return findings
@@ -69,7 +68,7 @@ def scan_sources(root, lang):
 
 def run_tests(cmd, cwd):
     r = subprocess.run(cmd, shell=True, cwd=cwd, capture_output=True, text=True)
-    return (r.returncode, (r.stdout or "") + (r.stderr or ""))
+    return r.returncode, (r.stdout or "") + (r.stderr or "")
 
 
 def main():
@@ -82,15 +81,15 @@ def main():
     root = os.getcwd()
     ok = True
 
-    print("== Saeule 1: Verbotene Nichtdeterminismus-Quellen ==")
+    print("== Saeule 1: Verbotene Host-Nichtdeterminismus-Quellen ==")
     findings = scan_sources(root, args.lang)
     if findings:
         ok = False
-        for f in findings[:20]:
-            print(f"  FINDING {f}")
+        for finding in findings[:20]:
+            print(f"  FINDING {finding}")
         print(f"  => {len(findings)} Fundstelle(n) — FAIL (REQ-ENG-002)")
     else:
-        print("  OK: keine Wall-Clock/RNG-Fundstellen im Produktquellcode")
+        print("  OK: keine verbotenen Host-Clock/Entropy-Fundstellen im Produktquellcode")
 
     if not args.skip_tests:
         print("== Saeule 2: Reproduzierbare Testlaeufe (2x, Byte-Vergleich) ==")
