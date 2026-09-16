@@ -3,6 +3,7 @@
 These checks intentionally verify only invariants that can be established by the
 repository itself. They do not claim ATVM/mainnet readiness.
 """
+
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
