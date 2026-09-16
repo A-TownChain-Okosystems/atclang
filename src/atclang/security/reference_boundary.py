@@ -18,8 +18,7 @@ class ReferenceBoundaryError(RuntimeError):
 def fail_closed(operation: str) -> NoReturn:
     """Reject an operation rather than returning simulated success."""
     raise ReferenceBoundaryError(
-        f"reference operation '{operation}' is unavailable: "
-        "no verified canonical backend is bound"
+        f"reference operation '{operation}' is unavailable: no verified canonical backend is bound"
     )
 
 
