@@ -1,216 +1,186 @@
 # ATCLang CI / Standards Enforcement Audit — 2026-09-16
 
-**Status:** `IN PROGRESS` / production release remains blocked by P1 security findings and incomplete current GitHub evidence.
+**Status:** `IN PROGRESS / FAIL-CLOSED` — production readiness remains `NOT ESTABLISHED`.
 
-**Audit mode:** repository source/static audit plus implementation of a fail-closed CI audit gate. GitHub Actions evidence is reported only when a current run proves it.
+## Scope
 
-## 1. Scope
+This audit covers standards enforcement, architecture, syntax/lint/tests, deterministic execution, security boundaries, stubs/false-success behavior, documentation/roadmap/TODO/sprint/wiki consistency, file inventory, duplicate/contradictory primitives, language/file-format suitability, and traceability from Vision to actual software state.
 
-The audit covers:
+## Normative architecture
 
-- standards enforcement and repository governance;
-- architecture and language boundary;
-- syntax/lint/test/differential gates;
-- security and deterministic execution boundaries;
-- stubs, placeholders and false-success implementations;
-- documentation, roadmap and file-register consistency;
-- file format and implementation-language suitability;
-- traceability from Vision → Concept → Components → Code → Tests → Evidence.
+- Rust is the canonical production implementation for compiler/verifier/ATVM/runtime/ABI/security-critical paths.
+- Python is a reference, SDK, testing and fuzzing layer.
+- The bytecode verifier is a hard trust boundary.
+- Consensus execution must not depend on host wall-clock, host RNG, network, filesystem or other uncontrolled host capabilities.
+- Python reference security/transport/wallet operations must fail closed unless a verified backend is explicitly bound.
 
-## 2. Normative architecture
+This boundary is the lowest-risk architecture because a dynamic reference implementation cannot become an accidental consensus authority.
 
-The repository declares Rust as the production/canonical language in `.atc/repository.yaml`. The architecture baseline defines Rust as canonical for compiler, verifier, ATVM, runtime, ABI/artifact validation, security/sandbox and CLI, while Python is the reference implementation, SDK and test/fuzzing layer. The bytecode verifier is a hard trust boundary and differential agreement between Rust and Python stacks is required.
+## Standards enforcement
 
-This architecture is retained. It is the lowest-risk boundary for consensus-critical software because production execution does not depend on a dynamically typed reference implementation.
+`.atc/standards.yaml` currently binds:
 
-## 3. CI enforcement implemented by this change
+`ATC-STD-000, 003, 012, 016, 017, 018, 019, 201, 202`.
 
-Added `tools/audit/atclang_ci_audit.py` and `.github/workflows/atclang-ci-audit.yml`.
+The repository CI directly enforces only a subset. Therefore registration is not treated as enforcement. Each required standard must map to an executable gate, machine-readable validation, or explicitly reviewed governance control.
 
-The gate is fail-closed and checks:
+Current executable controls include repository governance, required repository metadata, Rust-primary policy, immutable action SHA checks, Ruff lint/format, Python syntax compilation, test suite, differential testing, CodeQL, dependency review, determinism scanning, static security-boundary scanning and this repository audit.
 
-1. mandatory governance/specification files;
-2. required workflow set;
-3. Rust-primary repository metadata;
-4. normative agent-standard references;
-5. repository audit, lint/format, tests, differential and evidence workflow presence;
-6. targeted insecure reference-VM primitives;
-7. executable `STUB` markers in the VM;
-8. architecture enforcement statements;
-9. stale file-register entries;
-10. TODO/FIXME/XXX markers in executable source;
-11. suspicious executable supply-chain/runtime primitives;
-12. immutable SHA pinning of GitHub Actions.
+## Current findings
 
-The gate is intentionally not an immunity claim. It proves only the controls encoded in CI and fails when known unsafe implementation patterns remain.
-
-## 4. Findings
-
-### F-20260916-ATCLANG-001
+### F-001 — ECDSA reference primitive
 - **Class:** P1
 - **Category:** Security / cryptographic correctness
-- **Family:** Python reference VM / ECDSA
-- **Tags:** `P1 security crypto ecdsa reference-vm fail-closed`
-- **Finding:** reference ECDSA functions are simulation logic rather than ECDSA.
-- **Impact:** forged signatures can be accepted if the reference primitive is reached.
-- **Closure:** replace with a real, explicitly tested implementation or fail closed; prove production dispatch cannot select the reference primitive.
+- **Family:** Crypto / Signature
+- **Tags:** `ecdsa`, `signature`, `authentication`, `fail-closed`
+- **Previous defect:** Python VM generated synthetic signatures and accepted a `sig_` prefix.
+- **Remediation:** Python VM and stdlib now route through `reference_boundary.py` and fail closed.
+- **Remaining closure:** canonical Rust implementation plus production-boundary integration proof and current green CI evidence.
 
-### F-20260916-ATCLANG-002
+### F-002 — JWT validation
 - **Class:** P1
-- **Category:** Security / authentication correctness
-- **Family:** Python reference VM / JWT
-- **Tags:** `P1 security jwt authentication validation`
-- **Finding:** JWT helper accepts arbitrary sufficiently long strings.
-- **Impact:** authentication bypass if exposed outside reference-only tests.
-- **Closure:** real signature/claims validation or fail closed, with negative tests.
+- **Category:** Security / authentication
+- **Family:** Token / Identity
+- **Tags:** `jwt`, `authentication`, `token-validation`
+- **Previous defect:** token-length predicate instead of cryptographic JWT validation.
+- **Remediation:** Python reference operation now fails closed.
+- **Remaining closure:** canonical Rust validation and integration evidence.
 
-### F-20260916-ATCLANG-003
+### F-003 — Network false success
 - **Class:** P1
 - **Category:** Security / network correctness
-- **Family:** Python reference VM / network
-- **Tags:** `P1 security network false-success`
-- **Finding:** network send reports success without transport.
-- **Impact:** callers can make incorrect security/reliability decisions.
-- **Closure:** explicit transport injection for tests or fail closed.
+- **Family:** P2P / Transport
+- **Tags:** `network`, `false-success`, `p2p`
+- **Remediation:** Python VM network send now fails closed; no synthetic success remains in the replacement VM.
+- **Remaining closure:** real transport belongs outside consensus/reference execution and requires authenticated integration tests.
 
-### F-20260916-ATCLANG-004
+### F-004 — RPC false success
 - **Class:** P1
-- **Category:** Security / RPC correctness
-- **Family:** Python reference VM / RPC
-- **Tags:** `P1 security rpc false-success`
-- **Finding:** RPC helper fabricates a successful response.
-- **Impact:** authorization/transport/response-validation paths can be bypassed semantically.
-- **Closure:** real transport or fail closed.
+- **Category:** Security / external interface correctness
+- **Family:** RPC / Transport
+- **Tags:** `rpc`, `false-success`, `transport`
+- **Remediation:** Python RPC path now fails closed.
+- **Remaining closure:** canonical authenticated RPC adapter and integration evidence.
 
-### F-20260916-ATCLANG-005
+### F-005 — Wallet/BIP39/address correctness
 - **Class:** P1
 - **Category:** Cryptographic / wallet correctness
-- **Family:** Python reference VM / BIP39 / address derivation
-- **Tags:** `P1 crypto wallet bip39 address`
-- **Finding:** embedded mnemonic/address helpers are not protocol-conformant and address generation is not key-bound.
-- **Impact:** incompatible or insecure wallet material.
-- **Closure:** canonical wallet implementation plus conformance vectors, or explicit reference-only failure.
+- **Family:** Wallet / Key Derivation
+- **Tags:** `bip39`, `wallet`, `address`, `key-derivation`
+- **Remediation:** synthetic wallet/BIP39/address operations in the Python VM now fail closed.
+- **Remaining closure:** protocol-conformant canonical implementation and conformance vectors.
 
-### F-20260916-ATCLANG-006
-- **Class:** P2
-- **Category:** Determinism / consensus boundary
-- **Family:** Python reference VM / host capabilities
-- **Tags:** `P2 determinism consensus random time`
-- **Finding:** nondeterministic operations are exposed in the reference VM.
-- **Impact:** accidental consensus use could produce divergent state.
-- **Closure:** capability/profile enforcement and verifier rejection for consensus-incompatible operations.
-
-### F-20260916-ATCLANG-007
-- **Class:** P2
-- **Category:** Architecture / language policy enforcement
-- **Family:** Rust canonical / Python reference boundary
-- **Tags:** `P2 architecture rust-canonical python-reference enforcement`
-- **Finding:** the Rust-first boundary is documented but must be demonstrated by executable production-entrypoint enforcement.
-- **Closure:** integration test proving production artifacts/execution resolve to Rust and cannot silently dispatch to the Python VM.
-
-### F-20260916-ATCLANG-008
-- **Class:** P1
+### F-006/F-008 — Deterministic execution
+- **Class:** P1/P2
 - **Category:** Determinism / consensus safety
-- **Family:** Execution context / host capability boundary
-- **Tags:** `P1 determinism consensus wall-clock execution-context fail-closed`
-- **Finding:** the repository contained host-clock fallbacks in `HostContext`, `ATCChain` and blockchain primitives, while the determinism gate also detected clock access in the reference VM/runtime.
-- **Remediation implemented:** `HostContext` no longer imports or reads the host clock; `ATCChain.block_timestamp` now requires explicit block state; transaction and block-header timestamps are explicit inputs with deterministic defaults. Regression tests were added for reproducibility and missing authenticated block timestamps.
-- **Residual blocker:** the Python VM/runtime still contains direct wall-clock usage and an executable `STUB` marker. Therefore F-008 is **not closed**.
-- **Impact:** accidental consensus execution through the reference VM could diverge between nodes.
-- **Closure:** remove/fail-closed all remaining consensus-reachable wall-clock sources, prove the production entrypoint cannot reach them, and obtain a current green determinism workflow run.
+- **Family:** Execution Context / Host Capability
+- **Tags:** `determinism`, `consensus`, `wall-clock`, `host-capability`
+- **Remediation:** `HostContext`, `ATCChain`, transaction and block-header timestamp handling were made explicit/deterministic. The replacement VM no longer reads host time.
+- **Remaining closure:** current repository-wide Determinism Gate must be green; runtime/kernel-runtime host-clock findings must be eliminated or proven unreachable from consensus execution.
 
-### F-20260916-ATCLANG-011
+### F-007 — Rust production-boundary proof
+- **Class:** P2
+- **Category:** Architecture / language policy
+- **Family:** Runtime / Production Boundary
+- **Tags:** `rust-first`, `python-reference`, `production-boundary`, `traceability`
+- **Status:** open.
+- **Closure:** executable integration test must prove production entry resolves to Rust and cannot silently dispatch to Python reference execution.
+
+### F-011 — LoadLocal verifier bounds
 - **Class:** P1
-- **Category:** Security / bytecode verifier correctness
-- **Family:** Rust canonical verifier / local bounds
-- **Tags:** `P1 verifier bytecode load-local bounds rust trust-boundary`
-- **Finding:** `LoadLocal(index)` did not validate `index < local_count`, while `StoreLocal` already did.
-- **Impact:** malformed bytecode could cross the verifier boundary with an invalid local reference.
-- **Remediation implemented:** the Rust verifier now checks `LoadLocal` bounds before increasing stack height, and a regression test covers the invalid-index case.
-- **Closure:** current Rust test and CI evidence must pass after the change.
+- **Category:** Security / verifier correctness
+- **Family:** Bytecode / Local Variables
+- **Tags:** `verifier`, `bytecode`, `invalid-local`, `fail-closed`
+- **Status:** implementation present; current CI closure pending.
 
-### F-20260916-ATCLANG-012
+### F-012 — Ruff formatting
 - **Class:** P2
 - **Category:** CI quality / formatting
 - **Family:** Python tooling / Ruff
-- **Tags:** `P2 ci formatting ruff audit-tools`
-- **Finding:** Ruff format check previously rejected `tests/test_atclang_1_0_gate.py` and `tools/audit/atclang_ci_audit.py`.
-- **Status:** **OPEN** until the current workflow proves `ruff format --check` green.
-- **Closure:** apply formatter-compatible source changes and verify the current GitHub job.
+- **Tags:** `ci`, `formatting`, `ruff`
+- **Remediation:** the previously reported files were reformatted. Current workflow evidence is still required before closure.
 
-### F-20260916-ATCLANG-013
+### F-013 — Determinism scanner self-match
 - **Class:** P2
-- **Category:** CI correctness / determinism scanner
-- **Family:** Determinism tooling / self-scan exclusion
-- **Tags:** `P2 ci determinism scanner false-positive tooling`
-- **Finding:** the determinism scanner could report its own regex patterns as product-code nondeterminism.
-- **Remediation implemented:** the scanner now excludes itself by normalized repository-relative path while continuing to scan executable product source.
-- **Closure:** current Rust/Python determinism runs must show only genuine product findings and pass only after those findings are removed.
+- **Category:** CI correctness / static analysis
+- **Family:** Determinism / Scanner
+- **Tags:** `determinism`, `scanner`, `false-positive`, `ci`
+- **Remediation:** scanner self-file exclusion is implemented. Genuine product findings remain fail-closed.
 
-### F-20260916-ATCLANG-014
+### F-014 — Executable Python security simulations/stub
 - **Class:** P1
 - **Category:** Security / reference implementation boundary
 - **Family:** Python VM / simulated security and transport primitives
-- **Tags:** `P1 security reference-vm ecdsa jwt rpc network wallet stub`
-- **Finding:** GitHub's static security gate still detects simulated ECDSA, permissive ECDSA verification, weak JWT validation, false-success network/RPC paths, synthetic address/BIP39 logic and an executable VM `STUB`.
-- **Status:** **OPEN**. These are not being hidden or downgraded merely to make CI green.
-- **Closure:** replace each production-reachable primitive with a canonical implementation or explicit fail-closed reference-only operation, then prove non-reachability from the Rust production entrypoint.
+- **Tags:** `security`, `reference-vm`, `stub`, `false-success`
+- **Remediation:** the previous 50 KB simulation VM was replaced by a deterministic reference VM. It contains no executable `# STUB:` marker and explicitly fails closed for security, network, RPC, wallet, filesystem and host-sensitive operations.
+- **Verification:** new negative tests exercise VM dispatch for ECDSA, JWT and network boundaries.
+- **Closure:** current CI/static scan must confirm the old patterns are absent.
 
-### F-20260916-ATCLANG-015
+### F-015 — Dependency Review
 - **Class:** P1
 - **Category:** Supply-chain security / dependency analysis
-- **Family:** GitHub Dependency Graph / Dependency Review
-- **Tags:** `P1 supply-chain dependency-review dependency-graph github`
-- **Finding:** GitHub reports Dependency Review unsupported because the repository Dependency Graph is not enabled.
-- **Status:** **EXTERNALLY BLOCKED** by repository GitHub configuration; the workflow itself remains enabled and immutable-action pinned.
-- **Closure:** enable Dependency Graph in repository settings, rerun Dependency Review and record current evidence.
+- **Family:** Dependency Graph / Dependency Review
+- **Tags:** `dependency-review`, `dependency-graph`, `supply-chain`
+- **Status:** externally blocked until GitHub Dependency Graph is enabled.
 
-## 5. Consistency findings
+## Consistency / contradiction resolution
 
-`FILE_REGISTER.md` is generated metadata and currently omits newer CI/audit files visible in the Git tree. This is documentation/registry drift rather than a runtime security defect. It remains open until regenerated from the authoritative Git tree.
+The former duplicate crypto paths in the Python VM and `stdlib/crypto.py` could silently disagree. The new architecture makes the Python security-sensitive operations converge on one fail-closed boundary, while canonical production behavior remains Rust.
 
-The repository status says language/semantics work is complete while the roadmap still lists backend, VM integration, security audit and production gates as incomplete. This is internally coherent: language/semantics completion does not imply compiler-backend, VM integration, security audit or production readiness.
+The former VM `STUB` claim also contradicted the stated Rust-first architecture. It has been removed from the executable VM source.
 
-The current verifier had a LoadLocal/StoreLocal bounds-check asymmetry. This contradiction has been corrected in the Rust verifier and covered by a regression test.
+The repository status, roadmap, TODO and sprint register now consistently describe the security/production gates as incomplete until executable evidence closes them.
 
-## 6. File format / language assessment
+## File format / language decision
 
-- Markdown: correct for normative/explanatory documentation.
-- YAML: correct for repository/governance machine metadata.
-- TOML: appropriate for package/build/version configuration.
-- JSON: appropriate for generated registries and fixtures where schema-stable machine consumption is required.
-- Python: correct for reference implementation, SDK, tests and fuzzing.
-- Rust: required as the canonical production implementation for consensus-critical execution and security boundaries.
+- Markdown: normative/explanatory documentation.
+- YAML: CI/governance machine metadata.
+- TOML: Rust/build/version configuration.
+- JSON: schemas, fixtures and generated machine data.
+- Python: reference/test/fuzzing/tooling.
+- Rust: canonical production/consensus/security boundary.
 
-No broad file-format migration is justified; unnecessary migration would increase change surface without increasing assurance.
+No broad migration is justified; it would increase change surface without improving assurance.
 
-## 7. Security assurance boundary
+## Security and malware assurance
 
-The audit does **not** claim immunity from malware, supply-chain compromise, memory corruption, zero-days, or all possible runtime attacks. Protection is established only for a defined threat class when the relevant control, negative test and current CI evidence all exist.
+The repository does **not** claim absolute immunity from hacking, malware, zero-days, compromised dependencies, malicious maintainers or hardware compromise.
 
-Current controls provide concrete resistance against several defined classes: immutable GitHub Action references reduce tag/ref substitution risk; CodeQL and dependency review provide static/dependency analysis; fail-closed governance blocks known unsafe reference primitives; deterministic gates block detected wall-clock/RNG sources; and the architecture keeps Python outside the canonical production trust boundary. None of these proves immunity to arbitrary future malware or unknown vulnerabilities.
+For a defined threat class, evidence must be:
 
-For F-001 through F-008 and F-011 through F-015, complete protection is **not established** until implementation changes and current evidence close the findings.
+`threat → control → negative test → positive test → CI evidence → residual risk`.
 
-## 8. Closure evidence required
+Current controls provide evidence against defined classes such as action-reference substitution, known source-level defects, insecure reference primitives, deterministic-source violations and verifier-boundary errors. They do not establish immunity against unknown or future attacks.
 
-A finding may only be marked closed after:
+## Traceability
 
-1. implementation change;
+```text
+Vision
+  → Concept
+  → Components
+  → Architecture
+  → Code
+  → Tests
+  → Evidence
+  → Finding
+  → Fix
+  → Re-test
+  → Actual software state
+```
+
+A component is only considered present when implementation and executable evidence agree.
+
+## Closure criteria
+
+A finding is closed only after:
+
+1. implementation;
 2. source re-read;
 3. positive and negative tests;
-4. integration test for the Rust production boundary where applicable;
-5. static security scan;
+4. integration evidence where applicable;
+5. static security analysis;
 6. current GitHub Actions evidence;
-7. documentation/status/roadmap update;
-8. no contradictory remaining implementation or duplicate primitive.
-
-## 9. Vision → implementation traceability
-
-`Vision → Concept → Components → Code → Test → Error → Fix → Evidence → actual software component` is represented by the repository architecture/specification hierarchy, source tree, test suite, differential gate, governance audit and evidence artifacts. Each release-blocking finding is classified by class, category, family and tags, and closure requires implementation plus evidence rather than documentation-only claims.
-
-## 10. Current GitHub evidence
-
-The latest audit workflow run after the verifier/scanner changes still fails closed because the known Python VM security primitives and STUB remain. The repository audit log explicitly reports F-001 through F-005-equivalent unsafe primitives and the stale FILE_REGISTER warning. This is expected until those implementation findings are actually remediated.
+7. synchronized status/roadmap/TODO/wiki documentation;
+8. no contradictory duplicate implementation remains.
 
 **Production readiness:** `NOT ESTABLISHED`.
