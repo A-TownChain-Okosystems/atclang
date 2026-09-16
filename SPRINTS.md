@@ -11,7 +11,7 @@
 - remove or fail-closed all security-sensitive Python VM simulations;
 - prove Rust is the canonical production execution path;
 - establish deterministic capability enforcement;
-- close findings F-001..F-007 with reproducible evidence;
+- close findings F-001..F-008 with reproducible evidence;
 - synchronize documentation, file inventory and standards metadata.
 
 ### Work items
@@ -21,6 +21,12 @@
 - [ ] Network transport boundary
 - [ ] RPC transport boundary
 - [ ] Wallet/BIP39/address conformance
+- [x] HostContext wall-clock capability removed
+- [x] ATCChain explicit block timestamp requirement
+- [x] Transaction/block-header timestamp fallback removed
+- [x] Deterministic boundary regression tests added
+- [ ] Remove remaining wall-clock access from VM/runtime
+- [ ] Remove/fail-closed executable VM STUB
 - [ ] Determinism capability profile
 - [ ] Rust production-entrypoint integration proof
 - [ ] Positive and negative tests
