@@ -66,7 +66,11 @@ impl Bytecode {
         let mut stack = 0usize;
         for (pc, instruction) in self.instructions.iter().enumerate() {
             match instruction {
-                Instruction::ConstI64(_) | Instruction::LoadLocal(_) => stack += 1,
+                Instruction::ConstI64(_) => stack += 1,
+                Instruction::LoadLocal(index) => {
+                    if *index >= local_count { return Err(VerifyError::InvalidLocal { pc, index: *index }); }
+                    stack += 1;
+                }
                 Instruction::StoreLocal(index) => {
                     if *index >= local_count { return Err(VerifyError::InvalidLocal { pc, index: *index }); }
                     if stack < 1 { return Err(VerifyError::StackUnderflow { pc }); }
@@ -125,5 +129,11 @@ mod tests {
     fn verifier_rejects_invalid_local() {
         let bc = Bytecode { instructions: vec![Instruction::LoadLocal(2)] };
         assert_eq!(bc.verify(1, 1), Err(VerifyError::InvalidLocal { pc: 0, index: 2 }));
+    }
+
+    #[test]
+    fn verifier_rejects_invalid_store_local() {
+        let bc = Bytecode { instructions: vec![Instruction::ConstI64(1), Instruction::StoreLocal(1)] };
+        assert_eq!(bc.verify(1, 1), Err(VerifyError::InvalidLocal { pc: 1, index: 1 }));
     }
 }
