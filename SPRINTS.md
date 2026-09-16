@@ -16,25 +16,26 @@
 
 ### Work items
 
-- [ ] ECDSA implementation / fail-closed boundary
-- [ ] JWT validation / fail-closed boundary
-- [ ] Network transport boundary
-- [ ] RPC transport boundary
-- [ ] Wallet/BIP39/address conformance
+- [x] Python ECDSA simulation removed; reference boundary fails closed
+- [x] Python JWT permissive validation removed; reference boundary fails closed
+- [x] Python network false-success removed; reference VM fails closed
+- [x] Python RPC false-success removed; reference VM fails closed
+- [x] Python wallet/BIP39/address simulation removed; reference boundary fails closed
 - [x] HostContext wall-clock capability removed
 - [x] ATCChain explicit block timestamp requirement
 - [x] Transaction/block-header timestamp fallback removed
 - [x] Deterministic boundary regression tests added
-- [ ] Remove remaining wall-clock access from VM/runtime
-- [ ] Remove/fail-closed executable VM STUB
+- [ ] Remove remaining wall-clock access from runtime/kernel-runtime
+- [x] Remove/fail-closed executable VM STUB and simulated security primitives
 - [ ] Determinism capability profile
 - [ ] Rust production-entrypoint integration proof
-- [ ] Positive and negative tests
-- [ ] Differential tests
-- [ ] Security/static analysis
-- [ ] Current GitHub Actions evidence
+- [x] Positive and negative security-boundary tests
+- [ ] Full differential tests with canonical Rust implementation
+- [x] Security/static analysis gate updated and passing on the pre-latest remediation snapshot
+- [ ] Current GitHub Actions evidence for the latest commit
 - [ ] FILE_REGISTER regeneration
-- [ ] STATUS/ROADMAP/audit evidence synchronization
+- [x] STATUS/TODO/audit evidence synchronization
+- [ ] ROADMAP/Wiki final synchronization after CI closure
 
 ### Exit criteria
 
@@ -43,4 +44,4 @@ Sprint closes only when every P1 item is implemented, tested, re-read, staticall
 Agent-ID: ATC-AI-AUDIT-001
 Task-ID: ATC-TASK-20260916-SPRINT
 AI-Role: software-development
-Validation: PENDING
+Validation: PENDING CURRENT-CI
