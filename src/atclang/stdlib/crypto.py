@@ -1,22 +1,24 @@
 # Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
-"""
-ATCLang Stdlib — ATC::Crypto
-Kryptografische Operationen für ATCLang Smart Contracts.
-ATC-94 | Sprint 2.5 | Non-EVM: SHA-256 only
+"""ATCLang Stdlib — ATC::Crypto.
 
-Consensus rule: randomness is never sourced from the host OS. APIs that need
-pseudo-random bytes require an explicit deterministic VM seed and derive output
-with HMAC-SHA256. Canonical key/signature operations remain a Rust trust-boundary
-responsibility until protocol-conformant secp256k1 support is available.
+Hashing and encoding are deterministic reference operations. Canonical
+cryptographic signing, verification and wallet derivation remain outside the
+Python reference trust boundary until a protocol-conformant backend is bound.
 """
 
 import base64
 import hashlib
 import hmac
 
+from atclang.security.reference_boundary import (
+    ecdsa_sign,
+    ecdsa_verify,
+    wallet_operation,
+)
+
 
 class ATCCrypto:
-    """ATC::Crypto — SHA-256 based cryptography (Non-EVM Standard)."""
+    """ATC::Crypto — deterministic non-canonical reference primitives."""
 
     @staticmethod
     def sha256(data) -> str:
@@ -123,19 +125,17 @@ class ATCCrypto:
             counter += 1
         return bytes(out[:n])
 
-    # Canonical production ECDSA remains a Rust responsibility. These Python
-    # reference methods deliberately fail closed instead of providing fake crypto.
     @staticmethod
-    def generate_keypair(seed=None) -> tuple[str, str]:
-        raise RuntimeError("reference key generation is disabled; use canonical Rust crypto")
+    def generate_keypair(seed=None):
+        return wallet_operation("generate_keypair", seed)
 
     @staticmethod
-    def sign(message: str, private_key: str) -> str:
-        raise RuntimeError("reference signing is disabled; use canonical Rust crypto")
+    def sign(message: str, private_key: str):
+        return ecdsa_sign(message, private_key)
 
     @staticmethod
-    def verify(message: str, signature: str, public_key: str) -> bool:
-        raise RuntimeError("reference signature verification is disabled; use canonical Rust crypto")
+    def verify(message: str, signature: str, public_key: str):
+        return ecdsa_verify(message, signature, public_key)
 
     @staticmethod
     def random_bytes(n: int, vm_seed=None) -> bytes:
@@ -153,9 +153,8 @@ class ATCCrypto:
         return min_val + raw % span
 
     @staticmethod
-    def address_from_pubkey(pubkey: str) -> str:
-        h = hashlib.sha256(pubkey.encode()).hexdigest()
-        return "ATC" + h[:32]
+    def address_from_pubkey(pubkey: str):
+        return wallet_operation("address_from_pubkey", pubkey)
 
     @staticmethod
     def is_valid_address(addr: str) -> bool:
