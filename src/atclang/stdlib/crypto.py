@@ -3,54 +3,49 @@
 ATCLang Stdlib — ATC::Crypto
 Kryptografische Operationen für ATCLang Smart Contracts.
 ATC-94 | Sprint 2.5 | Non-EVM: SHA-256 only
+
+Consensus rule: randomness is never sourced from the host OS. APIs that need
+pseudo-random bytes require an explicit deterministic VM seed and derive output
+with HMAC-SHA256. Canonical key/signature operations remain a Rust trust-boundary
+responsibility until protocol-conformant secp256k1 support is available.
 """
 
 import base64
 import hashlib
 import hmac
-import secrets
 
 
 class ATCCrypto:
     """ATC::Crypto — SHA-256 based cryptography (Non-EVM Standard)."""
 
-    # ── Hashing ──────────────────────────────────
-
     @staticmethod
     def sha256(data) -> str:
-        """SHA-256 Hash → hex string. Gas: 30"""
         if isinstance(data, str):
             data = data.encode("utf-8")
         return hashlib.sha256(data).hexdigest()
 
     @staticmethod
     def sha256_bytes(data) -> bytes:
-        """SHA-256 Hash → raw bytes. Gas: 30"""
         if isinstance(data, str):
             data = data.encode("utf-8")
         return hashlib.sha256(data).digest()
 
     @staticmethod
     def double_sha256(data) -> str:
-        """Double SHA-256 (Bitcoin-style). Gas: 60"""
         if isinstance(data, str):
             data = data.encode("utf-8")
         return hashlib.sha256(hashlib.sha256(data).digest()).hexdigest()
 
     @staticmethod
     def hmac_sha256(key, msg) -> str:
-        """HMAC-SHA256. Gas: 50"""
         if isinstance(key, str):
             key = key.encode("utf-8")
         if isinstance(msg, str):
             msg = msg.encode("utf-8")
         return hmac.new(key, msg, hashlib.sha256).hexdigest()
 
-    # ── Encoding ─────────────────────────────────
-
     @staticmethod
     def base58_encode(data) -> str:
-        """Base58 Encode (Bitcoin alphabet). Gas: 20"""
         if isinstance(data, str):
             data = data.encode("utf-8")
         alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
@@ -68,7 +63,6 @@ class ATCCrypto:
 
     @staticmethod
     def base58_decode(s: str) -> bytes:
-        """Base58 Decode. Gas: 20"""
         alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
         num = 0
         for char in s:
@@ -86,73 +80,85 @@ class ATCCrypto:
 
     @staticmethod
     def base64_encode(data) -> str:
-        """Base64 Encode. Gas: 15"""
         if isinstance(data, str):
             data = data.encode("utf-8")
         return base64.b64encode(data).decode("ascii")
 
     @staticmethod
     def base64_decode(s: str) -> bytes:
-        """Base64 Decode. Gas: 15"""
         return base64.b64decode(s)
 
     @staticmethod
     def hex_encode(data) -> str:
-        """Hex Encode. Gas: 10"""
         if isinstance(data, str):
             data = data.encode("utf-8")
         return data.hex()
 
     @staticmethod
     def hex_decode(s: str) -> bytes:
-        """Hex Decode. Gas: 10"""
         return bytes.fromhex(s)
 
-    # ── ECDSA (secp256k1) ────────────────────────
+    @staticmethod
+    def _seed_bytes(seed) -> bytes:
+        if isinstance(seed, str):
+            seed = seed.encode("utf-8")
+        if not isinstance(seed, (bytes, bytearray)) or not seed:
+            raise ValueError("explicit deterministic vm_seed is required")
+        return bytes(seed)
 
     @staticmethod
-    def generate_keypair() -> tuple[str, str]:
-        """Generate ECDSA keypair. Gas: 1000"""
-        priv = secrets.token_hex(32)
-        pub = hashlib.sha256(priv.encode()).hexdigest()
-        return (priv, pub)
+    def _deterministic_bytes(seed, n: int, domain: bytes = b"ATC::Crypto") -> bytes:
+        if n < 0:
+            raise ValueError("length must be non-negative")
+        seed_bytes = ATCCrypto._seed_bytes(seed)
+        out = bytearray()
+        counter = 0
+        while len(out) < n:
+            block = hmac.new(
+                seed_bytes,
+                domain + counter.to_bytes(8, "big"),
+                hashlib.sha256,
+            ).digest()
+            out.extend(block)
+            counter += 1
+        return bytes(out[:n])
+
+    # Canonical production ECDSA remains a Rust responsibility. These Python
+    # reference methods deliberately fail closed instead of providing fake crypto.
+    @staticmethod
+    def generate_keypair(seed=None) -> tuple[str, str]:
+        raise RuntimeError("reference key generation is disabled; use canonical Rust crypto")
 
     @staticmethod
     def sign(message: str, private_key: str) -> str:
-        """Sign message with private key. Gas: 100"""
-        msg_hash = hashlib.sha256(message.encode()).hexdigest()
-        return hmac.new(private_key.encode(), msg_hash.encode(), hashlib.sha256).hexdigest()
+        raise RuntimeError("reference signing is disabled; use canonical Rust crypto")
 
     @staticmethod
     def verify(message: str, signature: str, public_key: str) -> bool:
-        """Verify signature. Gas: 100"""
-        msg_hash = hashlib.sha256(message.encode()).hexdigest()
-        expected = hmac.new(public_key.encode(), msg_hash.encode(), hashlib.sha256).hexdigest()
-        return hmac.compare_digest(signature, expected)
-
-    # ── Random ───────────────────────────────────
+        raise RuntimeError("reference signature verification is disabled; use canonical Rust crypto")
 
     @staticmethod
-    def random_bytes(n: int) -> bytes:
-        """Cryptographic random bytes. Gas: 50"""
-        return secrets.token_bytes(n)
+    def random_bytes(n: int, vm_seed=None) -> bytes:
+        return ATCCrypto._deterministic_bytes(vm_seed, n, b"ATC::Crypto::random_bytes")
 
     @staticmethod
-    def random_int(min_val: int, max_val: int) -> int:
-        """Cryptographic random integer. Gas: 50"""
-        return secrets.randbelow(max_val - min_val + 1) + min_val
-
-    # ── Address ──────────────────────────────────
+    def random_int(min_val: int, max_val: int, vm_seed=None) -> int:
+        if max_val < min_val:
+            raise ValueError("max_val must be >= min_val")
+        span = max_val - min_val + 1
+        raw = int.from_bytes(
+            ATCCrypto._deterministic_bytes(vm_seed, 8, b"ATC::Crypto::random_int"),
+            "big",
+        )
+        return min_val + raw % span
 
     @staticmethod
     def address_from_pubkey(pubkey: str) -> str:
-        """Derive ATC address from public key. Gas: 30"""
         h = hashlib.sha256(pubkey.encode()).hexdigest()
         return "ATC" + h[:32]
 
     @staticmethod
     def is_valid_address(addr: str) -> bool:
-        """Validate ATC address format. Gas: 5"""
         if not isinstance(addr, str) or not addr.startswith("ATC"):
             return False
         if len(addr) != 35:
