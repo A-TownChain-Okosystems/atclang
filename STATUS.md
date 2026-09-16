@@ -1,7 +1,7 @@
 ---
 document_id: ATC-DOC-LANG-001
 title: ATCLang Repository Status
-version: 1.1.1
+version: 1.2.0
 status: active
 owner: A-TownChain-Okosystems
 created: 2026-09-07
@@ -20,40 +20,41 @@ standard: ATC-STD-MD-001
 | Repository | atclang |
 | Version | 1.0.0 |
 | Status | development |
-| Build | not independently re-established in this audit |
-| Tests | deterministic-boundary regression tests added; current GitHub Actions evidence pending |
-| Security | S4 / release-blocked by open P1 findings |
-| Documentation | governance metadata present; audit remediation in progress |
-| Architecture | Rust-first production / Python reference boundary enforced by policy and CI checks |
+| Build | current GitHub evidence re-established continuously by CI |
+| Tests | security-boundary and deterministic regression tests implemented; current CI closure pending |
+| Security | S4 / release-blocked by remaining P1/P2 findings |
+| Documentation | synchronized with current remediation pass |
+| Architecture | Rust-first production / Python deterministic reference with fail-closed security boundary |
 | Last Audit | 2026-09-16 |
 | Production Readiness | NOT ESTABLISHED |
 
 ## Current Audit State
 
-The 2026-09-16 CI audit uses a fail-closed repository gate. It intentionally detects known insecure Python reference-VM primitives instead of allowing a false PASS.
+The 2026-09-16 CI audit is fail-closed. The previous Python VM contained simulated ECDSA/JWT/network/RPC/wallet behavior, host-clock access and an executable STUB. Those implementation patterns have now been removed from the Python VM and replaced by deterministic reference behavior with explicit fail-closed boundaries.
 
-Open release-blocking findings:
+### Implemented remediation
 
-- F-20260916-ATCLANG-001 — ECDSA simulation / permissive verification
-- F-20260916-ATCLANG-002 — non-validating JWT helper
-- F-20260916-ATCLANG-003 — network false-success simulation
-- F-20260916-ATCLANG-004 — RPC false-success simulation
-- F-20260916-ATCLANG-005 — non-conformant wallet/address helpers
-- F-20260916-ATCLANG-006 — nondeterministic host capabilities in reference VM
-- F-20260916-ATCLANG-007 — Rust production boundary requires executable integration proof
-- F-20260916-ATCLANG-008 — remaining wall-clock access in VM/runtime after deterministic context remediation
-
-Implemented in the current audit branch but awaiting current CI evidence:
-
-- `HostContext` no longer has a host wall-clock capability.
+- `HostContext` has no host wall-clock capability.
 - `ATCChain` requires explicit block timestamp state.
 - Transaction and block-header timestamps are explicit deterministic inputs.
-- Regression tests prove deterministic timestamp/hash behavior and reject missing chain timestamp state.
+- Rust `LoadLocal` verifier bounds are enforced.
+- Python security/transport/wallet reference operations route to `ReferenceBoundaryError`.
+- The old executable Python VM simulation was replaced by a deterministic reference VM.
+- VM negative tests prove ECDSA, JWT and network operations fail closed.
+- Ruff formatting fixes were applied to the files reported by CI.
 
-F-008 remains open because the VM/runtime still contains a direct clock path and an executable VM stub. It is not acceptable to close this finding from documentation alone.
+### Remaining release blockers
 
-A finding can only be closed after implementation, source re-read, positive/negative tests, integration evidence where applicable, current CI evidence, and documentation synchronization.
+- canonical Rust ECDSA/JWT/wallet implementations and conformance vectors;
+- real authenticated network/RPC adapters outside consensus execution;
+- repository-wide deterministic capability closure and green Determinism Gate;
+- executable Rust production-boundary proof;
+- current CI closure for verifier and tooling findings;
+- GitHub Dependency Graph enablement for Dependency Review;
+- complete FILE_REGISTER regeneration from the Git tree.
+
+A finding can only be closed after implementation, source re-read, positive/negative tests, integration evidence where applicable, current CI evidence and documentation synchronization.
 
 ## Assurance Statement
 
-This status does not claim immunity from malware, supply-chain compromise, zero-days, or all possible attacks. Assurance is limited to the implemented and executed controls with evidence recorded by the repository audit system.
+This status does not claim immunity from malware, supply-chain compromise, zero-days, or all possible attacks. Assurance is limited to implemented controls and current executable evidence. Production readiness remains `NOT ESTABLISHED` until the release blockers are closed.
