@@ -2,11 +2,21 @@
 
 > System- und Smart-Contract-Sprache des A-TownChain-Ökosystems mit Compiler, ATC-VM-Bytecode und Standardbibliothek.
 
+[![ATC COMPLIANCE](https://img.shields.io/badge/ATC%20COMPLIANCE-R4%20Governance-blue)](./SECURITY.md)
+
 **Project:** `atclang`  
 **Organization:** `A-TownChain-Okosystems`  
 **Status:** `development`  
 **Version:** `1.0.0`  
 **License:** `Apache-2.0` (see `LICENSE`)
+
+## Purpose
+
+ATCLang provides the language and contract-development layer for the A-TownChain ecosystem. Its purpose is to define source syntax, semantics, compilation and contract-facing tooling while keeping chain-bearing infrastructure outside the language implementation.
+
+## Scope
+
+The repository covers lexical analysis, parsing, semantic and type validation, intermediate representation, bytecode generation, ABI definitions, standard-library components, reference testing and integration with the ATC-VM boundary. It does not define the blockchain itself.
 
 ## Overview
 
@@ -28,6 +38,16 @@ Rust infrastructure
 ```
 
 ATCLang does **not** define the chain itself and does not replace the ATC-VM or the Rust chain infrastructure. Chain-bearing infrastructure remains outside the language layer.
+
+## Features
+
+- `.atc` lexical analysis, parsing and AST construction.
+- Semantic and type validation.
+- Intermediate representation and bytecode compilation.
+- ABI and contract-facing tooling.
+- Standard-library components.
+- Rust-first production architecture with Python limited to reference, test and fuzzing roles.
+- Differential testing and fail-closed security-boundary validation.
 
 ## Status
 
@@ -60,7 +80,7 @@ There is no current Mainnet/Production claim in this README. Release readiness i
 - Python >= 3.10
 - setuptools >= 68
 - Git >= 2.30
-- Rust tooling is required only for repository components that are implemented in Rust.
+- Rust tooling is required for repository components implemented in Rust and for the canonical production execution path.
 
 ## Installation
 
@@ -127,7 +147,11 @@ One state must never be inferred from another.
 
 ## Security
 
-Security issues must not be disclosed through public GitHub Issues. Follow the repository `SECURITY.md` and the organization's approved security-disclosure process.
+Security issues must not be disclosed through public GitHub Issues. Follow the repository `SECURITY.md` and the organization's approved security-disclosure process. The CI audit is fail-closed for known insecure reference primitives and release-blocking findings.
+
+## Roadmap
+
+The authoritative development roadmap is `ROADMAP.md`. Current release-blocking work includes removal or fail-closed isolation of insecure Python reference primitives, proof of the Rust canonical production boundary, deterministic capability enforcement, differential tests and security evidence.
 
 ## Documentation
 
@@ -136,6 +160,10 @@ Security issues must not be disclosed through public GitHub Issues. Follow the r
 - `ARCHITECTURE.md` — repository architecture.
 - `STATUS.md` — current repository status.
 - `ROADMAP.md` — development roadmap.
+- `TODO.md` — evidence-backed outstanding work.
+- `SPRINTS.md` — active implementation sprints.
+- `docs/wiki/README.md` — repository knowledge base.
+- `docs/audits/` — audit findings and closure evidence.
 
 ## Repository Structure
 
