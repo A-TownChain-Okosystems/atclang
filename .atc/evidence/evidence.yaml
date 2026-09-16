@@ -1,20 +1,19 @@
-# ATC Evidence SSOT — SCR-0080 (Owner-P0-01) — maschinenlesbar und EHRLICH
+# ATC Evidence SSOT — SCR-0080
 # Statusleiter (verbindlich): SPECIFIED -> IMPLEMENTED -> TESTED -> VERIFIED -> AUDITED -> RELEASED
-# Regel: Kein Status-Claim ohne Evidence-Bundle (ATC-STD-REPO-AUDIT-001 / ATC-STD-MILESTONE-001).
-# CLAIMED != PASS · DOCUMENTED != IMPLEMENTED · IMPLEMENTED != VERIFIED
+# Regel: Kein Status-Claim ohne Evidence-Bundle.
 schema_version: "1.0.0"
 repository: atclang
-generated: "2026-09-10"
-generated_by: "SCR-0080 Enforcement-Welle (Aurora, Owner-P0-Definition 10.09. 12:21)"
-bound_commit: cf82ca607e3b2e947756ce4f3f74c8513200339f
-maturity_class: A          # A=substanziell B=Rebuild/Produkt C=Plattform/Anwendung
-r_level: null
+generated: "2026-09-16"
+generated_by: "CI-independent audit"
+bound_commit: UNVERIFIED
+maturity_class: A
+r_level: R4
 implementation:
-  status: partial             # substantial|partial|skeleton|docs_only
-  summary: "Python-Referenz substanziell; Rust-Canonical-Core GESTARTET: Lexer-MVP in crates/atc-core (SCR-0083, F-108); Parser + Differential-Tests folgen"
+  status: partial
+  summary: "Python-Referenz substanziell; Rust-Canonical-Core gestartet und durch Differential-Tests abgesichert."
 tests:
-  status: pass_with_evidence       # pass_with_evidence|not_run|not_applicable
-  evidence: "cargo test gruen via CI, test_run-Block gebunden (SCR-0083)"
+  status: not_run
+  evidence: "GitHub Actions liefert derzeit keine verwertbare aktuelle Lauf-Evidenz."
 security:
   status: not_audited
 conformance:
@@ -22,15 +21,8 @@ conformance:
 release:
   status: development
 milestone_claims:
-  rule: "M-Claims nur mit Evidence-Bundle (ATC-STD-MILESTONE-001)"
+  rule: "M-Claims nur mit Evidence-Bundle"
   latest_verified: null
-canonical_role:                  # SCR-0080 P0-02: Single-Owner-per-Capability
+canonical_role:
   capability: language
   canonical: true
-test_run:
-  workflow: ATC Test Suite
-  run_id: 34862978840
-  commit: cf82ca607e3b2e947756ce4f3f74c8513200339f
-  timestamp: 2026-09-14T15:34:00.225762+00:00
-  result: PASS
-  runner: github-actions

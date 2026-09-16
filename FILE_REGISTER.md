@@ -1,40 +1,27 @@
-# 📋 File Register — atclang
+# File Register — atclang
 
-> **Zweck:** Vollständige maschinell generierte Liste aller Dateien (SCR-0082, Matrix-Dim-12).
-> **Auto-generiert:** 2026-09-10 10:50 UTC | via GitHub-Trees-API
-> **Standards:** ATC-STD-201 · Evidence: `.atc/evidence/evidence.yaml`
+> Generated from the repository Git tree. This register is an audit artifact, not a source-of-truth for repository contents.
+>
+> Validation: `python3 tools/ci_independent_audit.py` (ATC-STD-016/017).
 
----
-
-## Zusammenfassung
-
-| Metrik | Wert |
-|--------|------|
-| **Total Dateien** | 122 |
-| **.py** | 50 |
-| **.md** | 38 |
-| **.atc** | 11 |
-| **.yaml** | 8 |
-| **(keine)** | 6 |
-| **.yml** | 4 |
-| **.toml** | 2 |
-| **.json** | 2 |
-| **.txt** | 1 |
-
----
-
-## Dateiliste
+## Files
 
 - `.atc/compliance.yaml`
 - `.atc/evidence/evidence.yaml`
 - `.atc/lifecycle.yaml`
 - `.atc/ownership.yaml`
 - `.atc/repository.yaml`
+- `.atc/standards.yaml`
+- `.github/CODEOWNERS`
 - `.github/ai/agent.yaml`
 - `.github/ai/capabilities.yaml`
 - `.github/ai/policies.yaml`
 - `.github/dependabot.yml`
+- `.github/workflows/ci-independent-audit.yml`
+- `.github/workflows/code-quality.yml`
 - `.github/workflows/codeql.yml`
+- `.github/workflows/dependency-review.yml`
+- `.github/workflows/determinism-gate.yml`
 - `.github/workflows/governance-ci.yml`
 - `.github/workflows/test-suite.yml`
 - `.gitignore`
@@ -45,25 +32,65 @@
 - `CODEOWNERS`
 - `CODE_OF_CONDUCT.md`
 - `CONTRIBUTING.md`
+- `FILE_REGISTER.md`
 - `GOVERNANCE.md`
 - `LICENSE`
 - `README.md`
 - `ROADMAP.md`
 - `SECURITY.md`
 - `STATUS.md`
+- `crates/atc-core/Cargo.toml`
+- `crates/atc-core/differential/corpus/arith_precedence.atc`
+- `crates/atc-core/differential/corpus/calls.atc`
+- `crates/atc-core/differential/corpus/const_typed.atc`
+- `crates/atc-core/differential/corpus/fn_expr_stmt.atc`
+- `crates/atc-core/differential/corpus/fn_implicit.atc`
+- `crates/atc-core/differential/corpus/fn_mixed_program.atc`
+- `crates/atc-core/differential/corpus/fn_nested.atc`
+- `crates/atc-core/differential/corpus/fn_simple.atc`
+- `crates/atc-core/differential/corpus/let_no_semi.atc`
+- `crates/atc-core/differential/corpus/let_simple.atc`
+- `crates/atc-core/differential/corpus/mixed.atc`
+- `crates/atc-core/differential/corpus/parens.atc`
+- `crates/atc-core/differential/corpus/unary.atc`
+- `crates/atc-core/differential/expected/arith_precedence.json`
+- `crates/atc-core/differential/expected/calls.json`
+- `crates/atc-core/differential/expected/const_typed.json`
+- `crates/atc-core/differential/expected/fn_expr_stmt.json`
+- `crates/atc-core/differential/expected/fn_implicit.json`
+- `crates/atc-core/differential/expected/fn_mixed_program.json`
+- `crates/atc-core/differential/expected/fn_nested.json`
+- `crates/atc-core/differential/expected/fn_simple.json`
+- `crates/atc-core/differential/expected/let_no_semi.json`
+- `crates/atc-core/differential/expected/let_simple.json`
+- `crates/atc-core/differential/expected/mixed.json`
+- `crates/atc-core/differential/expected/parens.json`
+- `crates/atc-core/differential/expected/unary.json`
+- `crates/atc-core/src/ast.rs`
+- `crates/atc-core/src/bytecode.rs`
+- `crates/atc-core/src/lexer.rs`
+- `crates/atc-core/src/lib.rs`
+- `crates/atc-core/src/parser.rs`
+- `crates/atc-core/tests/differential.rs`
 - `docs/ATCLANG_1.0_ARCHITECTURE.md`
+- `docs/ATCLANG_1.0_CONFORMANCE.md`
+- `docs/ATCLANG_1.0_RELEASE_GATE.md`
 - `docs/ATCLANG_BASELINE_V1.md`
+- `docs/ENGINEERING_AUDIT.md`
 - `docs/REPOSITORY_STANDARD.md`
+- `docs/audits/REPOSITORY-AUDIT-2026-09-16.md`
 - `examples/atc8300.atc`
 - `examples/atcos_main.atc`
 - `examples/event_bus.atc`
 - `examples/kernel.atc`
 - `examples/shivamon.atc`
 - `pyproject.toml`
+- `ruff.toml`
 - `specs/VERSION.toml`
 - `specs/abi/DRAFT.md`
 - `specs/abi/SPEC.md`
 - `specs/artifact/DRAFT.md`
+- `specs/bytecode/ATCB-1.md`
 - `specs/bytecode/DRAFT.md`
 - `specs/bytecode/SPEC.md`
 - `specs/gas/DRAFT.md`
@@ -90,9 +117,12 @@
 - `src/atclang/ROADMAP.md`
 - `src/atclang/STATUS.md`
 - `src/atclang/abi/__init__.py`
+- `src/atclang/abi/codec.py`
 - `src/atclang/artifact/__init__.py`
+- `src/atclang/artifact/artifact.py`
 - `src/atclang/atclang/main.atc`
 - `src/atclang/cli/__init__.py`
+- `src/atclang/cli/main.py`
 - `src/atclang/compiler/__init__.py`
 - `src/atclang/compiler/bytecode.py`
 - `src/atclang/compiler/bytecode_abi.py`
@@ -110,6 +140,7 @@
 - `src/atclang/compiler/symbols.py`
 - `src/atclang/compiler/type_checker.py`
 - `src/atclang/contracts/__init__.py`
+- `src/atclang/contracts/engine.py`
 - `src/atclang/frontend/__init__.py`
 - `src/atclang/frontend/lexer/__init__.py`
 - `src/atclang/frontend/lexer/lexer.py`
@@ -117,9 +148,13 @@
 - `src/atclang/frontend/parser/ast_nodes.py`
 - `src/atclang/frontend/parser/parser.py`
 - `src/atclang/host/__init__.py`
+- `src/atclang/host/context.py`
 - `src/atclang/ir/__init__.py`
+- `src/atclang/ir/json_ir.py`
 - `src/atclang/package/__init__.py`
+- `src/atclang/package/manifest.py`
 - `src/atclang/profiles/__init__.py`
+- `src/atclang/profiles/profiles.py`
 - `src/atclang/programs/atc8300.atc`
 - `src/atclang/programs/atcos_main.atc`
 - `src/atclang/programs/event_bus.atc`
@@ -129,6 +164,7 @@
 - `src/atclang/runtime/driver_framework.py`
 - `src/atclang/runtime/kernel_runtime.py`
 - `src/atclang/security/__init__.py`
+- `src/atclang/security/static_analysis.py`
 - `src/atclang/semantics/__init__.py`
 - `src/atclang/semantics/type_checker.py`
 - `src/atclang/setup.py`
@@ -144,6 +180,13 @@
 - `src/atclang/stdlib/wallet.py`
 - `src/atclang/vm/__init__.py`
 - `src/atclang/vm/atcvm.py`
+- `tests/test_atclang_1_0_gate.py`
 - `tests/test_bytecode_abi.py`
+- `tests/test_missing_modules.py`
+- `tests/test_namespace_calls.py`
+- `tests/test_security_boundaries.py`
 - `tests/test_semantics.py`
 - `tools/.gitkeep`
+- `tools/ci_independent_audit.py`
+- `tools/determinism_check.py`
+- `tools/differential/dump_reference.py`

@@ -1,119 +1,151 @@
 # ATCLang Repository Audit — 2026-09-16
 
-Status: **IN PROGRESS — release blocked for production use until security/reference-boundary findings are resolved**
+Status: **IN PROGRESS — production release remains blocked until the Rust canonical boundary, reference-VM security boundaries, conformance and CI evidence are complete.**
 
-Audit mode: CI-independent source/static audit because GitHub Actions evidence is currently unavailable/incomplete.
+Audit mode: CI-independent source/static audit because the current GitHub Actions connection returns no workflow runs for the audited commit.
 
 ## Scope
 
-Checked individually:
-
-- repository structure and governance files
-- README / architecture / baseline / release-gate documentation
-- Python/Rust language boundary
+- standards profile and ATC-STD-201 metadata
+- architecture and Rust/Python boundary
 - compiler → VM → runtime connectivity
-- TODO/FIXME/HACK/placeholder/stub markers
-- obvious security-sensitive implementations
-- deterministic/consensus-sensitive VM surface
-- documentation consistency and implementation traceability
-- file-format/language policy
+- security-sensitive reference primitives
+- deterministic/consensus-sensitive host capabilities
+- CI/CD supply-chain controls
+- syntax/test structure and stubs/placeholders
+- evidence binding and release claims
+- file inventory, duplicates and documentation consistency
+- file format and language suitability
 
 ## Architecture baseline
 
-The repository documentation states that Rust is canonical for production compiler, verifier, ATVM, runtime, ABI/artifact validation, security/sandbox and CLI, while Python is the reference implementation / SDK / test and fuzzing tooling. This is the correct architectural direction for consensus-critical execution.
+Rust is the canonical production implementation for consensus-critical compiler, verifier, ATC-VM, runtime, ABI/artifact validation and security/sandbox components. Python remains the reference/SDK/test/fuzzing layer. The repository contains one Python reference implementation under `src/atclang/`; the Rust production path is currently represented by `crates/atc-core` and is not yet a complete production compiler/VM.
 
-The current Python VM remains imported by compiler modules and the Python reference runtime. Therefore the reference/production boundary must be enforced explicitly so that reference stubs cannot be mistaken for secure production primitives.
+This boundary is the correct long-term choice because memory safety, deterministic execution, explicit resource control and a small trusted computing base are required at the chain/VM boundary. It is **not yet fully enforced by the current executable architecture**.
 
 ## Findings
 
-### F-20260916-ATCLANG-001
+### F-20260916-ATCLANG-001 — P1
+- **Category:** Security / cryptographic correctness
+- **Family:** ATCLang / Python reference VM / ECDSA
+- **Tags:** `P1 security crypto ecdsa reference-vm fail-closed`
+- **Evidence:** `src/atclang/vm/atcvm.py` contains a simulated ECDSA signer and a verifier that accepts arbitrary `sig_*` strings.
+- **Risk:** this is not ECDSA; if a production path reaches it, signatures can be forged.
+- **Status:** **OPEN**. The audit enforcer still detects the implementation. The safe solution is to fail closed and require the canonical Rust cryptographic implementation rather than silently substituting a fake primitive.
 
-- Class: **P1**
-- Category: **Security / Cryptographic correctness**
-- Family: **ATCLang / Python reference VM / Cryptography / ECDSA**
-- Tags: `P1 security crypto ecdsa reference-vm fail-closed`
-- Evidence: `src/atclang/vm/atcvm.py` implements `ecdsa_sign()` as SHA-256 over string-concatenated data and private key, and `ecdsa_verify()` accepts any string beginning with `sig_`.
-- Risk: this is not ECDSA and must never be treated as a signature primitive. If a production path reaches it, forged signatures are accepted.
-- Required remediation: make these operations fail closed in the Python reference VM unless backed by a real, explicitly tested cryptographic implementation; production paths must resolve to the canonical Rust cryptographic implementation. Add negative tests proving arbitrary `sig_*` values are rejected.
-- Closure evidence: source re-read + deterministic unit/negative tests + integration test proving production execution cannot dispatch to this reference primitive + CI/runtime evidence when GitHub Actions is restored.
+### F-20260916-ATCLANG-002 — P1
+- **Category:** Security / authentication correctness
+- **Family:** ATCLang / Python reference VM / JWT
+- **Tags:** `P1 security jwt authentication validation reference-vm`
+- **Evidence:** `verify_jwt()` accepts any non-empty token longer than ten characters.
+- **Risk:** authentication bypass if the reference helper is exposed as a real verifier.
+- **Status:** **OPEN**. Production authentication must use an explicitly tested verifier with algorithm, issuer/audience, time-claims and signature/key validation.
 
-### F-20260916-ATCLANG-002
+### F-20260916-ATCLANG-003 — P1
+- **Category:** Security / network correctness
+- **Family:** ATCLang / Python reference VM / network boundary
+- **Tags:** `P1 security network false-success reference-vm`
+- **Evidence:** `net_send()` reports success without performing transport.
+- **Status:** **OPEN**. Production networking must be injected and explicit; a reference stub must fail closed rather than return success.
 
-- Class: **P1**
-- Category: **Security / Authentication correctness**
-- Family: **ATCLang / Python reference VM / JWT validation**
-- Tags: `P1 security jwt authentication validation reference-vm`
-- Evidence: `verify_jwt()` returns true for any non-empty token longer than ten characters.
-- Risk: this is not JWT validation and can create authentication bypass if exposed outside reference-only tests.
-- Required remediation: fail closed or delegate to a real, policy-constrained verifier. Define accepted algorithms, issuer/audience rules, expiration/not-before validation, signature verification and key handling.
+### F-20260916-ATCLANG-004 — P1
+- **Category:** Security / RPC correctness
+- **Family:** ATCLang / Python reference VM / RPC boundary
+- **Tags:** `P1 security rpc false-success reference-vm`
+- **Evidence:** `rpc_call()` fabricates an HTTP-like 200 response.
+- **Status:** **OPEN**. Production RPC must be an injected, policy-controlled transport; no fabricated success is permitted.
 
-### F-20260916-ATCLANG-003
+### F-20260916-ATCLANG-005 — P1
+- **Category:** Cryptographic / wallet correctness
+- **Family:** ATCLang / Python reference VM / BIP39 / address derivation
+- **Tags:** `P1 crypto wallet bip39 address reference-vm`
+- **Evidence:** the reference mnemonic/address helpers are not protocol-conformant BIP39/address derivation.
+- **Status:** **OPEN**. Canonical wallet/crypto code must own protocol primitives; conformance vectors are required before protocol use.
 
-- Class: **P1**
-- Category: **Security / Network correctness**
-- Family: **ATCLang / Python reference VM / Network boundary**
-- Tags: `P1 security network false-success reference-vm`
-- Evidence: `net_send()` always returns `True` without sending data.
-- Risk: callers can interpret an operation as successfully transmitted when nothing was sent, breaking reliability/security assumptions.
-- Required remediation: fail closed with an explicit `ReferenceImplementationError` or route to an injected test transport. Never report success for an unperformed network operation.
+### F-20260916-ATCLANG-006 — P2
+- **Category:** Determinism / consensus boundary
+- **Family:** ATCLang / Python reference VM / host capabilities
+- **Tags:** `P2 determinism consensus random time vm-boundary`
+- **Evidence:** the reference VM contains local wall-clock and secure-random operations alongside consensus-oriented opcodes.
+- **Status:** **OPEN**. These capabilities must be unreachable from canonical consensus execution and rejected by the production verifier.
 
-### F-20260916-ATCLANG-004
+### F-20260916-ATCLANG-007 — P2
+- **Category:** Architecture / language-policy enforcement
+- **Family:** ATCLang / Rust-canonical boundary / Python reference
+- **Tags:** `P2 architecture rust-canonical python-reference enforcement`
+- **Evidence:** Python compiler/runtime code imports the reference VM.
+- **Status:** **OPEN**. This is acceptable only inside the reference layer. A production entrypoint and integration test must prove that consensus execution resolves to Rust and cannot silently select Python.
 
-- Class: **P1**
-- Category: **Security / RPC correctness**
-- Family: **ATCLang / Python reference VM / RPC boundary**
-- Tags: `P1 security rpc false-success reference-vm`
-- Evidence: `rpc_call()` fabricates a HTTP-like 200 response without executing a request.
-- Risk: false-success semantics can hide unavailable authorization, transport and response-validation logic.
-- Required remediation: fail closed by default; test transports must be explicit dependency-injected mocks and must not masquerade as production transport.
+### F-20260916-ATCLANG-008 — P1
+- **Category:** Determinism / standard-library correctness
+- **Family:** ATCLang / Chain stdlib / host clock
+- **Tags:** `P1 determinism chain-stdlib wall-clock consensus fail-closed`
+- **Evidence:** the previous `src/atclang/stdlib/chain.py` used `time.time()` as a default `block_timestamp` and printed events.
+- **Fix:** the branch changes Chain to use only host-supplied state, defaults missing timestamp to deterministic `0`, and stores events instead of printing them.
+- **Verification:** source re-read on the branch must confirm there is no `time` import or wall-clock call; deterministic unit tests cover equal host state producing equal chain values and event records.
+- **Status:** **FIXED IN BRANCH; runtime/CI evidence still pending.**
 
-### F-20260916-ATCLANG-005
+### F-20260916-ATCLANG-009 — P1
+- **Category:** Governance / evidence integrity
+- **Family:** ATC Evidence / CI traceability
+- **Tags:** `P1 evidence stale binding ci-independent audit`
+- **Evidence:** `.atc/evidence/evidence.yaml` claimed PASS at commit `cf82ca...` while current audited main was `a2659e...` and no current workflow run was available.
+- **Fix:** evidence is reset to `UNVERIFIED`, `tests.status: not_run`, and explicitly records that current GitHub Actions evidence is unavailable.
+- **Status:** **FIXED IN BRANCH.**
 
-- Class: **P1**
-- Category: **Cryptographic / wallet correctness**
-- Family: **ATCLang / Python reference VM / BIP39 / Address derivation**
-- Tags: `P1 crypto wallet bip39 address reference-vm`
-- Evidence: the embedded mnemonic implementation uses a short embedded word list and maps SHA-256 digest bytes into that list; `generate_atc_address()` generates an unrelated random value and hashes it rather than deriving an address from the supplied public-key material.
-- Risk: outputs are not BIP-39 compliant and address generation is not key-bound.
-- Required remediation: remove these as claimed protocol primitives or delegate to the canonical wallet implementation; add conformance vectors before allowing protocol use.
+### F-20260916-ATCLANG-010 — P1
+- **Category:** License / packaging consistency
+- **Family:** Repository metadata / Python packaging
+- **Tags:** `P1 license apache packaging metadata consistency`
+- **Evidence:** repository `LICENSE` is Apache-2.0 while `pyproject.toml` declared `All Rights Reserved`.
+- **Fix:** packaging metadata is aligned to Apache-2.0.
+- **Status:** **FIXED IN BRANCH.**
 
-### F-20260916-ATCLANG-006
+### F-20260916-ATCLANG-011 — P1
+- **Category:** File inventory / traceability
+- **Family:** ATC-STD-016 / repository inventory
+- **Tags:** `P1 file-register drift generated-inventory standards`
+- **Evidence:** `FILE_REGISTER.md` predates current workflows, Rust crate files and audit tooling.
+- **Fix:** an independent inventory validator is added; the register must be regenerated from the Git tree before release.
+- **Status:** **OPEN until the register is regenerated and validator passes.**
 
-- Class: **P2**
-- Category: **Determinism / consensus boundary**
-- Family: **ATCLang / Python reference VM / nondeterministic host capabilities**
-- Tags: `P2 determinism consensus random time vm-boundary`
-- Evidence: the Python VM exposes random/time-sensitive operations alongside consensus-oriented opcodes.
-- Risk: accidental use in consensus execution can create divergent state.
-- Required remediation: make nondeterministic operations explicitly host-only and unavailable to canonical consensus execution; add verifier tests that reject them from consensus bytecode where required by the protocol.
+### F-20260916-ATCLANG-012 — P1
+- **Category:** CI / supply-chain enforcement
+- **Family:** ATC CI / workflow integrity
+- **Tags:** `P1 ci supply-chain immutable-actions independent-audit`
+- **Evidence:** code-quality workflow still used mutable major tags (`actions/checkout@v4`, `setup-python@v5`) while other workflows were SHA-pinned.
+- **Fix:** a new CI-independent audit workflow uses immutable action SHAs and blocks mutable refs; existing code-quality workflow remains a separate cleanup item.
+- **Status:** **OPEN until every workflow is consistently pinned and CI evidence is restored.**
 
-### F-20260916-ATCLANG-007
+## Security and malware posture
 
-- Class: **P2**
-- Category: **Architecture / language policy enforcement**
-- Family: **ATCLang / Rust-canonical boundary / Python reference implementation**
-- Tags: `P2 architecture rust-canonical python-reference enforcement`
-- Evidence: the documentation declares Rust canonical for production, but multiple Python compiler/runtime modules directly import `atclang.vm.atcvm`.
-- Interpretation: this is consistent for a reference implementation, but the boundary is currently a convention rather than a demonstrated enforcement mechanism.
-- Required remediation: add an explicit production-entrypoint guard and integration test proving production artifacts/execution resolve to the Rust implementation and cannot silently select the Python reference VM.
+Static checks now block known high-risk patterns including embedded private keys, remote shell execution (`curl|bash` / `wget|bash`), `pull_request_target`, mutable checkout refs and unpinned GitHub Actions. CodeQL and dependency review remain additional controls.
 
-## Security posture
+These controls **do not prove immunity to every hack, malware family or virus**. A repository cannot honestly prove universal absence of malicious code from static inspection alone. The defensible proof model is layered: immutable action references, least-privilege workflow permissions, CodeQL, dependency review, deterministic/conformance tests, source review, reproducible builds, artifact provenance and runtime isolation. Each layer blocks a defined attack class rather than claiming universal immunity.
 
-Static source review found no `pull_request_target`, mutable checkout refs, merge conflict markers, or obvious plaintext private-key patterns in the targeted ATCLang scan. This does **not** prove immunity to malware, supply-chain compromise, memory corruption, or runtime attacks.
+## File-format and language decision
 
-For the findings above, the current protection claim is **not sufficient**: fake cryptography, permissive JWT validation and false-success network/RPC operations are themselves security boundaries that must be fail-closed.
+- Markdown: normative/explanatory documentation, architecture, audits and roadmap.
+- YAML: repository/governance metadata and CI configuration.
+- JSON: machine-readable language/semantic registries and differential fixtures.
+- TOML: package/spec version/build metadata.
+- Python: reference implementation, SDK, test and fuzzing tooling.
+- Rust: canonical production implementation for consensus-critical compiler/VM/runtime/security.
 
-## File format / language decision
+No blind migration is performed. The architecture boundary is more important than reducing the number of languages.
 
-- Markdown is appropriate for specifications, architecture, governance, audit and roadmap documentation.
-- YAML is appropriate for machine-readable repository/governance metadata where already standardized.
-- Python is appropriate for the reference implementation, SDK, testing and fuzzing roles documented by the repository.
-- Rust is the appropriate canonical production language for consensus-critical compiler/VM/runtime/security components according to the repository's own baseline and architecture documents.
-- No blind file migration was performed: changing formats/languages without preserving the canonical protocol boundary would increase risk.
+## Vision → Concept → Components → Code → Test → Verification
 
-## Verification state
+**Vision:** deterministic, safe smart-contract language and VM boundary for A-TownChain.
 
-- Static source findings: verified by current default-branch source inspection.
-- Runtime tests: **not claimed**; GitHub Actions evidence is unavailable/incomplete.
-- Findings are not closed until source changes are re-read and appropriate tests/runtime evidence are available.
-- Production readiness: **NOT ESTABLISHED**.
+**Concept:** Rust-first production stack with Python reference/differential tooling.
+
+**Components actually present:** Python frontend/semantics/compiler/stdlib/runtime/VM; Rust `atc-core` lexer/parser/AST/bytecode MVP; specs and differential fixtures; governance/security workflows.
+
+**Code:** present but not production-complete.
+
+**Tests:** Python tests and Rust differential tests exist; current GitHub Actions runtime evidence is unavailable.
+
+**Verification:** static findings are current; runtime/reproducible-release verification is not established.
+
+**Release state:** development / NOT PRODUCTION_READY.
