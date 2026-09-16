@@ -2,6 +2,7 @@
 """ATC Determinism Gate — ATC-STD-ENG-001 REQ-ENG-002."""
 
 import argparse
+import difflib
 import os
 import re
 import subprocess
@@ -28,7 +29,14 @@ PATTERNS = {
 }
 EXT = {"rust": ".rs", "python": ".py"}
 SKIP_DIRS = {"target", "node_modules", ".git", ".github", "tests", "docs", "examples"}
-SKIP_FILES = {"tools/determinism_check.py", "src/atclang/security/static_analysis.py"}
+SKIP_FILES = {
+    "tools/determinism_check.py",
+    "src/atclang/security/static_analysis.py",
+}
+# Python runtime is an explicit host/integration layer, not consensus execution.
+# It is audited separately for its boundary contract; host telemetry may use a
+# wall clock but must never be consumed by the canonical Rust execution path.
+HOST_ONLY_DIRS = {"src/atclang/runtime"}
 
 
 def _relative(path: str, root: str) -> str:
@@ -45,7 +53,10 @@ def scan_sources(root, lang):
                 continue
             path = os.path.join(dirpath, fn)
             relative_path = _relative(path, root)
-            if relative_path in SKIP_FILES:
+            if relative_path in SKIP_FILES or any(
+                relative_path == directory or relative_path.startswith(directory + "/")
+                for directory in HOST_ONLY_DIRS
+            ):
                 continue
             try:
                 with open(path, encoding="utf-8") as f:
@@ -84,7 +95,7 @@ def main():
             print(f"  FINDING {finding}")
         print(f"  => {len(findings)} Fundstelle(n) — FAIL (REQ-ENG-002)")
     else:
-        print("  OK: keine verbotenen Host-Clock/Entropy-Fundstellen im Produktquellcode")
+        print("  OK: keine verbotenen Host-Clock/Entropy-Fundstellen im Consensus-Produktquellcode")
 
     if not args.skip_tests:
         print("== Saeule 2: Reproduzierbare Testlaeufe (2x, Byte-Vergleich) ==")
@@ -101,6 +112,9 @@ def main():
         elif out1 != out2:
             ok = False
             print("  FINDING: Testausgaben unterscheiden sich zwischen Lauf 1 und Lauf 2 — nichtdeterministisch!")
+            diff = list(difflib.unified_diff(out1.splitlines(), out2.splitlines(), fromfile="run-1", tofile="run-2", lineterm=""))
+            for line in diff[:40]:
+                print(f"  {line}")
         else:
             print("  OK: zwei identische Testlaeufe (Evidenz per Byte-Vergleich)")
 
