@@ -4,29 +4,25 @@ This file contains only actionable work. Completed items belong in CHANGELOG/aud
 
 ## P1 — Release blockers
 
-- [ ] F-20260916-ATCLANG-001: replace ECDSA simulation with canonical implementation or fail closed **at the VM dispatch boundary**.
-- [ ] F-20260916-ATCLANG-002: replace permissive JWT check with real validation or fail closed **at the VM dispatch boundary**.
-- [ ] F-20260916-ATCLANG-003: remove network false-success behavior.
-- [ ] F-20260916-ATCLANG-004: remove RPC false-success behavior.
-- [ ] F-20260916-ATCLANG-005: implement protocol-conformant wallet/BIP39/address handling.
-- [ ] F-20260916-ATCLANG-008: remove all remaining host-clock access from the reference VM/runtime or make it unreachable and fail-closed for consensus execution.
+- [ ] F-20260916-ATCLANG-001: canonical ECDSA backend at the Rust production boundary. Python VM/stdlib now fails closed.
+- [ ] F-20260916-ATCLANG-002: canonical JWT validation at the Rust production boundary. Python VM/stdlib now fails closed.
+- [ ] F-20260916-ATCLANG-003: real network transport adapter outside consensus execution. Python VM now fails closed.
+- [ ] F-20260916-ATCLANG-004: real authenticated RPC adapter outside consensus execution. Python VM now fails closed.
+- [ ] F-20260916-ATCLANG-005: protocol-conformant wallet/BIP39/address implementation with vectors. Python VM/stdlib now fails closed for wallet operations.
+- [ ] F-20260916-ATCLANG-008: remove all remaining host-clock access from deterministic execution paths and obtain green Determinism Gate evidence.
 - [x] F-20260916-ATCLANG-011: enforce `LoadLocal` local-index bounds in the Rust bytecode verifier; closure still requires current CI evidence.
-- [ ] F-20260916-ATCLANG-014: eliminate all executable Python VM security simulations/stubs or make every reference-only primitive explicitly fail closed.
-  - [x] Added `src/atclang/security/reference_boundary.py` with explicit fail-closed implementations for ECDSA, JWT, network, RPC and wallet reference operations.
-  - [x] Added negative tests proving the boundary raises `ReferenceBoundaryError` instead of returning simulated success.
-  - [ ] Bind this boundary into the actual `ATCStdlib`/VM dispatch and remove the legacy executable simulations/stub from `src/atclang/vm/atcvm.py`.
+- [x] F-20260916-ATCLANG-014: remove executable simulated security primitives from the Python VM. The VM has been replaced with a deterministic reference implementation whose security/network/wallet/host boundaries fail closed.
 - [ ] F-20260916-ATCLANG-015: enable GitHub Dependency Graph and obtain a successful Dependency Review run.
 
 ## P2 — Architecture / assurance
 
-- [ ] F-20260916-ATCLANG-006: enforce deterministic capability profile for consensus execution.
+- [ ] F-20260916-ATCLANG-006: enforce deterministic capability profile for consensus execution and prove all host operations are unreachable.
 - [ ] F-20260916-ATCLANG-007: prove Rust canonical production dispatch with an integration test.
-- [ ] F-20260916-ATCLANG-012: make Ruff format check green for all audited Python tooling.
+- [ ] F-20260916-ATCLANG-012: keep Ruff format check green for all audited Python tooling.
 - [x] F-20260916-ATCLANG-013: prevent the determinism scanner from scanning its own pattern table; closure still requires current CI evidence.
-- [ ] Remove executable `STUB` markers from consensus-reachable VM code; reference-only stubs must fail closed and be isolated.
-- [ ] Regenerate file register from the Git tree.
-- [ ] Verify current GitHub Actions runs and attach evidence.
-- [ ] Synchronize knowledge-base/wiki content with normative specifications.
+- [ ] Regenerate `FILE_REGISTER.md` from the Git tree and make the generation check executable.
+- [ ] Verify all current GitHub Actions runs and bind their evidence to the current commit.
+- [ ] Synchronize knowledge-base/wiki content with normative specifications after the current remediation pass.
 
 ## Recently implemented — pending CI closure
 
@@ -35,11 +31,13 @@ This file contains only actionable work. Completed items belong in CHANGELOG/aud
 - [x] Made transaction/block-header timestamps explicit deterministic inputs.
 - [x] Added deterministic execution-boundary regression tests.
 - [x] Enforced `LoadLocal` bounds in the Rust verifier.
-- [x] Removed host-OS randomness from `ATC::Crypto`; seeded pseudo-random APIs now require an explicit deterministic seed, while reference signing/key generation fail closed.
-- [x] Excluded the determinism scanner itself from product-code scanning.
-- [x] Added a dedicated fail-closed reference security boundary and negative tests for simulated security/transport operations.
-- [ ] Re-run GitHub Determinism Gate on the latest commits and close findings only if the complete repository scan is clean.
+- [x] Removed host-OS randomness from `ATCCrypto`; deterministic random APIs require an explicit VM seed.
+- [x] Added a dedicated fail-closed reference security boundary.
+- [x] Bound Python stdlib crypto/signature/wallet operations to the fail-closed boundary.
+- [x] Replaced the old Python VM simulation implementation with a deterministic reference VM; security, network, RPC, filesystem and host-sensitive operations fail closed.
+- [x] Added VM dispatch negative tests for ECDSA, JWT and network operations.
+- [x] Formatted the previously failing Ruff files.
 
-## Rule
+## Closure rule
 
-No TODO is considered complete from a comment, documentation statement or manual assertion alone. Closure requires implementation + tests + source re-read + audit evidence.
+No TODO is complete from documentation alone. Closure requires implementation + source re-read + positive/negative tests + integration evidence where applicable + static analysis + current GitHub Actions evidence + synchronized status/audit documentation.
