@@ -2,7 +2,7 @@
 """ATC Determinism Gate — ATC-STD-ENG-001 REQ-ENG-002 (D-CRITICAL-Repos).
 
 Prüft zwei Determinismus-Säulen:
-  1. VERBOTENE QUELLEN: Wall-Clock / RNG im Quellcode (Sprachmuster je --lang)
+  1. VERBOTENE QUELLEN: Wall-Clock / RNG im Produktquellcode
   2. REPRODUIERBARE TESTS: Testsuite zweimal, Byte-Vergleich der Ausgaben
 
 Fail-closed: Exit 0 nur wenn BEIDE Säulen grün sind (REQ-ENG-012 — Evidenz
@@ -34,16 +34,12 @@ PATTERNS = {
     ],
 }
 EXT = {"rust": ".rs", "python": ".py"}
-SKIP_DIRS = {
-    "target",
-    "node_modules",
-    ".git",
-    ".github",
-    "tests",
-    "docs",
-    "examples",
-    "tools/determinism_check.py",
-}
+SKIP_DIRS = {"target", "node_modules", ".git", ".github", "tests", "docs", "examples"}
+SKIP_FILES = {"tools/determinism_check.py"}
+
+
+def _relative(path: str, root: str) -> str:
+    return os.path.relpath(path, root).replace(os.sep, "/")
 
 
 def scan_sources(root, lang):
@@ -55,12 +51,20 @@ def scan_sources(root, lang):
             if not fn.endswith(ext):
                 continue
             path = os.path.join(dirpath, fn)
+            relative_path = _relative(path, root)
+            # The scanner's own pattern table necessarily contains examples of
+            # forbidden APIs. It is tooling, not consensus/runtime code, and must
+            # never be reported as a product-code finding.
+            if relative_path in SKIP_FILES:
+                continue
             try:
                 with open(path, encoding="utf-8") as f:
                     for i, line in enumerate(f, 1):
                         for pat, desc in PATTERNS[lang]:
                             if re.search(pat, line):
-                                findings.append(f"{path}:{i}: {desc}: {line.strip()[:80]}")
+                                findings.append(
+                                    f"{relative_path}:{i}: {desc}: {line.strip()[:80]}"
+                                )
             except (OSError, UnicodeDecodeError):
                 continue
     return findings
@@ -91,7 +95,7 @@ def main():
             print(f"  FINDING {f}")
         print(f"  => {len(findings)} Fundstelle(n) — FAIL (REQ-ENG-002)")
     else:
-        print("  OK: keine Wall-Clock/RNG-Fundstellen im Quellcode")
+        print("  OK: keine Wall-Clock/RNG-Fundstellen im Produktquellcode")
 
     if not args.skip_tests:
         print("== Saeule 2: Reproduzierbare Testlaeufe (2x, Byte-Vergleich) ==")
