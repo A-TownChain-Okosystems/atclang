@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed repository audit for ATCLang.
-
-The audit checks enforceable repository invariants. It deliberately does not
-claim absolute immunity from zero-days or malware; it proves only the controls
-encoded here and fails when known unsafe implementation patterns are present.
-"""
+"""Fail-closed repository audit for ATCLang."""
 
 from __future__ import annotations
 
@@ -14,35 +9,16 @@ import re
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 REQUIRED = {
-    "README.md",
-    "AGENTS.md",
-    "AGENT_MANIFEST.md",
-    "ARCHITECTURE.md",
-    "CHANGELOG.md",
-    "CODEOWNERS",
-    "CONTRIBUTING.md",
-    "GOVERNANCE.md",
-    "LICENSE",
-    "ROADMAP.md",
-    "SECURITY.md",
-    "STATUS.md",
-    "TODO.md",
-    "SPRINTS.md",
-    ".atc/repository.yaml",
-    ".atc/standards.yaml",
-    ".atc/evidence/evidence.yaml",
-    "specs/VERSION.toml",
-    "specs/language/SPEC.md",
-    "specs/semantics/SPEC.md",
-    "docs/wiki/README.md",
+    "README.md", "AGENTS.md", "AGENT_MANIFEST.md", "ARCHITECTURE.md", "CHANGELOG.md",
+    "CODEOWNERS", "CONTRIBUTING.md", "GOVERNANCE.md", "LICENSE", "ROADMAP.md",
+    "SECURITY.md", "STATUS.md", "TODO.md", "SPRINTS.md", ".atc/repository.yaml",
+    ".atc/standards.yaml", ".atc/evidence/evidence.yaml", "specs/VERSION.toml",
+    "specs/language/SPEC.md", "specs/semantics/SPEC.md", "docs/wiki/README.md",
 }
 WORKFLOWS = {
-    ".github/workflows/code-quality.yml",
-    ".github/workflows/codeql.yml",
-    ".github/workflows/dependency-review.yml",
-    ".github/workflows/determinism-gate.yml",
-    ".github/workflows/governance-ci.yml",
-    ".github/workflows/test-suite.yml",
+    ".github/workflows/code-quality.yml", ".github/workflows/codeql.yml",
+    ".github/workflows/dependency-review.yml", ".github/workflows/determinism-gate.yml",
+    ".github/workflows/governance-ci.yml", ".github/workflows/test-suite.yml",
     ".github/workflows/atclang-ci-audit.yml",
 }
 FAIL: list[str] = []
@@ -66,12 +42,7 @@ def main() -> int:
         FAIL.append(".atc/repository.yaml: primary language must remain Rust")
 
     agents = read("AGENTS.md")
-    for required in (
-        "ATC-STD-README-001",
-        "ATC-STD-MD-001",
-        "ATC-STD-201",
-        "ATC-STD-AI-DEV-007",
-    ):
+    for required in ("ATC-STD-README-001", "ATC-STD-MD-001", "ATC-STD-201", "ATC-STD-AI-DEV-007"):
         if required not in agents:
             FAIL.append(f"AGENTS.md: missing normative reference {required}")
 
@@ -120,14 +91,7 @@ def main() -> int:
     audit = read("docs/audits/REPOSITORY-AUDIT-2026-09-16-CI.md")
     if "NOT ESTABLISHED" not in status and "NOT ESTABLISHED" not in audit:
         FAIL.append("release status: production readiness is not explicitly bounded")
-
-    for finding in (
-        "F-20260916-ATCLANG-001",
-        "F-20260916-ATCLANG-002",
-        "F-20260916-ATCLANG-003",
-        "F-20260916-ATCLANG-004",
-        "F-20260916-ATCLANG-005",
-    ):
+    for finding in ("F-001", "F-002", "F-003", "F-004", "F-005"):
         if finding not in audit:
             FAIL.append(f"audit documentation: missing release-blocking finding {finding}")
 
