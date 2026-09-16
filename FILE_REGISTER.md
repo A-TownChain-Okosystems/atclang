@@ -37,6 +37,10 @@
 - `.github/workflows/codeql.yml`
 - `.github/workflows/governance-ci.yml`
 - `.github/workflows/test-suite.yml`
+- `.github/workflows/code-quality.yml`
+- `.github/workflows/dependency-review.yml`
+- `.github/workflows/determinism-gate.yml`
+- `.github/workflows/atclang-ci-audit.yml`
 - `.gitignore`
 - `AGENTS.md`
 - `AGENT_MANIFEST.md`
@@ -54,6 +58,7 @@
 - `docs/ATCLANG_1.0_ARCHITECTURE.md`
 - `docs/ATCLANG_BASELINE_V1.md`
 - `docs/REPOSITORY_STANDARD.md`
+- `docs/audits/CI-AUDIT-2026-09-16-ATCLANG.md`
 - `examples/atc8300.atc`
 - `examples/atcos_main.atc`
 - `examples/event_bus.atc`
@@ -132,7 +137,6 @@
 - `src/atclang/semantics/__init__.py`
 - `src/atclang/semantics/type_checker.py`
 - `src/atclang/setup.py`
-- `src/atclang/stdlib/__init__.py`
 - `src/atclang/stdlib/chain.py`
 - `src/atclang/stdlib/collections.py`
 - `src/atclang/stdlib/crypto.py`
@@ -147,3 +151,8 @@
 - `tests/test_bytecode_abi.py`
 - `tests/test_semantics.py`
 - `tools/.gitkeep`
+- `tools/audit/atclang_ci_audit.py`
+
+## Regeneration requirement
+
+This register is an evidence artifact, not a hand-maintained source of truth. Any future addition/removal must be followed by regeneration from the Git tree and a CI consistency check.
