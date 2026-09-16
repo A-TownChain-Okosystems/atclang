@@ -93,12 +93,14 @@ Current executable controls include repository governance, required repository m
 - **Tags:** `verifier`, `bytecode`, `invalid-local`, `fail-closed`
 - **Status:** implementation present; current CI closure pending.
 
-### F-012 — Ruff formatting
+### F-012 — Ruff quality gate
 - **Class:** P2
-- **Category:** CI quality / formatting
+- **Category:** CI quality / lint and formatting
 - **Family:** Python tooling / Ruff
-- **Tags:** `ci`, `formatting`, `ruff`
-- **Remediation:** the previously reported files were reformatted. Current workflow evidence is still required before closure.
+- **Tags:** `ci`, `lint`, `formatting`, `ruff`
+- **Detected defect:** current CI run 35114977328 reported 216 Ruff findings in the replacement VM plus one import-order finding in the security-boundary regression test.
+- **Remediation:** `src/atclang/vm/atcvm.py` was rewritten in Ruff-compliant style and `tests/test_reference_security_boundary.py` import ordering was normalized.
+- **Verification:** a new CI cycle is required; closure is not claimed until the latest branch commit is green.
 
 ### F-013 — Determinism scanner self-match
 - **Class:** P2
@@ -112,8 +114,8 @@ Current executable controls include repository governance, required repository m
 - **Category:** Security / reference implementation boundary
 - **Family:** Python VM / simulated security and transport primitives
 - **Tags:** `security`, `reference-vm`, `stub`, `false-success`
-- **Remediation:** the previous 50 KB simulation VM was replaced by a deterministic reference VM. It contains no executable `# STUB:` marker and explicitly fails closed for security, network, RPC, wallet, filesystem and host-sensitive operations.
-- **Verification:** new negative tests exercise VM dispatch for ECDSA, JWT and network boundaries.
+- **Remediation:** the previous simulation VM was replaced by a deterministic reference VM. It contains no executable `# STUB:` marker and explicitly fails closed for security, network, RPC, wallet, filesystem and host-sensitive operations.
+- **Verification:** negative tests exercise VM dispatch for ECDSA, JWT and network boundaries.
 - **Closure:** current CI/static scan must confirm the old patterns are absent.
 
 ### F-015 — Dependency Review
@@ -122,6 +124,7 @@ Current executable controls include repository governance, required repository m
 - **Family:** Dependency Graph / Dependency Review
 - **Tags:** `dependency-review`, `dependency-graph`, `supply-chain`
 - **Status:** externally blocked until GitHub Dependency Graph is enabled.
+- **Evidence:** current GitHub run 35114977583 fails because Dependency Review reports that Dependency Graph is not enabled for the repository. The immutable action reference itself is intact.
 
 ## Consistency / contradiction resolution
 
