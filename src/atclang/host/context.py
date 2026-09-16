@@ -1,41 +1,36 @@
 # Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
-"""HostContext — die einzige Quelle fuer Umgebungszustaende in der Contract-Ausfuehrung.
+"""Deterministic execution context for ATCLang.
 
-Determinismus-Regel (ATC-99 / ATC-STD-100 L4): Contracts duerfen NIE direkt
-auf Wanduhr, Zufall oder OS zugreifen. Alle Umgebungswerte kommen aus dem
-HostContext, der vom Knoten (Node) deterministisch aus Block-Headern gebaut
-wird — zwei ehrliche Nodes MUSSSEN denselben Context fuer denselben Block
-liefern (Konsens-Voraussetzung).
+Consensus execution receives all environmental state from the block context.
+There is deliberately no host wall-clock fallback and no host RNG capability.
 """
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass, field
 from typing import Any
 
 
-@dataclass
+@dataclass(frozen=True)
 class HostPolicy:
-    """Ausfuehrungs-Politik: was der Host erlaubt."""
+    """Capabilities available to an execution context."""
 
-    allow_wall_clock: bool = False  # Konsens: False — nur block_timestamp
     allow_os_access: bool = False
-    allow_random: bool = False  # Zufall nur via vm-seed, nie host
+    allow_random: bool = False
     max_gas: int = 30_000_000
     max_call_depth: int = 64
 
 
 @dataclass
 class HostContext:
-    """Deterministischer Ausfuehrungskontext eines Blocks."""
+    """Deterministic execution context derived from a block header."""
 
     chain_id: int = 658467
     block_number: int = 0
-    block_timestamp: int = 0  # vom Block-Header, nicht time.time()
+    block_timestamp: int = 0
     block_hash: str = "0x" + "00" * 32
     prev_block_hash: str = "0x" + "00" * 32
-    vm_seed: int = 0  # deterministische Seed-Quelle
+    vm_seed: int = 0
     gas_limit: int = 30_000_000
     policy: HostPolicy = field(default_factory=HostPolicy)
     _events: list[dict[str, Any]] = field(default_factory=list)
@@ -48,25 +43,32 @@ class HostContext:
         block_number: int,
         block_timestamp: int,
         block_hash: str,
+        prev_block_hash: str = "0x" + "00" * 32,
+        vm_seed: int = 0,
         policy: HostPolicy | None = None,
-    ) -> HostContext:
-        """Kanonischer Konstruktor: Node baut Context aus Block-Header."""
+    ) -> "HostContext":
+        """Build the canonical context from authenticated block data."""
+        if block_number < 0 or block_timestamp < 0:
+            raise ValueError("block number/timestamp must be non-negative")
+        if not block_hash:
+            raise ValueError("block_hash is required")
         return cls(
             chain_id=chain_id,
             block_number=block_number,
             block_timestamp=block_timestamp,
             block_hash=block_hash,
+            prev_block_hash=prev_block_hash,
+            vm_seed=vm_seed,
+            gas_limit=(policy or HostPolicy()).max_gas,
             policy=policy or HostPolicy(),
         )
 
     def now(self) -> int:
-        """Zeitquelle fuer Contracts — Konsens-Pflicht: block_timestamp."""
-        if self.policy.allow_wall_clock:
-            return int(time.time())
+        """Return the block timestamp; host wall-clock access is impossible."""
         return self.block_timestamp
 
     def emit(self, name: str, **fields: Any) -> None:
-        """Event-Log (Evidence-Spur, geordnet, replizierbar)."""
+        """Record a deterministic, replayable event."""
         self._events.append({"name": name, "block": self.block_number, **fields})
 
     def log(self, message: str) -> None:
@@ -78,6 +80,8 @@ class HostContext:
         return list(self._events)
 
     def gas_consume(self, amount: int, used: int) -> int:
+        if amount < 0:
+            raise ValueError("gas amount must be non-negative")
         used += amount
         if used > self.gas_limit:
             raise RuntimeError(f"Gas-Limit ueberschritten: {used} > {self.gas_limit}")
