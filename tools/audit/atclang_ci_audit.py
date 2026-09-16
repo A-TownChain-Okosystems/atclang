@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import pathlib
 import re
-import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -93,7 +92,6 @@ def main() -> int:
         if phrase.lower() not in arch.lower():
             FAIL.append(f"architecture baseline: missing enforcement statement: {phrase}")
 
-    # Release-readiness must remain explicit while P1 findings exist.
     status = read("STATUS.md")
     audit = read("docs/audits/REPOSITORY-AUDIT-2026-09-16-CI.md")
     if "NOT ESTABLISHED" not in status and "NOT ESTABLISHED" not in audit:
@@ -102,8 +100,6 @@ def main() -> int:
         if finding not in audit:
             FAIL.append(f"audit documentation: missing release-blocking finding {finding}")
 
-    # Detect common malware/supply-chain primitives in executable code. These are
-    # review triggers, not proof of malware. False positives must be documented.
     source_files = list((ROOT / "src").rglob("*.py")) + list((ROOT / "crates").rglob("*.rs"))
     suspicious = re.compile(r"\b(eval|exec)\s*\(|pickle\.loads?\s*\(|os\.system\s*\(|subprocess\.(Popen|run|call)\s*\(|curl\s+https?://|wget\s+https?://", re.I)
     for p in source_files:
@@ -113,7 +109,6 @@ def main() -> int:
         if re.search(r"\bTODO\b|\bFIXME\b|\bXXX\b", text):
             WARN.append(f"placeholder marker in executable source: {p.relative_to(ROOT)}")
 
-    # Verify workflow actions are pinned to immutable commit SHAs.
     for path in sorted(WORKFLOWS):
         text = read(path)
         for match in re.finditer(r"uses:\s*([^\s#]+)", text):
