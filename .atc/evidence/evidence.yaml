@@ -4,19 +4,20 @@
 # CLAIMED != PASS · DOCUMENTED != IMPLEMENTED · IMPLEMENTED != VERIFIED
 schema_version: "1.0.0"
 repository: atclang
-generated: "2026-09-10"
-generated_by: "SCR-0080 Enforcement-Welle (Aurora, Owner-P0-Definition 10.09. 12:21)"
-bound_commit: cf82ca607e3b2e947756ce4f3f74c8513200339f
-maturity_class: A          # A=substanziell B=Rebuild/Produkt C=Plattform/Anwendung
+generated: "2026-09-16"
+generated_by: "CI Audit 2026-09-16"
+bound_commit: ec6f5d59393a9fbfbaf02f038955740205a67ea8
+maturity_class: A
 r_level: null
 implementation:
-  status: partial             # substantial|partial|skeleton|docs_only
-  summary: "Python-Referenz substanziell; Rust-Canonical-Core GESTARTET: Lexer-MVP in crates/atc-core (SCR-0083, F-108); Parser + Differential-Tests folgen"
+  status: partial
+  summary: "Python-Referenz substanziell; Rust-Canonical-Core vorhanden und durch CI getestet; Production-Readiness bleibt wegen offener P1/P2 Findings nicht etabliert"
 tests:
-  status: pass_with_evidence       # pass_with_evidence|not_run|not_applicable
-  evidence: "cargo test gruen via CI, test_run-Block gebunden (SCR-0083)"
+  status: pass_with_evidence
+  evidence: "ATC Test Suite run 35107408987 PASS; release-blocking gates remain separately red"
 security:
-  status: not_audited
+  status: audited
+  evidence: "CI audit 2026-09-16 identifies open P1 security findings; CodeQL run 35107409053 PASS; static security gate remains fail-closed"
 conformance:
   status: not_verified
 release:
@@ -24,13 +25,13 @@ release:
 milestone_claims:
   rule: "M-Claims nur mit Evidence-Bundle (ATC-STD-MILESTONE-001)"
   latest_verified: null
-canonical_role:                  # SCR-0080 P0-02: Single-Owner-per-Capability
+canonical_role:
   capability: language
   canonical: true
 test_run:
   workflow: ATC Test Suite
-  run_id: 34862978840
-  commit: cf82ca607e3b2e947756ce4f3f74c8513200339f
-  timestamp: 2026-09-14T15:34:00.225762+00:00
+  run_id: 35107408987
+  commit: 039ba93f68120a2d77d15d5adf5f64f7a568c65a
+  timestamp: 2026-09-16T14:16:00Z
   result: PASS
   runner: github-actions
