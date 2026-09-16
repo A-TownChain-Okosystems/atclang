@@ -1,7 +1,7 @@
 ---
 document_id: ATC-DOC-LANG-003
 title: ATCLang Roadmap
-version: 1.1.0
+version: 1.2.0
 status: active
 owner: A-TownChain-Okosystems
 created: 2026-09-07
@@ -24,22 +24,26 @@ standard: ATC-STD-MD-001
 - [ ] Gate G5 Stdlib & Host API Completion
 
 ## Phase 2.1 — Security Boundary Remediation (Release Blocker)
-- [ ] F-001 real ECDSA or explicit fail-closed reference boundary + negative tests
-- [ ] F-002 real JWT validation or explicit fail-closed reference boundary + negative tests
-- [ ] F-003 real transport adapter or fail-closed network reference operation
-- [ ] F-004 real RPC adapter or fail-closed RPC reference operation
-- [ ] F-005 protocol-conformant wallet/BIP39/address implementation + vectors
+- [x] F-001 Python ECDSA simulation removed; reference operation fails closed
+- [x] F-002 Python JWT permissive validation removed; reference operation fails closed
+- [x] F-003 Python network false-success removed; reference operation fails closed
+- [x] F-004 Python RPC false-success removed; reference operation fails closed
+- [x] F-005 Python wallet/BIP39/address simulation removed; reference operation fails closed
+- [ ] F-005 canonical protocol-conformant wallet/BIP39/address implementation + vectors
 - [ ] F-006 deterministic capability profile and verifier rejection of consensus-incompatible host operations
 - [ ] F-007 production integration test proving Rust canonical execution boundary
+- [ ] F-008 current CI closure for verifier correctness
 - [ ] Differential tests for every shared semantic/bytecode primitive
 - [ ] Security audit evidence regenerated after each P1 closure
+- [ ] GitHub Dependency Graph enabled and Dependency Review green
 
 ## Phase 2.2 — Governance / Documentation Synchronization
 - [ ] Regenerate FILE_REGISTER.md from Git tree
-- [ ] Synchronize STATUS.md and audit evidence after verified CI runs
+- [x] Synchronize STATUS.md, TODO.md, SPRINTS.md and audit evidence with current remediation
 - [ ] Validate AGENT_MANIFEST against current standards registry
-- [ ] Add/maintain machine-readable sprint records and closure evidence
-- [ ] Keep wiki/knowledge-base content synchronized with normative specs
+- [x] Maintain machine-readable sprint/closure records
+- [ ] Keep wiki/knowledge-base content synchronized with normative specs after CI closure
+- [ ] Build a standards-to-enforcement matrix covering every registered ATC-STD
 
 ## Phase 3 — Verification & Release
 - [ ] Gate G18 Security Audit
