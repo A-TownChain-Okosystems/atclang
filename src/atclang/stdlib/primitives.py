@@ -1,11 +1,14 @@
 # Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
 """ATCLang Stdlib — deterministic ATC primitive types.
 
-Consensus-visible timestamps are explicit inputs. No primitive reads the host clock.
+Consensus-visible timestamps are explicit inputs. Canonical signature creation
+is not implemented in the Python reference layer and therefore fails closed.
 """
 
 import hashlib
 from typing import Any
+
+from atclang.security.reference_boundary import ecdsa_sign
 
 
 class ATCAddress:
@@ -18,7 +21,7 @@ class ATCAddress:
 
     @staticmethod
     def from_pubkey(pubkey: str) -> "ATCAddress":
-        """Derive address deterministically from public key material."""
+        """Create a deterministic reference address container from key material."""
         h = hashlib.sha256(pubkey.encode()).hexdigest()
         return ATCAddress("ATC" + h[:32])
 
@@ -77,21 +80,15 @@ class ATCHash:
 
 
 class ATCSignature:
-    """ATC signature container.
-
-    The Python reference layer must not be mistaken for the canonical signature
-    implementation; production verification belongs to the Rust cryptographic
-    boundary. This container therefore performs no fake verification.
-    """
+    """Reference signature container; canonical signing belongs to Rust."""
 
     def __init__(self, value: str):
         self._value = value
 
     @staticmethod
     def create(message: str, private_key: str) -> "ATCSignature":
-        # Reference-only deterministic placeholder; canonical signing is Rust.
-        msg_hash = hashlib.sha256(message.encode()).hexdigest()
-        return ATCSignature(hashlib.sha256((private_key + msg_hash).encode()).hexdigest())
+        ecdsa_sign(message, private_key)
+        raise AssertionError("unreachable: canonical ECDSA boundary must fail closed")
 
     def as_string(self) -> str:
         return self._value
