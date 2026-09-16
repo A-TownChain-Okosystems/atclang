@@ -9,7 +9,7 @@ from atclang.security.reference_boundary import (
     verify_jwt,
     wallet_operation,
 )
-from atclang.vm.atcvm import ATCStdlib, ATCVM, Instruction, OP
+from atclang.vm.atcvm import ATCVM, OP, ATCStdlib, Instruction
 
 
 @pytest.mark.parametrize(
@@ -40,10 +40,18 @@ def test_vm_dispatch_uses_fail_closed_security_boundary():
 
     with pytest.raises(ReferenceBoundaryError):
         vm.execute(
-            [Instruction(OP.PUSH, ["token"]), Instruction(OP.CALL_EXT, ["ATC::Crypto::verify_jwt", 1])]
+            [
+                Instruction(OP.PUSH, ["token"]),
+                Instruction(OP.CALL_EXT, ["ATC::Crypto::verify_jwt", 1]),
+            ]
         )
 
     with pytest.raises(ReferenceBoundaryError):
         vm.execute(
-            [Instruction(OP.PUSH, ["127.0.0.1"]), Instruction(OP.PUSH, [1]), Instruction(OP.PUSH, [b"data"]), Instruction(OP.NET_SEND)]
+            [
+                Instruction(OP.PUSH, ["127.0.0.1"]),
+                Instruction(OP.PUSH, [1]),
+                Instruction(OP.PUSH, [b"data"]),
+                Instruction(OP.NET_SEND),
+            ]
         )
