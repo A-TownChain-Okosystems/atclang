@@ -4,14 +4,17 @@ This file contains only actionable work. Completed items belong in CHANGELOG/aud
 
 ## P1 — Release blockers
 
-- [ ] F-20260916-ATCLANG-001: replace ECDSA simulation with canonical implementation or fail closed.
-- [ ] F-20260916-ATCLANG-002: replace permissive JWT check with real validation or fail closed.
+- [ ] F-20260916-ATCLANG-001: replace ECDSA simulation with canonical implementation or fail closed **at the VM dispatch boundary**.
+- [ ] F-20260916-ATCLANG-002: replace permissive JWT check with real validation or fail closed **at the VM dispatch boundary**.
 - [ ] F-20260916-ATCLANG-003: remove network false-success behavior.
 - [ ] F-20260916-ATCLANG-004: remove RPC false-success behavior.
 - [ ] F-20260916-ATCLANG-005: implement protocol-conformant wallet/BIP39/address handling.
 - [ ] F-20260916-ATCLANG-008: remove all remaining host-clock access from the reference VM/runtime or make it unreachable and fail-closed for consensus execution.
 - [x] F-20260916-ATCLANG-011: enforce `LoadLocal` local-index bounds in the Rust bytecode verifier; closure still requires current CI evidence.
 - [ ] F-20260916-ATCLANG-014: eliminate all executable Python VM security simulations/stubs or make every reference-only primitive explicitly fail closed.
+  - [x] Added `src/atclang/security/reference_boundary.py` with explicit fail-closed implementations for ECDSA, JWT, network, RPC and wallet reference operations.
+  - [x] Added negative tests proving the boundary raises `ReferenceBoundaryError` instead of returning simulated success.
+  - [ ] Bind this boundary into the actual `ATCStdlib`/VM dispatch and remove the legacy executable simulations/stub from `src/atclang/vm/atcvm.py`.
 - [ ] F-20260916-ATCLANG-015: enable GitHub Dependency Graph and obtain a successful Dependency Review run.
 
 ## P2 — Architecture / assurance
@@ -34,6 +37,7 @@ This file contains only actionable work. Completed items belong in CHANGELOG/aud
 - [x] Enforced `LoadLocal` bounds in the Rust verifier.
 - [x] Removed host-OS randomness from `ATC::Crypto`; seeded pseudo-random APIs now require an explicit deterministic seed, while reference signing/key generation fail closed.
 - [x] Excluded the determinism scanner itself from product-code scanning.
+- [x] Added a dedicated fail-closed reference security boundary and negative tests for simulated security/transport operations.
 - [ ] Re-run GitHub Determinism Gate on the latest commits and close findings only if the complete repository scan is clean.
 
 ## Rule
