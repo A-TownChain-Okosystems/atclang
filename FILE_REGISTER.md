@@ -15,6 +15,7 @@
 - `.github/ai/capabilities.yaml`
 - `.github/ai/policies.yaml`
 - `.github/dependabot.yml`
+- `.github/workflows/cargo-audit.yml`
 - `.github/workflows/ci-independent-audit.yml`
 - `.github/workflows/code-quality.yml`
 - `.github/workflows/codeql.yml`
@@ -69,7 +70,9 @@
 - `crates/atc-core/src/bytecode.rs`
 - `crates/atc-core/src/lexer.rs`
 - `crates/atc-core/src/lib.rs`
+- `crates/atc-core/src/main.rs`
 - `crates/atc-core/src/parser.rs`
+- `crates/atc-core/tests/cli.rs`
 - `crates/atc-core/tests/differential.rs`
 - `determinism_allowlist.yaml`
 - `docs/ATCLANG_1.0_ARCHITECTURE.md`

@@ -1,0 +1,39 @@
+name: Cargo Security Audit (RustSec)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+permissions:
+  contents: read
+jobs:
+  cargo-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # master@2026-06-30
+        with:
+          toolchain: stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - name: cargo audit ueber alle Manifeste (SCR-0083-Muster, P2 Security)
+        run: |
+          set +e
+          FAIL=0
+          # Phase 1: Lockfiles sicherstellen (Workspace-Members schreiben an den Workspace-Root)
+          while IFS= read -r f; do
+            d="$(dirname "$f")"
+            echo "=== ensure lockfile in $d"
+            (cd "$d" && { [ -f Cargo.lock ] || cargo generate-lockfile --quiet; })
+          done < <(find . -name Cargo.toml -not -path "*/archive/*" -not -path "*/node_modules/*")
+          # Phase 2: jedes entstandene Lockfile genau einmal auditieren (Workspace => 1 Audit am Root)
+          while IFS= read -r lock; do
+            echo "=== cargo audit --file $lock"
+            if ! cargo audit --file "$lock"; then
+              echo "cargo audit FAILED: $lock"; FAIL=1
+            fi
+          done < <(find . -name Cargo.lock -not -path "*/archive/*" -not -path "*/node_modules/*")
+          exit $FAIL

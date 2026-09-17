@@ -3,6 +3,10 @@ name = "atc-core"
 version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
-description = "ATCLang Canonical Core (Rust) — Lexer-MVP (F-108-Umsetzung, SCR-0083)"
+description = "ATCLang Canonical Core (Rust) — Lexer, Parser, AST, Bytecode-Verifizierer, CLI (SCR-0083/0085)"
 
 [dependencies]
+
+[[bin]]
+name = "atc"
+path = "src/main.rs"

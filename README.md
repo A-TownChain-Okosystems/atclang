@@ -83,13 +83,20 @@ The current release state is determined by the applicable standards, conformance
 ```bash
 git clone https://github.com/A-TownChain-Okosystems/atclang.git
 cd atclang
-python3 -m pip install -e .
+cargo build --release --manifest-path crates/atc-core/Cargo.toml
+cargo install --path crates/atc-core   # installs the `atc` CLI
+```
+
+CLI (Frontend-Gate: lex -> parse -> kanonische AST-JSON):
+
+```bash
+atc compile differential/corpus/calls.atc   # kanonisches JSON auf stdout
+atc check differential/corpus/calls.atc     # stille Validierung (Exit-Code)
 ```
 
 ## Testing
 
 ```bash
-python3 -m pytest -q
 cargo test --manifest-path crates/atc-core/Cargo.toml
 python3 tools/ci_independent_audit.py
 ```
