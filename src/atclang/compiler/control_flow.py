@@ -763,7 +763,7 @@ class ControlFlowCompiler:
         """
         Kompiliert break.
 
-        Der Jump wird zunächst als Placeholder emittiert und
+        Der Jump wird zunaechst mit Offset 0 emittiert und
         beim Verlassen des Loops gepatcht.
         """
 

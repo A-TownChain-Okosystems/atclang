@@ -34,7 +34,7 @@ class SecurityGate:
         r"(?:\btime\.(?:time|monotonic)\s*\(|\bdatetime\.(?:now|utcnow)\s*\(|"
         r"\bos\.(?:system|popen|remove|unlink|mkdir|makedirs|rename)\s*\(|"
         r"\bsubprocess\.(?:run|Popen|call|check_call|check_output)\s*\(|"
-        r"\bopen\s*\(|\bsocket\.(?:socket|create_connection)\s*()"
+        r"\bopen\s*\(|\bsocket\.(?:socket|create_connection)\s*\()"
     )
     FORBIDDEN_IMPORT = re.compile(
         r"^\s*(?:import\s+(?:time|datetime|os|subprocess|socket|random)\b|"
@@ -55,20 +55,40 @@ class SecurityGate:
             if profile == "consensus":
                 if self.FORBIDDEN_IMPORT.search(line) or self.FORBIDDEN_HOST.search(line):
                     findings.append(
-                        Finding("SEC-001", Severity.BLOCKER, lineno, "Host/OS capability is forbidden in consensus code")
+                        Finding(
+                            "SEC-001",
+                            Severity.BLOCKER,
+                            lineno,
+                            "Host/OS capability is forbidden in consensus code",
+                        )
                     )
                 if self.RANDOM_CALL.search(line):
                     findings.append(
-                        Finding("SEC-002", Severity.BLOCKER, lineno, "Randomness is forbidden in consensus code")
+                        Finding(
+                            "SEC-002",
+                            Severity.BLOCKER,
+                            lineno,
+                            "Randomness is forbidden in consensus code",
+                        )
                     )
                 if self.FORBIDDEN_NAMESPACE.search(line):
                     findings.append(
-                        Finding("SEC-003", Severity.BLOCKER, lineno, "Non-deterministic host capability is forbidden in consensus code")
+                        Finding(
+                            "SEC-003",
+                            Severity.BLOCKER,
+                            lineno,
+                            "Non-deterministic host capability is forbidden in consensus code",
+                        )
                     )
             match = self.UNSAFE_FN.search(line)
             if match and not self._function_has_require(source, match.group(1)):
                 findings.append(
-                    Finding("SEC-004", Severity.MEDIUM, lineno, f"{match.group(1)} lacks an explicit require guard")
+                    Finding(
+                        "SEC-004",
+                        Severity.MEDIUM,
+                        lineno,
+                        f"{match.group(1)} lacks an explicit require guard",
+                    )
                 )
         return findings
 
@@ -80,7 +100,7 @@ class SecurityGate:
         )
 
     def _function_has_require(self, source: str, fn: str) -> bool:
-        match = re.search(rf"fn\s+{re.escape(fn)}\s*\([^)]*\)[^{]*\{{", source)
+        match = re.search(r"fn\s+" + re.escape(fn) + r"\s*\([^)]*\)[^{]*\{", source)
         if not match:
             return False
         body = source[match.end() :]

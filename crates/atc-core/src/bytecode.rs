@@ -66,7 +66,11 @@ impl Bytecode {
         let mut stack = 0usize;
         for (pc, instruction) in self.instructions.iter().enumerate() {
             match instruction {
-                Instruction::ConstI64(_) | Instruction::LoadLocal(_) => stack += 1,
+                Instruction::ConstI64(_) => stack += 1,
+                Instruction::LoadLocal(index) => {
+                    if *index >= local_count { return Err(VerifyError::InvalidLocal { pc, index: *index }); }
+                    stack += 1;
+                }
                 Instruction::StoreLocal(index) => {
                     if *index >= local_count { return Err(VerifyError::InvalidLocal { pc, index: *index }); }
                     if stack < 1 { return Err(VerifyError::StackUnderflow { pc }); }

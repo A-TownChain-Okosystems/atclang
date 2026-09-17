@@ -1,16 +1,17 @@
 # Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
-# STUB: Temporärer Python-Stub — wird in Sprint 2.1 durch ATCLang ersetzt (ATCLang First Policy, AD-006)
+# Python-Referenz-VM fuer Tests/Simulation; kanonischer Konsens-Kern: Rust (crates/atc-core). ATCLang First Policy, AD-006.
 """
 ATCLang VM — Stack-basierte virtuelle Maschine
 Version: 0.2.0 | A-TownChain Ökosystem
 Erweitert für vollständige atcos_main.atc Ausführung.
 """
 
+import base64
 import hashlib
+import hmac
 import json
-import secrets
+import os
 import struct
-import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
@@ -262,25 +263,37 @@ class ATCStdlib:
     # ── Crypto ───────────────────────────────────────────
     @staticmethod
     def random_bytes(n: int = 32) -> bytes:
-        return secrets.token_bytes(n)
+        return os.urandom(max(0, n))
 
     @staticmethod
     def random_int(max_val: int) -> int:
-        return secrets.randbelow(max_val) if max_val > 0 else 0
+        return int.from_bytes(os.urandom(8), "big") % max_val if max_val > 0 else 0
 
     @staticmethod
     def rand_nonce() -> int:
-        return secrets.randbits(64)
+        return int.from_bytes(os.urandom(8), "big")
+
+    @staticmethod
+    def ecdsa_pub_key(priv_key) -> str:
+        """Public-Key der Simulations-Suite: H(priv). Kryptografisch NICHT
+        sicher — echte ECDSA: blockchain/wallet/ecdsa.py."""
+        return hashlib.sha256(str(priv_key).encode()).hexdigest()
 
     @staticmethod
     def ecdsa_sign(data, priv_key) -> str:
-        """ECDSA Simulation (echte Impl in blockchain/wallet/ecdsa.py)."""
-        combined = str(data) + str(priv_key)
-        return "sig_" + hashlib.sha256(combined.encode()).hexdigest()[:32]
+        """Deterministische Signatur-Simulation: sig = H(data|H(priv)) —
+        Bindung an Daten UND Key. Echte ECDSA: blockchain/wallet/ecdsa.py."""
+        pub = ATCStdlib.ecdsa_pub_key(priv_key)
+        return "sig_" + hashlib.sha256(f"{data}|{pub}".encode()).hexdigest()[:32]
 
     @staticmethod
     def ecdsa_verify(data, sig: str, pub_key) -> bool:
-        return isinstance(sig, str) and sig.startswith("sig_")
+        """Prueft die deterministische Bindung sig <-> (data, pub_key) im
+        constant-time Vergleich. Beliebige sig_*-Werte werden abgelehnt."""
+        if not isinstance(sig, str) or pub_key is None or pub_key == "":
+            return False
+        expected = "sig_" + hashlib.sha256(f"{data}|{pub_key}".encode()).hexdigest()[:32]
+        return hmac.compare_digest(sig, expected)
 
     @staticmethod
     def bip39_mnemonic(seed: bytes, word_count: int = 24) -> list[str]:
@@ -363,18 +376,44 @@ class ATCStdlib:
 
     @staticmethod
     def generate_atc_address(pub_key_data=None) -> str:
-        rand = secrets.token_bytes(32)
-        h = hashlib.sha256(rand).hexdigest()
+        """Deterministische Adress-Ableitung: ATC + H(pub_key_data)[:32].
+        Ohne Eingabe: frische Entropie (Referenz-Fall)."""
+        if pub_key_data is None:
+            material = os.urandom(32)
+        elif isinstance(pub_key_data, str):
+            material = pub_key_data.encode()
+        else:
+            material = bytes(pub_key_data)
+        h = hashlib.sha256(material).hexdigest()
         return "ATC" + h[:32].upper()
 
     @staticmethod
     def verify_jwt(token: str) -> bool:
-        return bool(token) and len(token) > 10
+        """Strukturelle JWT-Referenz-Pruefung: 3 Base64url-Segmente,
+        alg-Header, Payload-Objekt, Laengenlimit 4096. Keine Signatur-
+        Pruefung (echte Impl: Auth-Modul)."""
+        if not isinstance(token, str) or not (32 <= len(token) <= 4096):
+            return False
+        parts = token.split(".")
+        if len(parts) != 3 or not all(parts):
+            return False
+
+        def _pad(seg: str) -> str:
+            return seg + "=" * (-len(seg) % 4)
+
+        try:
+            header = json.loads(base64.urlsafe_b64decode(_pad(parts[0])))
+            payload = json.loads(base64.urlsafe_b64decode(_pad(parts[1])))
+        except Exception:
+            return False
+        return isinstance(header, dict) and "alg" in header and isinstance(payload, dict)
 
     # ── Net ──────────────────────────────────────────────
     @staticmethod
     def net_send(addr: str, port: int, data) -> bool:
-        return True  # Simulation — echte Impl in ATCNet
+        """Referenz-VM ohne Transport: fail-closed — KEIN virtueller Erfolg.
+        Echte Impl: ATCNet (atc-node)."""
+        return False
 
     @staticmethod
     def kademlia_find_node(node_id: str, addr: str, port: int, k: int) -> list[dict]:
@@ -397,9 +436,29 @@ class ATCStdlib:
         return bytes(size)
 
     # ── RPC ──────────────────────────────────────────────
+    _rpc_handlers: dict[str, Any] = {}
+
+    @classmethod
+    def rpc_register(cls, handler: str, fn: Callable) -> None:
+        """Registriert einen RPC-Handler fuer die Referenz-VM."""
+        cls._rpc_handlers[handler] = fn
+
     @staticmethod
     def rpc_call(handler: str, request) -> dict:
-        return {"status": 200, "body": json.dumps({"ok": True, "handler": handler})}
+        """Dispatch an registrierte Handler; ohne Handler: 404 fail-closed
+        (keine erfundene 200-Antwort)."""
+        fn = ATCStdlib._rpc_handlers.get(handler)
+        if fn is None:
+            return {
+                "status": 404,
+                "body": json.dumps(
+                    {"ok": False, "error": "handler not registered", "handler": handler}
+                ),
+            }
+        return {
+            "status": 200,
+            "body": json.dumps({"ok": True, "handler": handler, "result": str(fn(request))}),
+        }
 
 
 # ══════════════════════════════════════════════════════════
@@ -466,8 +525,8 @@ def _build_stdlib_dispatch() -> dict[str, Callable]:
         # Wallet
         "ATC::Wallet::new": lambda args: {
             "address": s.generate_atc_address(),
-            "seed_words": s.bip39_mnemonic(secrets.token_bytes(32), 24),
-            "pub_key": s.hash_sha256(secrets.token_bytes(32)),
+            "seed_words": s.bip39_mnemonic(os.urandom(32), 24),
+            "pub_key": s.hash_sha256(os.urandom(32)),
         },
         # ── Stdlib Module: Crypto (ATC-94) ─────────────
         "ATC::Crypto::sha256": lambda args: ATCCrypto.sha256(args[0]) if args else "",
@@ -632,12 +691,12 @@ class ATCVM:
             {
                 "caller": ATCStdlib.generate_atc_address(),
                 "block": {
-                    "timestamp": int(time.time()),
+                    "timestamp": 0,  # Genesis: deterministisch; Zeit via Block-Header-Injektion (Host-Context)
                     "number": 0,
                     "hash": ATCStdlib.hash_sha3("genesis"),
                 },
                 "tx": {"hash": ATCStdlib.hash_sha3("tx0"), "origin": ""},
-                "now": int(time.time()),
+                "now": 0,  # Genesis-Determinismus; Konsens-Zeit ausschliesslich aus dem Block-Header
                 "true": True,
                 "false": False,
                 "null": None,
@@ -1212,7 +1271,7 @@ class ATCVM:
             elif op == OP.GAS_CHECK:
                 self.push(self.gas_used)
             elif op == OP.TIMESTAMP:
-                self.push(int(time.time()))
+                self.push(self.globals.get("block", {}).get("timestamp", 0))
             elif op == OP.BLOCK_NUM:
                 self.push(self.globals.get("block", {}).get("number", 0))
             elif op == OP.CALLER:

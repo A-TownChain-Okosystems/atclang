@@ -4,8 +4,6 @@
 >
 > Validation: `python3 tools/ci_independent_audit.py` (ATC-STD-016/017).
 
-## Files
-
 - `.atc/compliance.yaml`
 - `.atc/evidence/evidence.yaml`
 - `.atc/lifecycle.yaml`
@@ -39,6 +37,7 @@
 - `ROADMAP.md`
 - `SECURITY.md`
 - `STATUS.md`
+- `crates/atc-core/Cargo.lock`
 - `crates/atc-core/Cargo.toml`
 - `crates/atc-core/differential/corpus/arith_precedence.atc`
 - `crates/atc-core/differential/corpus/calls.atc`
@@ -72,6 +71,7 @@
 - `crates/atc-core/src/lib.rs`
 - `crates/atc-core/src/parser.rs`
 - `crates/atc-core/tests/differential.rs`
+- `determinism_allowlist.yaml`
 - `docs/ATCLANG_1.0_ARCHITECTURE.md`
 - `docs/ATCLANG_1.0_CONFORMANCE.md`
 - `docs/ATCLANG_1.0_RELEASE_GATE.md`
@@ -79,11 +79,8 @@
 - `docs/ENGINEERING_AUDIT.md`
 - `docs/REPOSITORY_STANDARD.md`
 - `docs/audits/REPOSITORY-AUDIT-2026-09-16.md`
-- `examples/atc8300.atc`
+- `examples/README.md`
 - `examples/atcos_main.atc`
-- `examples/event_bus.atc`
-- `examples/kernel.atc`
-- `examples/shivamon.atc`
 - `pyproject.toml`
 - `ruff.toml`
 - `specs/VERSION.toml`

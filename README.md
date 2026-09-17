@@ -8,7 +8,32 @@
 **Version:** `1.0.0`  
 **License:** `Apache-2.0` (see `LICENSE`)
 
+![ATC COMPLIANCE](https://img.shields.io/badge/ATC%20COMPLIANCE-R4%20%C2%B7%20ATC--STD--201%2F202%2F203-brightgreen)
+
+
+## Purpose
+
+ATCLang ist die Vertragssprache des A-TownChain-Ökosystems: deterministisch,
+verifizierbar und auf die ATC-VM als Konsens-Ziel kompiliert. Diese Referenz-
+Implementierung definiert Semantik, Bytecode-Encoding und Sicherheits-Gates
+(verifizierte Konsens-Tauglichkeit statt Vertrauen in Audits).
+
+## Features
+
+- ATCLang-Frontend mit deterministischer Semantik (Konsens-Pflicht)
+- Rust-Consensus-Core (`crates/atc-core`): Bytecode-Verifizierer mit
+  fail-closed Bounds-Checking (Stack, Locals, Functions)
+- Python-Referenz-VM (`src/atclang/vm`) für Tests und Simulation
+- Security-Gate (Static Analysis, fail-closed): Verbots-Import- und
+  Hostcall-Detektion auf Contract-Quellen
+- Determinism-Gate (SCR-0126 Checker v2, allowlist-geprüft)
+
 ## Architecture boundary
+
+**Rust is canonical**: `crates/atc-core` ist der produktive Konsens-Kern
+(Bytecode-Verifizierer, Differential-Test-Ziel). Die Python-Pakete unter
+`src/atclang` sind Referenz-Implementierungen fuer Tests und Simulation —
+kein Produktions- oder Konsens-Pfad.
 
 ATCLang is the language and contract-development layer of A-TownChain. The repository deliberately uses a dual-stack model:
 

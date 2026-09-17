@@ -180,7 +180,7 @@
 **Beschreibung:** Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. Apache-2.0 lizenziert — siehe LICENSE
 **Funktionen/Structs:** —
 
-**Status:** 🔄 STUB
+**Status:** 🔄 geplant (noch nicht implementiert)
 
 ---
 

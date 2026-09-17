@@ -32,8 +32,9 @@ def rules(ds):
 
 
 def test_examples_clean():
-    """Alle parsbaren Beispiel-Programme muessen semantisch CLEAN sein."""
-    base = os.path.join(os.path.dirname(__file__), "..", "examples")
+    """Alle parsbaren Beispiel-Programme (kanonisch: src/atclang/programs,
+    siehe examples/README.md) muessen semantisch CLEAN sein."""
+    base = os.path.join(os.path.dirname(__file__), "..", "src", "atclang", "programs")
     checked = 0
     for p in sorted(glob.glob(os.path.join(base, "*.atc"))):
         src = open(p, encoding="utf-8").read()

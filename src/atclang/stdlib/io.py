@@ -97,11 +97,11 @@ class ATCIO:
     @staticmethod
     def net_send(host: str, port: int, data: str) -> bool:
         """Send network packet. Gas: 50. Node context only."""
-        # Stub — real implementation in ATCLang Network module
+        # Referenz ohne Transport: fail-closed; echte Impl im ATCLang Network-Modul
         return False
 
     @staticmethod
     def net_recv(port: int) -> str | None:
         """Receive network packet. Gas: 50. Node context only."""
-        # Stub — real implementation in ATCLang Network module
+        # Referenz ohne Transport: fail-closed; echte Impl im ATCLang Network-Modul
         return None

@@ -47,7 +47,7 @@ specs/ → Implementierung → generierte Tabellen → Conformance-Tests. KEINE 
 
 | Bereich | Befund | Maßnahme |
 |---|---|---|
-| VM | atc-vm = 116/98-LOC-Stub vs. kanonisch 978 LOC | entfernt (Vault+Historie) |
+| VM | atc-vm = 116/98 LOC (Minimal-Basis) vs. kanonisch 978 LOC | entfernt (Vault+Historie) |
 | Stdlib | atc-stdlib: 4 identisch, math.py differs (154/138), 4 unique (*_ext) | entfernt; Merge-Kandidaten Phase 2 |
 | atc-atclang | kleinere Parallel-Implementierungen (Parser 1431/892, Compiler 561/2229 LOC) | entfernt; Re-Export-Layer entfällt |
 | Legacy-Shims | lexer.py/parser.py/compiler.py à 5–6 LOC | entfernt |

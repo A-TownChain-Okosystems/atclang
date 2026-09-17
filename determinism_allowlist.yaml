@@ -1,0 +1,99 @@
+# determinism_allowlist.yaml — SCR-0126 Determinism-Gate-Remediation (ATCLang-Welle)
+# Jeder Eintrag ist reviewte Ausnahme mit Begruendung. Ziel: iterativ auf 0 reduzieren.
+# Welle-3-Richtziel: injizierbare Clock/Nonce (ATC-STD-ENG), bis dahin Verhalten eingefroren.
+entries:
+  # ── Python-Referenz-VM (F-20260916-ATCLANG-006: Rust-Konsens-Pfad ist autoritativ) ──
+  - file: src/atclang/host/context.py
+    line: 65
+    pattern: "Wall-Clock"
+    justification: "Fallback nur bei policy.allow_wall_clock; Konsens-Pfad nutzt block_timestamp (Konsens-Pflicht)"
+    scr: "SCR-0126"
+  # ── Kernel-Runtime-Telemetrie (kein Konsens-Pfad) ──
+  - file: src/atclang/runtime/kernel_runtime.py
+    line: 144
+    pattern: "Wall-Clock"
+    justification: "Kernel-Boot-Zeit Telemetrie; Welle 3 injizierbare Clock"
+    scr: "SCR-0126"
+  - file: src/atclang/runtime/kernel_runtime.py
+    line: 296
+    pattern: "Wall-Clock"
+    justification: "Event-timestamp Telemetrie; Welle 3 injizierbare Clock"
+    scr: "SCR-0126"
+  - file: src/atclang/runtime/kernel_runtime.py
+    line: 421
+    pattern: "Wall-Clock"
+    justification: "Event-timestamp Telemetrie; Welle 3 injizierbare Clock"
+    scr: "SCR-0126"
+  - file: src/atclang/runtime/kernel_runtime.py
+    line: 446
+    pattern: "Wall-Clock"
+    justification: "Hostcall ATC::Kernel::timestamp Telemetrie"
+    scr: "SCR-0126"
+  - file: src/atclang/runtime/kernel_runtime.py
+    line: 447
+    pattern: "Wall-Clock"
+    justification: "Hostcall ATC::Kernel::uptime Telemetrie"
+    scr: "SCR-0126"
+  - file: src/atclang/runtime/kernel_runtime.py
+    line: 555
+    pattern: "Wall-Clock"
+    justification: "Event-timestamp Telemetrie; Welle 3 injizierbare Clock"
+    scr: "SCR-0126"
+  - file: src/atclang/runtime/kernel_runtime.py
+    line: 577
+    pattern: "Wall-Clock"
+    justification: "Uptime-Statistik Telemetrie"
+    scr: "SCR-0126"
+  - file: src/atclang/runtime/kernel_runtime.py
+    line: 595
+    pattern: "Wall-Clock"
+    justification: "Uptime-Statistik Telemetrie"
+    scr: "SCR-0126"
+  - file: src/atclang/runtime/kernel_runtime.py
+    line: 647
+    pattern: "Wall-Clock"
+    justification: "Kernel-Boot-Zeit Telemetrie; Welle 3 injizierbare Clock"
+    scr: "SCR-0126"
+  # ── Stdlib: Timestamp mit explizitem Parameter-Fallback ──
+  - file: src/atclang/stdlib/primitives.py
+    line: 130
+    pattern: "Wall-Clock"
+    justification: "Stdlib-Timestamp-Default; Aufrufer kann timestamp injizieren; Welle 3 injizierbare Clock"
+    scr: "SCR-0126"
+  - file: src/atclang/stdlib/primitives.py
+    line: 177
+    pattern: "Wall-Clock"
+    justification: "Timestamp-Default nur wenn kein Parameter uebergeben"
+    scr: "SCR-0126"
+  # ── Security-Gate: eigene Detektionsmuster (kein Ausfuehrungspfad) ──
+  - file: src/atclang/security/static_analysis.py
+    line: 40
+    pattern: "random-Modul"
+    justification: "Detektions-Regex des Security-Gates (FORBIDDEN_IMPORT), kein Import"
+    scr: "SCR-0126"
+  - file: src/atclang/security/static_analysis.py
+    line: 41
+    pattern: "random-Modul"
+    justification: "Detektions-Regex des Security-Gates (FORBIDDEN_IMPORT), kein Import"
+    scr: "SCR-0126"
+  - file: src/atclang/security/static_analysis.py
+    line: 43
+    pattern: "random-Modul"
+    justification: "Detektions-Regex des Security-Gates (RANDOM_CALL), kein Aufruf"
+    scr: "SCR-0126"
+  - file: src/atclang/stdlib/crypto.py
+    line: 137
+    pattern: "random-Modul"
+    justification: "Docstring-Beschreibung der Cryptographic-random-Hostcall; kein Import/Aufruf"
+    scr: "SCR-0126"
+  - file: src/atclang/stdlib/crypto.py
+    line: 142
+    pattern: "random-Modul"
+    justification: "Docstring-Beschreibung der Cryptographic-random-Hostcall; kein Import/Aufruf"
+    scr: "SCR-0126"
+  # ── CI-Tooling: Audit-Detektor ──
+  - file: tools/ci_independent_audit.py
+    line: 121
+    pattern: "Wall-Clock"
+    justification: "Detektor-String im CI-Audit (F-20260916-ATCLANG-006-Pruefung), kein Aufruf"
+    scr: "SCR-0126"

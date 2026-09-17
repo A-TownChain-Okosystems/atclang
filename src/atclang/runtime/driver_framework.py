@@ -1,6 +1,6 @@
 # Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
 """
-ATCLang Driver Framework — Python Runtime Stub
+ATCLang Driver Framework — Python-Referenz-Implementierung fuer Tests (kanonisch: driver_framework.atc)
 =================================================
 Version: 1.0.0-alpha | ATC-22+ | Sprint 3.1
 

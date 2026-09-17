@@ -40,9 +40,7 @@ class ATCChain:
 
     def emit(self, event_name: str, **kwargs: Any) -> None:
         """Record an event for deterministic host-side collection."""
-        self._events.append(
-            {"event": event_name, "block": self.block_number, "args": dict(kwargs)}
-        )
+        self._events.append({"event": event_name, "block": self.block_number, "args": dict(kwargs)})
 
     @property
     def events(self) -> list[dict[str, Any]]:
