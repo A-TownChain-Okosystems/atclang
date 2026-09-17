@@ -21,11 +21,9 @@ jobs:
         with:
           python-version: '3.11'
       - name: Python syntax
-        run: python3 -m compileall -q src tests tools
+        run: python3 -m compileall -q tools
       - name: Independent governance/security audit
         run: python3 tools/ci_independent_audit.py
-      - name: Reference tests
-        run: python3 -m pytest -q
       - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # master@2026-06-30
         with:
           toolchain: stable

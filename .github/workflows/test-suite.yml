@@ -29,27 +29,6 @@ jobs:
             (cd "$d" && npm run build --if-present --silent) || { echo "npm build FAILED in $d"; FAIL=1; }
           done < <(find . -name package.json -not -path "*/archive/*" -not -path "*/node_modules/*" -not -path "*/.*/")
           exit $FAIL
-  pytest:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
-        with:
-          python-version: "3.11"
-      - name: pytest ueber alle Requirements-Module (SCR-0078)
-        run: |
-          set +e
-          FAIL=0
-          while IFS= read -r f; do
-            d="$(dirname "$f")"
-            if ! (cd "$d" && grep -rql --include="*.py" "def test_" .); then
-              echo "SKIP $d: keine Tests vorhanden"; continue
-            fi
-            echo "=== pytest in $d"
-            (cd "$d" && pip install -q -r requirements.txt pytest && python -m pytest -q --no-header) \
-              || { echo "pytest FAILED in $d"; FAIL=1; }
-          done < <(find . -name requirements.txt -not -path "*/archive/*")
-          exit $FAIL
   rust-core:
     runs-on: ubuntu-latest
     steps:
@@ -89,7 +68,7 @@ jobs:
       - name: Differential-Test (Rust-Canonical vs. expected)
         run: cd crates/atc-core && cargo test --quiet
   evidence:
-    needs: [npm-tests, pytest, rust-core, differential]
+    needs: [npm-tests, rust-core, differential]
     if: success()
     runs-on: ubuntu-latest
     steps:

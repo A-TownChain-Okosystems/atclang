@@ -31,9 +31,9 @@ Implementierung definiert Semantik, Bytecode-Encoding und Sicherheits-Gates
 ## Architecture boundary
 
 **Rust is canonical**: `crates/atc-core` ist der produktive Konsens-Kern
-(Bytecode-Verifizierer, Differential-Test-Ziel). Die Python-Pakete unter
-`src/atclang` sind Referenz-Implementierungen fuer Tests und Simulation —
-kein Produktions- oder Konsens-Pfad.
+(Bytecode-Verifizierer, Differential-Test-Ziel). Die Python-Referenz-Pipeline
+(Former: `src/atclang`) ist seit 2026-09-17 vollstaendig dokumentiert unter
+`docs/reference/python/` und aus dem Repository entfernt — Rust-only.
 
 ATCLang is the language and contract-development layer of A-TownChain. The repository deliberately uses a dual-stack model:
 

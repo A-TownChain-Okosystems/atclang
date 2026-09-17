@@ -9,9 +9,19 @@
 pub enum Expr {
     Int(i64),
     Ident(String),
-    Unary { op: String, operand: Box<Expr> },
-    Binary { op: String, left: Box<Expr>, right: Box<Expr> },
-    Call { target: Box<Expr>, args: Vec<Expr> },
+    Unary {
+        op: String,
+        operand: Box<Expr>,
+    },
+    Binary {
+        op: String,
+        left: Box<Expr>,
+        right: Box<Expr>,
+    },
+    Call {
+        target: Box<Expr>,
+        args: Vec<Expr>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -45,7 +55,9 @@ pub struct FunctionDef {
 pub enum Stmt {
     Let(LetStmt),
     Fn(FunctionDef),
-    Return { value: Option<Expr> },
+    Return {
+        value: Option<Expr>,
+    },
     /// Nackter Ausdruck — Referenz wrappt als ExprStatement.
     Expr(Expr),
 }

@@ -17,6 +17,5 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install package and test runner
-        run: python3 -m pip install -e . pytest
       - name: Run ATC determinism gate
-        run: python3 tools/determinism_check.py --lang python --test-cmd "python3 -m pytest -q"
+        run: python3 tools/determinism_check.py --lang rust --test-cmd "cargo test --manifest-path crates/atc-core/Cargo.toml --quiet"

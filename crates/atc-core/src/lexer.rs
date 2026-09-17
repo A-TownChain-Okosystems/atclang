@@ -45,7 +45,7 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
             '=' => tokens.push(Token::Assign),
             '+' => tokens.push(Token::Plus),
             '-' => {
-                if chars.peek().map_or(false, |&(_, c)| c == '>') {
+                if chars.peek().is_some_and(|&(_, c)| c == '>') {
                     chars.next();
                     tokens.push(Token::Arrow);
                 } else {
@@ -107,33 +107,39 @@ mod tests {
     #[test]
     fn let_zuweisung() {
         let ts = tokenize("let x = 42;").unwrap();
-        assert_eq!(ts, vec![
-            Token::Let,
-            Token::Ident("x".to_string()),
-            Token::Assign,
-            Token::Int(42),
-            Token::Semi,
-            Token::Eof,
-        ]);
+        assert_eq!(
+            ts,
+            vec![
+                Token::Let,
+                Token::Ident("x".to_string()),
+                Token::Assign,
+                Token::Int(42),
+                Token::Semi,
+                Token::Eof,
+            ]
+        );
     }
 
     #[test]
     fn fn_signatur_mit_arrow() {
         let ts = tokenize("fn add(a: u64) -> u64 { }").unwrap();
-        assert_eq!(ts, vec![
-            Token::Fn,
-            Token::Ident("add".to_string()),
-            Token::LParen,
-            Token::Ident("a".to_string()),
-            Token::Colon,
-            Token::Ident("u64".to_string()),
-            Token::RParen,
-            Token::Arrow,
-            Token::Ident("u64".to_string()),
-            Token::LBrace,
-            Token::RBrace,
-            Token::Eof,
-        ]);
+        assert_eq!(
+            ts,
+            vec![
+                Token::Fn,
+                Token::Ident("add".to_string()),
+                Token::LParen,
+                Token::Ident("a".to_string()),
+                Token::Colon,
+                Token::Ident("u64".to_string()),
+                Token::RParen,
+                Token::Arrow,
+                Token::Ident("u64".to_string()),
+                Token::LBrace,
+                Token::RBrace,
+                Token::Eof,
+            ]
+        );
     }
 
     #[test]

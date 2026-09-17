@@ -1,9 +1,0 @@
-// Copyright (c) 2026 Michael Wroblewski / ShivaCore / A-TownChain-Okosystems. All Rights Reserved.
-// ──────────────────────────────────────────────────────────────
-// ⚠️  ARCHIVED — Diese Datei wurde nach archive/atclang-v01/ verschoben.
-// ⚠️  v1.0 Showcase — nicht parsebar mit v0.3+ Parser.
-// ⚠️  Siehe: archive/atclang-v01/atcos_main.atc
-// ──────────────────────────────────────────────────────────────
-// Ursprünglicher Inhalt war ein v1.0 Syntax-Demo mit Vererbung,
-// for-in, Power-Operator und benannter Struct-Initialisierung.
-// Aktive Module befinden sich in modules/ (v0.3/v0.4 Syntax).

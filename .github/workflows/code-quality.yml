@@ -1,5 +1,6 @@
 # ATC Code Quality Gate — ATC-STD-081 (Coding) / ATC-STD-082 (Code Style)
-# Profil-SSOT: ruff.toml | ruff gepinnt 0.16.7
+# Rust-only seit 2026-09-17: kanonischer Kern crates/atc-core.
+# Python-Governance-Werkzeuge (tools/) bleiben ruff-gepinnt 0.16.7.
 name: ATC Code Quality (STD-081/082)
 on:
   push:
@@ -17,7 +18,15 @@ jobs:
         with: {python-version: '3.11'}
       - name: Ruff installieren (gepinnt, ATC-STD-CI-001/CI-004)
         run: pip install ruff==0.16.7
-      - name: Lint-Pruefung (ATC-STD-081)
-        run: ruff check .
-      - name: Format-Pruefung (ATC-STD-082)
-        run: ruff format --check .
+      - name: Lint-Pruefung tools/ (ATC-STD-081)
+        run: ruff check tools/
+      - name: Format-Pruefung tools/ (ATC-STD-082)
+        run: ruff format --check tools/
+      - uses: dtolnay/rust-toolchain@fa04a1451ff1842e2626ccb99004d0195b455a88 # master@2026-06-30
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Rust-Format (ATC-STD-082)
+        run: cargo fmt --manifest-path crates/atc-core/Cargo.toml -- --check
+      - name: Rust-Clippy (ATC-STD-081)
+        run: cargo clippy --manifest-path crates/atc-core/Cargo.toml --all-targets -- -D warnings

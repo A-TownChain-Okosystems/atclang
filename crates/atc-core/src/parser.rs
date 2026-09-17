@@ -55,7 +55,9 @@ impl Parser {
                 self.pos += 1;
                 Ok(TypeHint { name: n })
             }
-            other => Err(ParseError { message: format!("Typ erwartet, fand {:?}", other) }),
+            other => Err(ParseError {
+                message: format!("Typ erwartet, fand {:?}", other),
+            }),
         }
     }
 
@@ -65,7 +67,9 @@ impl Parser {
         let name = match self.cur() {
             Token::Ident(n) => n,
             other => {
-                return Err(ParseError { message: format!("Name erwartet, fand {:?}", other) })
+                return Err(ParseError {
+                    message: format!("Name erwartet, fand {:?}", other),
+                })
             }
         };
         self.pos += 1;
@@ -82,18 +86,29 @@ impl Parser {
         if self.cur() == Token::Semi {
             self.pos += 1;
         }
-        Ok(LetStmt { name, is_const, type_hint, value })
+        Ok(LetStmt {
+            name,
+            is_const,
+            type_hint,
+            value,
+        })
     }
 
     fn function(&mut self) -> Result<FunctionDef, ParseError> {
         self.pos += 1; // 'fn'
         let name = match self.cur() {
             Token::Ident(n) => n,
-            other => return Err(ParseError { message: format!("Fn-Name erwartet, fand {:?}", other) }),
+            other => {
+                return Err(ParseError {
+                    message: format!("Fn-Name erwartet, fand {:?}", other),
+                })
+            }
         };
         self.pos += 1;
         if self.cur() != Token::LParen {
-            return Err(ParseError { message: "'(' erwartet".to_string() });
+            return Err(ParseError {
+                message: "'(' erwartet".to_string(),
+            });
         }
         self.pos += 1;
         let mut params = Vec::new();
@@ -101,16 +116,23 @@ impl Parser {
             let pname = match self.cur() {
                 Token::Ident(n) => n,
                 other => {
-                    return Err(ParseError { message: format!("Parametername erwartet, fand {:?}", other) })
+                    return Err(ParseError {
+                        message: format!("Parametername erwartet, fand {:?}", other),
+                    })
                 }
             };
             self.pos += 1;
             if self.cur() != Token::Colon {
-                return Err(ParseError { message: "Parameter-Typ ist Pflicht (': typ'), Referenz-Regel".to_string() });
+                return Err(ParseError {
+                    message: "Parameter-Typ ist Pflicht (': typ'), Referenz-Regel".to_string(),
+                });
             }
             self.pos += 1;
             let t = self.simple_type()?;
-            params.push(Param { name: pname, type_hint: t });
+            params.push(Param {
+                name: pname,
+                type_hint: t,
+            });
             if self.cur() == Token::Comma {
                 self.pos += 1;
             } else {
@@ -118,7 +140,9 @@ impl Parser {
             }
         }
         if self.cur() != Token::RParen {
-            return Err(ParseError { message: "')' erwartet".to_string() });
+            return Err(ParseError {
+                message: "')' erwartet".to_string(),
+            });
         }
         self.pos += 1;
         let mut return_type = None;
@@ -127,11 +151,18 @@ impl Parser {
             return_type = Some(self.simple_type()?);
         }
         if self.cur() != Token::LBrace {
-            return Err(ParseError { message: "'{' erwartet".to_string() });
+            return Err(ParseError {
+                message: "'{' erwartet".to_string(),
+            });
         }
         self.pos += 1;
         let body = self.block()?;
-        Ok(FunctionDef { name, params, return_type, body })
+        Ok(FunctionDef {
+            name,
+            params,
+            return_type,
+            body,
+        })
     }
 
     fn block(&mut self) -> Result<Vec<Stmt>, ParseError> {
@@ -140,7 +171,9 @@ impl Parser {
             stmts.push(self.statement()?);
         }
         if self.cur() != Token::RBrace {
-            return Err(ParseError { message: "'}' erwartet".to_string() });
+            return Err(ParseError {
+                message: "'}' erwartet".to_string(),
+            });
         }
         self.pos += 1;
         Ok(stmts)
@@ -241,10 +274,15 @@ impl Parser {
                 }
             }
             if self.cur() != Token::RParen {
-                return Err(ParseError { message: "')' erwartet".to_string() });
+                return Err(ParseError {
+                    message: "')' erwartet".to_string(),
+                });
             }
             self.pos += 1;
-            node = Expr::Call { target: Box::new(node), args };
+            node = Expr::Call {
+                target: Box::new(node),
+                args,
+            };
         }
         Ok(node)
     }
@@ -263,7 +301,9 @@ impl Parser {
                 self.pos += 1;
                 let e = self.expr()?;
                 if self.cur() != Token::RParen {
-                    return Err(ParseError { message: "')' erwartet".to_string() });
+                    return Err(ParseError {
+                        message: "')' erwartet".to_string(),
+                    });
                 }
                 self.pos += 1;
                 Ok(e)

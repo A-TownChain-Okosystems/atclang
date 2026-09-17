@@ -82,15 +82,6 @@ def audit_metadata(findings: list[str]) -> None:
     if not re.search(r"(?m)^language:\s*\n\s*primary:\s*rust\s*$", repo):
         fail(findings, "F-ATCLANG-STD-002 P1 architecture: repository primary language is not Rust")
 
-    pyproject = read(ROOT / "pyproject.toml")
-    if 'license = { text = "All Rights Reserved' in pyproject:
-        fail(
-            findings,
-            "F-ATCLANG-LIC-001 P1 consistency: pyproject conflicts with repository Apache-2.0 license",
-        )
-    if 'license = { text = "Apache-2.0" }' not in pyproject:
-        fail(findings, "F-ATCLANG-LIC-002 P1 packaging: pyproject license is not Apache-2.0")
-
     readme = read(ROOT / "README.md")
     if "Rust is canonical" not in readme or "Python" not in readme:
         fail(
@@ -134,45 +125,51 @@ def audit_security_and_determinism(findings: list[str]) -> None:
     if "pull_request_target" in source:
         fail(findings, "F-ATCLANG-SEC-003 P1 workflow security: pull_request_target detected")
 
-    vm = read(ROOT / "src/atclang/vm/atcvm.py")
-    if 'return isinstance(sig, str) and sig.startswith("sig_")' in vm:
+    # Rust-only-Politik (2026-09-17): Python-Referenz ist dokumentiert und entfernt
+    if (ROOT / "src").exists() or (ROOT / "pyproject.toml").exists() or (ROOT / "tests").exists():
         fail(
             findings,
-            "F-20260916-ATCLANG-001 P1 crypto: reference ECDSA verifier still accepts arbitrary sig_* values",
+            "F-ATCLANG-PY-001 P1 architecture: Python-Referenz noch vorhanden — "
+            "Rust-only-Politik verlangt vollstaendige Entfernung (Doku: docs/reference/python/)",
         )
-    if "return bool(token) and len(token) > 10" in vm:
+    if not (ROOT / "docs/reference/python/README.md").exists():
         fail(
             findings,
-            "F-20260916-ATCLANG-002 P1 auth: reference JWT verifier still accepts arbitrary long tokens",
+            "F-ATCLANG-PY-002 P1 traceability: Referenz-Dokumentation fehlt (docs/reference/python/)",
         )
-    if "def net_send" in vm and "return True  # Simulation" in vm:
+    if not (ROOT / "crates/atc-core/Cargo.toml").exists():
         fail(
             findings,
-            "F-20260916-ATCLANG-003 P1 network: reference net_send reports success without transport",
-        )
-    if 'return {"status": 200, "body": json.dumps({"ok": True, "handler": handler})}' in vm:
-        fail(findings, "F-20260916-ATCLANG-004 P1 RPC: reference rpc_call fabricates HTTP 200")
-    if "words = [" in vm and "generate_atc_address" in vm and "secrets.token_bytes(32)" in vm:
-        fail(
-            findings,
-            "F-20260916-ATCLANG-005 P1 wallet: reference mnemonic/address implementation is not protocol-conformant",
-        )
-    if "time.time()" in vm or "secrets.token_bytes" in vm or "secrets.randbits" in vm:
-        fail(
-            findings,
-            "F-20260916-ATCLANG-006 P2 determinism: Python reference VM contains nondeterministic host operations; Rust consensus path must reject them",
+            "F-ATCLANG-PY-003 P1 architecture: kanonischer Rust-Kern fehlt (crates/atc-core)",
         )
 
-    chain = read(ROOT / "src/atclang/stdlib/chain.py")
-    if "time.time" in chain or "import time" in chain:
-        fail(findings, "F-ATCLANG-DET-001 P1 determinism: Chain stdlib reads local wall clock")
+    roadmap = read(ROOT / "ROADMAP.md")
+    if "G3" not in roadmap or "G18" not in roadmap or "G19" not in roadmap:
+        fail(
+            findings,
+            "F-ATCLANG-DOC-001 P2 roadmap: mandatory compiler/security/release gates are not represented",
+        )
+
+    audit = read(ROOT / "docs/audits/REPOSITORY-AUDIT-2026-09-16.md")
+    if "F-20260916-ATCLANG-001" not in audit or "F-20260916-ATCLANG-007" not in audit:
+        fail(
+            findings,
+            "F-ATCLANG-DOC-002 P1 traceability: audit record does not contain all known P1/P2 findings",
+        )
 
 
 def audit_placeholders_and_docs(findings: list[str]) -> None:
     patterns = re.compile(
         r"\b(TODO|FIXME|HACK|XXX|unimplemented!|NotImplementedError|STUB|placeholder)\b", re.I
     )
-    allowed = {"docs/audits/REPOSITORY-AUDIT-2026-09-16.md", "tools/ci_independent_audit.py"}
+    allowed = {
+        "docs/audits/REPOSITORY-AUDIT-2026-09-16.md",
+        "tools/ci_independent_audit.py",
+        "docs/reference/python/src-atclang.md",
+        "docs/reference/python/tests.md",
+        "docs/reference/python/tools.md",
+        "docs/reference/python/README.md",
+    }
     for path in files():
         if path.suffix not in TEXT_SUFFIXES:
             continue

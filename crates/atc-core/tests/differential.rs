@@ -17,12 +17,13 @@ fn differential_gemeinsamer_subset() {
         .expect("corpus-Verzeichnis fehlt")
         .filter_map(|e| e.ok())
         .map(|e| e.path())
-        .filter(|p| {
-            p.extension().map_or(false, |x| x.to_string_lossy() == "atc")
-        })
+        .filter(|p| p.extension().is_some_and(|x| x.to_string_lossy() == "atc"))
         .collect();
     entries.sort();
-    assert!(!entries.is_empty(), "Corpus leer — Differential-Test ungueltig");
+    assert!(
+        !entries.is_empty(),
+        "Corpus leer — Differential-Test ungueltig"
+    );
     let mut n = 0;
     for path in entries {
         let src = fs::read_to_string(&path).unwrap();
@@ -30,11 +31,14 @@ fn differential_gemeinsamer_subset() {
         let exp_path = expected.join(format!("{}.json", stem));
         let exp = fs::read_to_string(&exp_path)
             .unwrap_or_else(|_| panic!("expected/{}.json fehlt", stem));
-        let prog = parse_program(&src)
-            .unwrap_or_else(|e| panic!("{}: Parse-Fehler: {:?}", stem, e));
+        let prog =
+            parse_program(&src).unwrap_or_else(|e| panic!("{}: Parse-Fehler: {:?}", stem, e));
         let got = prog.to_json();
         assert_eq!(exp.trim(), got, "DIVERGENZ in {}", stem);
         n += 1;
     }
-    println!("Differential: {} Corpus-Dateien bytgleich mit Python-Referenz", n);
+    println!(
+        "Differential: {} Corpus-Dateien bytgleich mit Python-Referenz",
+        n
+    );
 }
