@@ -224,7 +224,8 @@ def audit_evidence(findings: list[str]) -> None:
         try:
             chk = subprocess.run(
                 ["git", "cat-file", "-e", b + "^{commit}"],
-                capture_output=True, cwd=ROOT,
+                capture_output=True,
+                cwd=ROOT,
             )
             if chk.returncode == 0:
                 return  # gueltiger historischer Eintrag; Bindung wird von diesem Lauf nachgezogen
