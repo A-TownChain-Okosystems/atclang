@@ -93,7 +93,7 @@ entries:
     scr: "SCR-0126"
   # ── CI-Tooling: Audit-Detektor ──
   - file: tools/ci_independent_audit.py
-    line: 121
+    line: 160
     pattern: "Wall-Clock"
     justification: "Detektor-String im CI-Audit (F-20260916-ATCLANG-006-Pruefung), kein Aufruf"
     scr: "SCR-0126"

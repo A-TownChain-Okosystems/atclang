@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   audit:
@@ -31,3 +31,23 @@ jobs:
           toolchain: stable
       - name: Rust canonical core
         run: cargo test --manifest-path crates/atc-core/Cargo.toml --quiet
+      - name: Evidence-Bindung (SCR-0086 Folge-Commit, nach bestandenem Audit)
+        if: success()
+        run: |
+          python3 - <<'PY'
+          import datetime, os, re
+          sha = os.environ["GITHUB_SHA"]
+          rid = os.environ["GITHUB_RUN_ID"]
+          ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+          p = ".atc/evidence/evidence.yaml"
+          t = open(p, encoding="utf-8").read()
+          t = re.sub(r"bound_commit: [^\n]*", "bound_commit: " + sha, t)
+          t = re.sub(r"(?m)^(tests:\n  status:) [^\n]*", r"\1 pass_with_evidence", t)
+          t = re.sub(r"(?m)^  evidence: [^\n]*", "  evidence: CI-Independent ATCLang Audit run " + rid + " @ " + ts, t)
+          open(p, "w", encoding="utf-8").write(t)
+          PY
+          git config user.name "ShivaCoreDev"
+          git config user.email "shivacoredev@users.noreply.github.com"
+          git add .atc/evidence/evidence.yaml
+          git commit -m "chore(evidence): CI-independent audit bound [skip ci]" || echo "nichts zu committen"
+          git push

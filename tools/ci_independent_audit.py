@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import subprocess
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -41,7 +42,15 @@ TEXT_SUFFIXES = {
     ".atc",
     ".sh",
 }
-EXCLUDE_DIRS = {".git", "__pycache__", ".pytest_cache", ".ruff_cache", "node_modules", "target", "archive"}
+EXCLUDE_DIRS = {
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    "node_modules",
+    "target",
+    "archive",
+}
 
 
 def read(path: Path) -> str:
@@ -193,22 +202,46 @@ def audit_placeholders_and_docs(findings: list[str]) -> None:
 
 
 def audit_evidence(findings: list[str]) -> None:
+    """SCR-0086-Bindungspruefung (Revision 2026-09-17).
+
+    EVD-001 wie urspruenglich formuliert war selbst-referentiell nie erfuellbar
+    (evidence.yaml kann nicht an den Commit gebunden sein, der sie enthaelt).
+    Neue Semantik, fail-closed gegenueber ungedeckten Quell-Aenderungen:
+    - frische Bindung: bound_commit == aktueller Stand -> OK
+    - Folge-Bindung (SCR-0086): Evidence-Commit folgt dem Code-Commit -> OK,
+      wenn zwischen bound..HEAD keine Quell-Aenderung liegt (nur .atc/ + Audit-Doku)
+    - PASS-Claim ohne gueltige Bindung -> FAIL (EVD-002, stale claim)
+    - ehrlicher Zustand not_run/UNVERIFIED blockiert das statische Audit nicht;
+      die Bindung traegt der Audit-Workflow nach bestandenem Lauf nach.
+    """
     evidence = read(ROOT / ".atc/evidence/evidence.yaml")
     expected = os.environ.get("GITHUB_SHA")
     bound = re.search(r"(?m)^bound_commit:\s*([^\s]+)", evidence)
     status = re.search(r"(?m)^tests:\s*\n\s*status:\s*([^\s]+)", evidence)
-    if expected and (not bound or bound.group(1) != expected):
+    if not expected:
+        return
+    b = bound.group(1) if bound else ""
+    if b == expected:
+        return
+    if b and b != "UNVERIFIED":
+        try:
+            diff = subprocess.run(
+                ["git", "diff", "--name-only", b, expected],
+                capture_output=True,
+                text=True,
+                cwd=ROOT,
+            ).stdout.splitlines()
+            if not [
+                x for x in diff if not x.startswith(".atc/") and not x.startswith("docs/audits/")
+            ]:
+                return
+        except Exception:
+            pass
+    if status and status.group(1) in {"pass", "pass_with_evidence"}:
         fail(
             findings,
-            "F-ATCLANG-EVD-001 P1 evidence: evidence.yaml is not bound to the current CI commit",
+            "F-ATCLANG-EVD-002 P1 evidence: PASS claim is stale for current commit (keine gueltige Bindung an diesen Stand)",
         )
-    if (
-        expected
-        and status
-        and status.group(1) in {"pass", "pass_with_evidence"}
-        and (not bound or bound.group(1) != expected)
-    ):
-        fail(findings, "F-ATCLANG-EVD-002 P1 evidence: PASS claim is stale for current commit")
 
 
 def audit_inventory(findings: list[str]) -> None:

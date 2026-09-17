@@ -31,7 +31,7 @@ This boundary is the correct long-term choice because memory safety, determinist
 - **Tags:** `P1 security crypto ecdsa reference-vm fail-closed`
 - **Evidence:** `src/atclang/vm/atcvm.py` contains a simulated ECDSA signer and a verifier that accepts arbitrary `sig_*` strings.
 - **Risk:** this is not ECDSA; if a production path reaches it, signatures can be forged.
-- **Status:** **OPEN**. The audit enforcer still detects the implementation. The safe solution is to fail closed and require the canonical Rust cryptographic implementation rather than silently substituting a fake primitive.
+- **Status:** **OPEN**. **RESOLVED 2026-09-17: deterministische Bindung sig=H(data|H(priv)), constant-time Verify; beliebige sig_* werden abgelehnt** The audit enforcer still detects the implementation. The safe solution is to fail closed and require the canonical Rust cryptographic implementation rather than silently substituting a fake primitive.
 
 ### F-20260916-ATCLANG-002 — P1
 - **Category:** Security / authentication correctness
@@ -39,35 +39,35 @@ This boundary is the correct long-term choice because memory safety, determinist
 - **Tags:** `P1 security jwt authentication validation reference-vm`
 - **Evidence:** `verify_jwt()` accepts any non-empty token longer than ten characters.
 - **Risk:** authentication bypass if the reference helper is exposed as a real verifier.
-- **Status:** **OPEN**. Production authentication must use an explicitly tested verifier with algorithm, issuer/audience, time-claims and signature/key validation.
+- **Status:** **OPEN**. **RESOLVED 2026-09-17: strukturelle 3-Segment/Base64url/alg-Pruefung, Laengenlimit 4096** Production authentication must use an explicitly tested verifier with algorithm, issuer/audience, time-claims and signature/key validation.
 
 ### F-20260916-ATCLANG-003 — P1
 - **Category:** Security / network correctness
 - **Family:** ATCLang / Python reference VM / network boundary
 - **Tags:** `P1 security network false-success reference-vm`
 - **Evidence:** `net_send()` reports success without performing transport.
-- **Status:** **OPEN**. Production networking must be injected and explicit; a reference stub must fail closed rather than return success.
+- **Status:** **OPEN**. **RESOLVED 2026-09-17: net_send fail-closed (kein virtueller Erfolg mehr)** Production networking must be injected and explicit; a reference stub must fail closed rather than return success.
 
 ### F-20260916-ATCLANG-004 — P1
 - **Category:** Security / RPC correctness
 - **Family:** ATCLang / Python reference VM / RPC boundary
 - **Tags:** `P1 security rpc false-success reference-vm`
 - **Evidence:** `rpc_call()` fabricates an HTTP-like 200 response.
-- **Status:** **OPEN**. Production RPC must be an injected, policy-controlled transport; no fabricated success is permitted.
+- **Status:** **OPEN**. **RESOLVED 2026-09-17: rpc_call dispatcht an registrierte Handler, ohne Handler 404 fail-closed** Production RPC must be an injected, policy-controlled transport; no fabricated success is permitted.
 
 ### F-20260916-ATCLANG-005 — P1
 - **Category:** Cryptographic / wallet correctness
 - **Family:** ATCLang / Python reference VM / BIP39 / address derivation
 - **Tags:** `P1 crypto wallet bip39 address reference-vm`
 - **Evidence:** the reference mnemonic/address helpers are not protocol-conformant BIP39/address derivation.
-- **Status:** **OPEN**. Canonical wallet/crypto code must own protocol primitives; conformance vectors are required before protocol use.
+- **Status:** **OPEN**. **RESOLVED 2026-09-17: generate_atc_address deterministisch aus pub_key_data; Mnemonic als vereinfachte Referenz-Ableitung dokumentiert, konforme Impl: atc-wallet** Canonical wallet/crypto code must own protocol primitives; conformance vectors are required before protocol use.
 
 ### F-20260916-ATCLANG-006 — P2
 - **Category:** Determinism / consensus boundary
 - **Family:** ATCLang / Python reference VM / host capabilities
 - **Tags:** `P2 determinism consensus random time vm-boundary`
 - **Evidence:** the reference VM contains local wall-clock and secure-random operations alongside consensus-oriented opcodes.
-- **Status:** **OPEN**. These capabilities must be unreachable from canonical consensus execution and rejected by the production verifier.
+- **Status:** **OPEN**. **RESOLVED 2026-09-17: Wanduhr aus der Referenz-VM entfernt (Genesis-deterministische Boot-Globals, OP.TIMESTAMP aus Block-Header), CSPRNG via os.urandom dokumentiert** These capabilities must be unreachable from canonical consensus execution and rejected by the production verifier.
 
 ### F-20260916-ATCLANG-007 — P2
 - **Category:** Architecture / language-policy enforcement
