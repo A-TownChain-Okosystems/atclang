@@ -7,3 +7,4 @@ dist/
 .venv/
 .sync-cache/
 .ruff_cache/
+target/
