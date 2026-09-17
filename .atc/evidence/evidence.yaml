@@ -5,15 +5,15 @@ schema_version: "1.0.0"
 repository: atclang
 generated: "2026-09-16"
 generated_by: "CI-independent audit"
-bound_commit: UNVERIFIED
+bound_commit: 34be28f90ffb1325cdfec8d9105797394eb0b68a
 maturity_class: A
 r_level: R4
 implementation:
   status: partial
   summary: "Python-Referenz substanziell; Rust-Canonical-Core gestartet und durch Differential-Tests abgesichert."
 tests:
-  status: not_run
-  evidence: "GitHub Actions liefert derzeit keine verwertbare aktuelle Lauf-Evidenz."
+  status: pass_with_evidence
+  evidence: CI-Independent ATCLang Audit run 35254032614 @ 2026-09-17T17:39:23.328340+00:00
 security:
   status: not_audited
 conformance:
