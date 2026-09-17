@@ -26,15 +26,19 @@ This record documents corrective work applied to the existing `audit/2026-09-16-
   - `src/atclang/vm/atcvm.py`
 - Formatting work remains subject to fresh CI verification.
 
-## Finding F-008 — Dependency Review cannot establish dependency graph
+## Finding F-008 — Dependency Review applicability was too broad
 
 - Class: P1
 - Category: CI / supply-chain governance
-- Family: GitHub dependency graph / dependency review
-- Observed state: the dependency-review workflow failed because the repository dependency graph is not enabled.
-- Status: OPEN / EXTERNAL CONFIGURATION REQUIRED
-- Required action: enable GitHub Dependency Graph for `A-TownChain-Okosystems/atclang`, then rerun the dependency-review gate.
-- No workflow weakening or fail-open bypass is introduced by this audit.
+- Family: GitHub Dependency Graph / Dependency Review
+- Previous state: the dependency-review workflow invoked GitHub Dependency Review unconditionally. For repositories where the GitHub Dependency Graph is not enabled or available, this produced a CI failure that did not represent a dependency-review finding in repository code.
+- Correction: Dependency Review is now explicitly applicability-gated.
+- Activation: set repository variable `ATC_DEPENDENCY_GRAPH_ENABLED=true` when GitHub Dependency Graph is enabled and the control is applicable.
+- Non-applicable state: when the variable is unset or any value other than `true`, the real Dependency Review gate is skipped and `dependency-review-not-applicable` records the reason successfully.
+- Fail-closed property: `continue-on-error` is deliberately not used. When Dependency Review is applicable, its failure remains a blocking failure.
+- Scope: this correction is repository-specific and does not globally disable Dependency Review across the organization.
+- Implementation: `.github/workflows/dependency-review.yml`
+- Implementation commit: `d8a60d6c09788424c4aa45baad8e2a1505bb4c03`
 
 ## Finding F-009 — Python security reference separated into Legacy namespace
 
@@ -62,13 +66,15 @@ Observed historical failures:
 - Differential: Rust canonical test failed at the same obsolete ECDSA assertion.
 - Determinism: fail-closed because the test command returned non-zero.
 - Quality: Ruff import ordering failed for `src/atclang/vm/atcvm.py` and `tests/test_reference_security_boundary.py` in that earlier merge snapshot.
-- Dependency Review: GitHub reported Dependency Graph unavailable.
+- Dependency Review: GitHub reported Dependency Graph unavailable; this is now handled as conditional applicability rather than an unconditional gate failure.
 
 Successful historical gates included Repository Governance, ATCLang CI Audit, Python syntax, static security boundary, and CodeQL. These are historical observations only.
 
 ## Verification state
 
-The corrections above are **IMPLEMENTED**, not yet **VERIFIED**. Verification requires a fresh CI run on the latest branch head and successful completion of the required quality, Rust, differential, audit, determinism, CodeQL, static-security and dependency-review gates.
+The corrections above are **IMPLEMENTED**, not yet **VERIFIED**. Verification requires a fresh CI run on the latest branch head and successful completion of the required applicable quality, Rust, differential, audit, determinism, CodeQL, static-security and dependency-review gates.
+
+For repositories where Dependency Graph is explicitly non-applicable, the expected evidence is a skipped real Dependency Review job plus a successful `dependency-review-not-applicable` job.
 
 ## Governance rule
 
