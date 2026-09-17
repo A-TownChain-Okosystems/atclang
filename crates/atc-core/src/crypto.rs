@@ -124,10 +124,6 @@ pub fn verify_hs256_jwt(
     let supplied = URL_SAFE_NO_PAD.decode(signature_b64).map_err(|_| CryptoError::InvalidJwtEncoding)?;
 
     let signing_input = format!("{header_b64}.{claims_b64}");
-    let mut mac = Sha256::new();
-    mac.update(secret);
-    mac.update(signing_input.as_bytes());
-    let expected = mac.finalize();
     // HS256 is HMAC-SHA256, not plain SHA-256. The explicit HMAC construction
     // below avoids accidentally treating a digest as a MAC.
     let expected = hmac_sha256(secret, signing_input.as_bytes());
