@@ -1,3 +1,18 @@
+<!--
+SUPERSEDED-IN-PART — 2026-09-17:
+Dieser Audit beschreibt den Stand VOR der Python-Referenz-Loeschung (17.09., Welle 2).
+Ist-Stand seit Welle 2 (Commit e915589, Evidence-Bindung ba77948):
+- Die Python-Referenzimplementierung ist dokumentiert (docs/reference/python/) und
+  GELÖSCHT. atclang ist Rust-only; kanonischer Kern: crates/atc-core.
+- Die vollständige Kette ist live: Lexer -> Parser -> AST -> Bytecode-Lowering
+  (Verifizierer-Zwang je Funktion) -> deterministische Stack-VM -> `atc run`.
+- 25 Tests, fmt/clippy clean, 7/7 CI-Gates grün (inkl. Determinism, RustSec-Audit).
+- Python-bezogene Funde (Referenz-VM-Kryptographie, JWT, RPC, Wallet-Derivation)
+  sind damit HISTORISCH — der betroffene Code existiert nicht mehr im Baum.
+- Aktuell offene Punkte: ATC-VM-ABI-Bindung (G4, SCR-0128 Stufe 2), Sprachumfang
+  (Kontrollstrukturen, SCR-0128 Stufe 1), Stdlib/Gas/Storage (G5/G7/G8).
+Dieser Vermerk korrigiert den Ist-Zustand, ohne den historischen Audittext zu ändern.
+-->
 # ATCLang Repository Audit — 2026-09-16
 
 Status: **IN PROGRESS — production release remains blocked until the Rust canonical boundary, reference-VM security boundaries, conformance and CI evidence are complete.**

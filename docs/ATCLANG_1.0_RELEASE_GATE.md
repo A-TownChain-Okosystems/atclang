@@ -1,6 +1,6 @@
 # ATCLang 1.0.0 Release Gate
 
-**Status:** `NO-GO`  
+**Status:** `NO-GO` (Stand 2026-09-17, nach Welle 2 aktualisiert)  
 **Version:** 1.0.0  
 **Date:** 2026-09-14  
 **Authority:** ATC-STD-000 v1.3.0
@@ -14,14 +14,14 @@ This document is the machine-reviewable release gate for ATCLang 1.0.0. A versio
 | G0 | Repository baseline/build | PASS (documented) |
 | G1 | Normative language specification | PASS |
 | G2 | Semantic/type-checking specification | PASS |
-| G3 | Canonical IR, bytecode emission and verification | PARTIAL — ATCB-1 baseline implemented |
+| G3 | Canonical IR, bytecode emission and verification | IMPLEMENTED (i64-Subset) — Lowering + Verifizierer-Zwang je Funktion, `atc run`; Evidence e915589; volle Sprachreife: SCR-0128 |
 | G4 | ATVM integration and execution conformance | OPEN |
 | G5 | Standard library and host API completion | OPEN |
 | G6 | ABI specification and compatibility tests | OPEN |
 | G7 | Storage/state model | OPEN |
 | G8 | Resource/gas model | OPEN |
 | G9 | Deterministic compilation | OPEN |
-| G10 | Deterministic execution | OPEN |
+| G10 | Deterministic execution | PASS (Referenz-VM) — checked-Arithmetik, feste Aufruftiefe, keine Uhr/RNG; Determinism-Gate grün (e915589); Kreuz-VM-Konformenz: G11 |
 | G11 | Cross-implementation conformance | OPEN |
 | G12 | Negative/fuzz/malformed-input testing | OPEN |
 | G13 | Security hardening | OPEN |
