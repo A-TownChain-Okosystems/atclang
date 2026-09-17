@@ -183,7 +183,12 @@ mod tests {
         let signature = ecdsa_sign(b"atc", &private).unwrap();
         assert!(ecdsa_verify(b"atc", &signature, public.as_bytes()).unwrap());
         assert!(!ecdsa_verify(b"tampered", &signature, public.as_bytes()).unwrap());
-        assert!(!ecdsa_verify(b"atc", "sig_simulated", public.as_bytes()).unwrap());
+
+        let malformed = ecdsa_verify(b"atc", "sig_simulated", public.as_bytes());
+        assert_eq!(malformed, Err(CryptoError::InvalidSignature));
+
+        let wrong_signature = URL_SAFE_NO_PAD.encode([0u8; 64]);
+        assert!(!ecdsa_verify(b"atc", &wrong_signature, public.as_bytes()).unwrap());
     }
 
     #[test]
