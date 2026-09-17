@@ -18,8 +18,14 @@ PATTERNS = {
     ],
     "python": [
         (r"^\s*(?:import\s+random|from\s+random\s+import)\b", "random-Modul"),
-        (r"\brandom\.(?:random|randint|randrange|choice|choices|shuffle|sample)\s*\(", "RNG-Aufruf"),
-        (r"\bsecrets\.(?:token_bytes|token_hex|token_urlsafe|randbelow|randbits)\s*\(", "OS-Entropy-RNG"),
+        (
+            r"\brandom\.(?:random|randint|randrange|choice|choices|shuffle|sample)\s*\(",
+            "RNG-Aufruf",
+        ),
+        (
+            r"\bsecrets\.(?:token_bytes|token_hex|token_urlsafe|randbelow|randbits)\s*\(",
+            "OS-Entropy-RNG",
+        ),
         (r"\bos\.urandom\s*\(", "OS-Entropy-RNG"),
         (r"\btime\.time\s*\(\)", "Wall-Clock"),
         (r"\bdatetime\.now\s*\(", "Wall-Clock (datetime)"),
@@ -63,7 +69,9 @@ def scan_sources(root, lang):
                     for i, line in enumerate(f, 1):
                         for pat, desc in PATTERNS[lang]:
                             if re.search(pat, line):
-                                findings.append(f"{relative_path}:{i}: {desc}: {line.strip()[:120]}")
+                                findings.append(
+                                    f"{relative_path}:{i}: {desc}: {line.strip()[:120]}"
+                                )
             except (OSError, UnicodeDecodeError):
                 continue
     return findings
@@ -81,7 +89,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--lang", choices=["rust", "python"], required=True)
     ap.add_argument("--test-cmd", default=None)
-    ap.add_argument("--skip-tests", action="store_true", help="nur Quellcode-Scan (nicht empfohlen)")
+    ap.add_argument(
+        "--skip-tests", action="store_true", help="nur Quellcode-Scan (nicht empfohlen)"
+    )
     args = ap.parse_args()
 
     root = os.getcwd()
@@ -108,11 +118,23 @@ def main():
         rc2, out2 = run_tests(cmd, root)
         if rc1 != 0 or rc2 != 0:
             ok = False
-            print(f"  FINDING: Tests schlagen fehl (rc={rc1}/{rc2}) — Determinismus nicht pruefbar (Fail Closed)")
+            print(
+                f"  FINDING: Tests schlagen fehl (rc={rc1}/{rc2}) — Determinismus nicht pruefbar (Fail Closed)"
+            )
         elif out1 != out2:
             ok = False
-            print("  FINDING: Testausgaben unterscheiden sich zwischen Lauf 1 und Lauf 2 — nichtdeterministisch!")
-            diff = list(difflib.unified_diff(out1.splitlines(), out2.splitlines(), fromfile="run-1", tofile="run-2", lineterm=""))
+            print(
+                "  FINDING: Testausgaben unterscheiden sich zwischen Lauf 1 und Lauf 2 — nichtdeterministisch!"
+            )
+            diff = list(
+                difflib.unified_diff(
+                    out1.splitlines(),
+                    out2.splitlines(),
+                    fromfile="run-1",
+                    tofile="run-2",
+                    lineterm="",
+                )
+            )
             for line in diff[:40]:
                 print(f"  {line}")
         else:
