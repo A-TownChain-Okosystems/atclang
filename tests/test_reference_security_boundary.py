@@ -1,6 +1,6 @@
 import pytest
 
-from atclang.security.reference_boundary import (
+from atclang.legacy.security.reference_boundary import (
     ReferenceBoundaryError,
     ecdsa_sign,
     ecdsa_verify,
