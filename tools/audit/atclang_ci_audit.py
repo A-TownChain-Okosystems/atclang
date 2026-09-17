@@ -9,16 +9,35 @@ import re
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 REQUIRED = {
-    "README.md", "AGENTS.md", "AGENT_MANIFEST.md", "ARCHITECTURE.md", "CHANGELOG.md",
-    "CODEOWNERS", "CONTRIBUTING.md", "GOVERNANCE.md", "LICENSE", "ROADMAP.md",
-    "SECURITY.md", "STATUS.md", "TODO.md", "SPRINTS.md", ".atc/repository.yaml",
-    ".atc/standards.yaml", ".atc/evidence/evidence.yaml", "specs/VERSION.toml",
-    "specs/language/SPEC.md", "specs/semantics/SPEC.md", "docs/wiki/README.md",
+    "README.md",
+    "AGENTS.md",
+    "AGENT_MANIFEST.md",
+    "ARCHITECTURE.md",
+    "CHANGELOG.md",
+    "CODEOWNERS",
+    "CONTRIBUTING.md",
+    "GOVERNANCE.md",
+    "LICENSE",
+    "ROADMAP.md",
+    "SECURITY.md",
+    "STATUS.md",
+    "TODO.md",
+    "SPRINTS.md",
+    ".atc/repository.yaml",
+    ".atc/standards.yaml",
+    ".atc/evidence/evidence.yaml",
+    "specs/VERSION.toml",
+    "specs/language/SPEC.md",
+    "specs/semantics/SPEC.md",
+    "docs/wiki/README.md",
 }
 WORKFLOWS = {
-    ".github/workflows/code-quality.yml", ".github/workflows/codeql.yml",
-    ".github/workflows/dependency-review.yml", ".github/workflows/determinism-gate.yml",
-    ".github/workflows/governance-ci.yml", ".github/workflows/test-suite.yml",
+    ".github/workflows/code-quality.yml",
+    ".github/workflows/codeql.yml",
+    ".github/workflows/dependency-review.yml",
+    ".github/workflows/determinism-gate.yml",
+    ".github/workflows/governance-ci.yml",
+    ".github/workflows/test-suite.yml",
     ".github/workflows/atclang-ci-audit.yml",
 }
 FAIL: list[str] = []
@@ -42,7 +61,12 @@ def main() -> int:
         FAIL.append(".atc/repository.yaml: primary language must remain Rust")
 
     agents = read("AGENTS.md")
-    for required in ("ATC-STD-README-001", "ATC-STD-MD-001", "ATC-STD-201", "ATC-STD-AI-DEV-007"):
+    for required in (
+        "ATC-STD-README-001",
+        "ATC-STD-MD-001",
+        "ATC-STD-201",
+        "ATC-STD-AI-DEV-007",
+    ):
         if required not in agents:
             FAIL.append(f"AGENTS.md: missing normative reference {required}")
 
@@ -77,7 +101,9 @@ def main() -> int:
         }
         for name, pattern in dangerous.items():
             if re.search(pattern, vm, re.I):
-                FAIL.append(f"src/atclang/vm/atcvm.py: unsafe reference primitive remains: {name}")
+                FAIL.append(
+                    f"src/atclang/vm/atcvm.py: unsafe reference primitive remains: {name}"
+                )
         if "# STUB:" in vm:
             FAIL.append("src/atclang/vm/atcvm.py: executable STUB marker remains")
 
