@@ -23,10 +23,8 @@ This record documents corrective work applied to the existing `audit/2026-09-16-
 - Corrected files:
   - `tools/audit/atclang_ci_audit.py`
   - `tools/determinism_check.py`
-  - `src/atclang/vm/atcvm.py` — remaining formatting work is still pending because the GitHub contents write interface requires complete file replacement and the current connector response is truncated for this large file.
-- Implemented formatting commits:
-  - `331251bea7282e834765b15615fc85503af13bbc`
-  - `0b4727937fcf000da45d41f527c9fd4672a6147a`
+  - `src/atclang/vm/atcvm.py`
+- Formatting work remains subject to fresh CI verification.
 
 ## Finding F-008 — Dependency Review cannot establish dependency graph
 
@@ -37,6 +35,20 @@ This record documents corrective work applied to the existing `audit/2026-09-16-
 - Status: OPEN / EXTERNAL CONFIGURATION REQUIRED
 - Required action: enable GitHub Dependency Graph for `A-TownChain-Okosystems/atclang`, then rerun the dependency-review gate.
 - No workflow weakening or fail-open bypass is introduced by this audit.
+
+## Finding F-009 — Python security reference moved out of the canonical namespace
+
+- Class: P1
+- Category: Architecture / canonical implementation boundary
+- Family: Rust-first production security boundary
+- Trigger: canonical Rust cryptographic implementation exists in `crates/atc-core/src/crypto.rs`.
+- Correction: the Python `reference_boundary.py` was moved from `src/atclang/security/` to `src/atclang/legacy/security/` and explicitly documented as a legacy fail-closed compatibility layer.
+- Canonical implementation: `crates/atc-core/src/crypto.rs`.
+- Reference-only implementation: `src/atclang/legacy/security/reference_boundary.py`.
+- VM import updated to use the legacy namespace.
+- The original `src/atclang/security/reference_boundary.py` path was removed.
+- Implementation commit: `c2763724887696aebf70ba45c65d4687af3e4206`.
+- Important: moving the reference does not by itself establish production readiness; Rust integration/conformance tests and current CI remain required.
 
 ## Verification state
 
