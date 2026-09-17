@@ -1,9 +1,7 @@
-"""Fail-closed security boundary for non-canonical ATCLang reference operations.
+"""Legacy fail-closed Python security reference boundary.
 
-The Python reference runtime is never a source of consensus/security truth.
-Operations that would otherwise require canonical cryptography, identity,
-network transport, RPC, or wallet conformance MUST fail closed until they are
-bound to a verified implementation.
+This module remains only for reference/test compatibility. Canonical
+cryptographic/security implementations live in the Rust production boundary.
 """
 
 from __future__ import annotations
@@ -12,13 +10,12 @@ from typing import NoReturn
 
 
 class ReferenceBoundaryError(RuntimeError):
-    """Raised when a reference-only security operation has no verified backend."""
+    """Raised when a legacy reference operation has no verified backend."""
 
 
 def fail_closed(operation: str) -> NoReturn:
-    """Reject an operation rather than returning simulated success."""
     raise ReferenceBoundaryError(
-        f"reference operation '{operation}' is unavailable: no verified canonical backend is bound"
+        f"legacy reference operation '{operation}' is unavailable: no verified canonical backend is bound"
     )
 
 

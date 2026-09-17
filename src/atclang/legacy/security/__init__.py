@@ -1,0 +1,1 @@
+"""Legacy security reference adapters."""
