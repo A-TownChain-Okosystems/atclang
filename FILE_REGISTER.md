@@ -70,10 +70,13 @@
 - `crates/atc-core/src/bytecode.rs`
 - `crates/atc-core/src/lexer.rs`
 - `crates/atc-core/src/lib.rs`
+- `crates/atc-core/src/lower.rs`
 - `crates/atc-core/src/main.rs`
 - `crates/atc-core/src/parser.rs`
+- `crates/atc-core/src/vm.rs`
 - `crates/atc-core/tests/cli.rs`
 - `crates/atc-core/tests/differential.rs`
+- `crates/atc-core/tests/run.rs`
 - `determinism_allowlist.yaml`
 - `docs/ATCLANG_1.0_ARCHITECTURE.md`
 - `docs/ATCLANG_1.0_CONFORMANCE.md`

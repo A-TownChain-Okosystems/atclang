@@ -3,7 +3,7 @@
 //! Encoding is deterministic: fixed opcode bytes, little-endian immediates,
 //! no host-dependent serialization.
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Instruction {
     ConstI64(i64),
     LoadLocal(u16),
@@ -91,16 +91,23 @@ impl Bytecode {
 
     pub fn verify(&self, local_count: u16, function_count: u16) -> Result<(), VerifyError> {
         let mut stack = 0usize;
+        // Letzter Konstantenwert: faengt 'ConstI64(0), Div' (Div/0) statisch ab.
+        let mut last_const: Option<i64> = None;
         for (pc, instruction) in self.instructions.iter().enumerate() {
             match instruction {
-                Instruction::ConstI64(_) => stack += 1,
+                Instruction::ConstI64(v) => {
+                    last_const = Some(*v);
+                    stack += 1;
+                }
                 Instruction::LoadLocal(index) => {
+                    last_const = None;
                     if *index >= local_count {
                         return Err(VerifyError::InvalidLocal { pc, index: *index });
                     }
                     stack += 1;
                 }
                 Instruction::StoreLocal(index) => {
+                    last_const = None;
                     if *index >= local_count {
                         return Err(VerifyError::InvalidLocal { pc, index: *index });
                     }
@@ -109,18 +116,31 @@ impl Bytecode {
                     }
                     stack -= 1;
                 }
-                Instruction::Add | Instruction::Sub | Instruction::Mul | Instruction::Div => {
+                Instruction::Add | Instruction::Sub | Instruction::Mul => {
+                    last_const = None;
+                    if stack < 2 {
+                        return Err(VerifyError::StackUnderflow { pc });
+                    }
+                    stack -= 1;
+                }
+                Instruction::Div => {
+                    if last_const == Some(0) {
+                        return Err(VerifyError::DivisionByZeroConstant { pc });
+                    }
+                    last_const = None;
                     if stack < 2 {
                         return Err(VerifyError::StackUnderflow { pc });
                     }
                     stack -= 1;
                 }
                 Instruction::Neg => {
+                    last_const = None;
                     if stack < 1 {
                         return Err(VerifyError::StackUnderflow { pc });
                     }
                 }
                 Instruction::Call { function, argc } => {
+                    last_const = None;
                     if *function >= function_count {
                         return Err(VerifyError::InvalidFunction {
                             pc,
@@ -134,6 +154,7 @@ impl Bytecode {
                     stack = stack - argc + 1;
                 }
                 Instruction::Return => {
+                    last_const = None;
                     if stack != 1 {
                         return Err(VerifyError::InvalidStackHeight {
                             pc,
@@ -143,6 +164,7 @@ impl Bytecode {
                     }
                 }
                 Instruction::Pop => {
+                    last_const = None;
                     if stack < 1 {
                         return Err(VerifyError::StackUnderflow { pc });
                     }

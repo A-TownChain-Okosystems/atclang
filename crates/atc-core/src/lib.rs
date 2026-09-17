@@ -6,4 +6,6 @@
 pub mod ast;
 pub mod bytecode;
 pub mod lexer;
+pub mod lower;
 pub mod parser;
+pub mod vm;

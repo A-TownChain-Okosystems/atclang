@@ -73,3 +73,30 @@ fn cli_lehnt_ungueltiges_programm_und_aufrufe_ab() {
         "unlesbare Datei muss Exit-Code 2 geben"
     );
 }
+#[test]
+fn cli_run_fuehrt_programm_aus_und_lehnt_laufzeitfehler_ab() {
+    let exe = env!("CARGO_BIN_EXE_atc");
+    let good = std::env::temp_dir().join("atc_cli_run_good.atc");
+    std::fs::write(
+        &good,
+        "fn add(a: i64, b: i64) -> i64 { return a + b } fn main() -> i64 { return add(20, 22) }",
+    )
+    .unwrap();
+    let out = Command::new(exe).arg("run").arg(&good).output().unwrap();
+    assert!(
+        out.status.success(),
+        "run fehlgeschlagen: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "42");
+
+    let bad = std::env::temp_dir().join("atc_cli_run_bad.atc");
+    std::fs::write(&bad, "fn main() -> i64 { return 1 / 0 }").unwrap();
+    let out = Command::new(exe).arg("run").arg(&bad).output().unwrap();
+    assert_eq!(out.status.code(), Some(1), "Div/0 muss Exit-Code 1 geben");
+    let msg = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        msg.contains("Kompilierfehler") || msg.contains("Verifizierer"),
+        "Meldung: {msg}"
+    );
+}

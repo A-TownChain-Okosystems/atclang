@@ -5,7 +5,9 @@
 //! Noch NICHT Bestandteil: AST->Bytecode-Lowering (der Bytecode-Verifizierer ist
 //! als Bibliothek ueber atc_core::bytecode erreichbar; Lowering folgt via SCR).
 
+use atc_core::lower::{lower_program, CompiledProgram};
 use atc_core::parser::parse_program;
+use atc_core::vm::execute;
 use std::env;
 use std::fs;
 use std::process::ExitCode;
@@ -14,12 +16,18 @@ const USAGE: &str = "ATCLang Compiler-CLI
 
 USAGE:
     atc compile <datei.atc>   kompiliert: kanonische AST-JSON auf stdout
+    atc run     <datei.atc>   kompiliert, verifiziert und fuehrt aus
     atc check   <datei.atc>   validiert still (Exit-Code 0 = ok)
 
 EXIT-CODES:
     0  ok
-    1  Kompilier-/Parse-Fehler
+    1  Kompilier-/Parse-/Laufzeit-Fehler
     2  Aufruffehler";
+
+fn compile_to_bytecode(src: &str) -> Result<CompiledProgram, String> {
+    let program = parse_program(src).map_err(|e| e.message)?;
+    lower_program(&program).map_err(|e| e.message)
+}
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
@@ -44,6 +52,25 @@ fn main() -> ExitCode {
         }
     };
     match mode {
+        "run" => {
+            let compiled = match compile_to_bytecode(&src) {
+                Ok(c) => c,
+                Err(msg) => {
+                    eprintln!("Kompilierfehler in {path}: {msg}");
+                    return ExitCode::from(1);
+                }
+            };
+            match execute(&compiled) {
+                Ok(value) => {
+                    println!("{value}");
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("Laufzeitfehler in {path}: {e:?}");
+                    ExitCode::from(1)
+                }
+            }
+        }
         "compile" => {
             println!("{}", program.to_json());
             let mut fns = 0;

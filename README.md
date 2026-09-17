@@ -87,12 +87,20 @@ cargo build --release --manifest-path crates/atc-core/Cargo.toml
 cargo install --path crates/atc-core   # installs the `atc` CLI
 ```
 
-CLI (Frontend-Gate: lex -> parse -> kanonische AST-JSON):
+CLI (Frontend + Lowering + Ausfuehrung):
 
 ```bash
-atc compile differential/corpus/calls.atc   # kanonisches JSON auf stdout
+atc compile differential/corpus/calls.atc   # kanonisches AST-JSON auf stdout
+atc run programm.atc                       # kompiliert, verifiziert, fuehrt aus (Ergebnis auf stdout)
 atc check differential/corpus/calls.atc     # stille Validierung (Exit-Code)
 ```
+
+Ablaufmodell: top-level Statements bilden die implizite Entry-Funktion; eine
+nutzerdefinierte `fn main` ist der Entry, wenn keine top-level Statements
+existieren. Ausfuehrung ist eine deterministische i64-Stack-Maschine ueber
+verifiziertem Bytecode: checked-Arithmetik (Overflow = Fehler, kein Wrap),
+Division/0 statisch vom Verifizierer bzw. dynamisch als Laufzeitfehler
+abgelehnt, feste maximale Aufruftiefe (1024, fail-closed statt Stack-Overflow).
 
 ## Testing
 

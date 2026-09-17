@@ -51,3 +51,4 @@ standard: ATC-STD-MD-001
 
 No milestone is considered complete from documentation alone; implementation, tests and evidence must converge before a gate is closed.
 - [x] `atc` CLI-Binary (compile/check, Frontend-Gate) und cargo-audit-Gate — 2026-09-17
+- [x] AST->Bytecode-Lowering + deterministische Stack-Maschine (`atc run`) — 2026-09-17
