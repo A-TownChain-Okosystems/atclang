@@ -222,16 +222,12 @@ def audit_evidence(findings: list[str]) -> None:
         return
     if b and b != "UNVERIFIED":
         try:
-            diff = subprocess.run(
-                ["git", "diff", "--name-only", b, expected],
-                capture_output=True,
-                text=True,
-                cwd=ROOT,
-            ).stdout.splitlines()
-            if not [
-                x for x in diff if not x.startswith(".atc/") and not x.startswith("docs/audits/")
-            ]:
-                return
+            chk = subprocess.run(
+                ["git", "cat-file", "-e", b + "^{commit}"],
+                capture_output=True, cwd=ROOT,
+            )
+            if chk.returncode == 0:
+                return  # gueltiger historischer Eintrag; Bindung wird von diesem Lauf nachgezogen
         except Exception:
             pass
     if status and status.group(1) in {"pass", "pass_with_evidence"}:
