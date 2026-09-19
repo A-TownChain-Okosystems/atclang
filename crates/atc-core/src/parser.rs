@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Michael Wroblewski — Apache-2.0
-//! Recursive-Descent-Parser — Stage 3 des Canonical Cores (SCR-0085).
-//! Subset exakt nach Python-Referenz (src/atclang/frontend/parser/parser.py):
-//! Programmebene = let/const/fn; Funktionskoerper = let/return/ExprStatement.
+//! Recursive-Descent-Parser — Canonical Core (SCR-0085, Fortschreibung SCR-0128
+//! Stufe 1). Programm-Ebene = let/const/fn; Bloecke = let/return/if/else/while/
+//! ExprStatement. Praezedenz: Vergleich (< == >) unter Addition, Addition unter
+//! Multiplikation (linksassoziativ, keine Kurzschluss-Booleans).
 //! Referenz-Semantiken bewusst uebernommen: Parameter MIT Pflicht-Typ,
 //! 'return' nur ohne Semikolon vor '}' (return; wirft wie Referenz Fehler),
 //! nackte Ausdruecke werden als ExprStatement gewrappt.
@@ -182,6 +183,8 @@ impl Parser {
     fn statement(&mut self) -> Result<Stmt, ParseError> {
         match self.cur() {
             Token::Let | Token::Const => Ok(Stmt::Let(self.let_stmt()?)),
+            Token::If => self.if_stmt(),
+            Token::While => self.while_stmt(),
             Token::Return => {
                 self.pos += 1;
                 let value = if self.cur() == Token::RBrace || self.cur() == Token::Eof {
@@ -204,8 +207,82 @@ impl Parser {
         }
     }
 
+    /// if <expr> { ... } [else { ... } | else if ...] — SCR-0128 Stufe 1.
+    fn if_stmt(&mut self) -> Result<Stmt, ParseError> {
+        self.pos += 1; // 'if'
+        let cond = self.expr()?;
+        if self.cur() != Token::LBrace {
+            return Err(ParseError {
+                message: "'{' nach if-Bedingung erwartet".to_string(),
+            });
+        }
+        self.pos += 1;
+        let then_body = self.block()?;
+        let else_body = if self.cur() == Token::Else {
+            self.pos += 1;
+            match self.cur() {
+                Token::LBrace => {
+                    self.pos += 1;
+                    Some(self.block()?)
+                }
+                // else if = else { if ... } (Zucker, kanonisch verschachtelt)
+                Token::If => Some(vec![self.if_stmt()?]),
+                other => {
+                    return Err(ParseError {
+                        message: format!("'{{' oder 'if' nach else erwartet, fand {:?}", other),
+                    })
+                }
+            }
+        } else {
+            None
+        };
+        Ok(Stmt::If {
+            cond,
+            then_body,
+            else_body,
+        })
+    }
+
+    /// while <expr> { ... } — SCR-0128 Stufe 1.
+    fn while_stmt(&mut self) -> Result<Stmt, ParseError> {
+        self.pos += 1; // 'while'
+        let cond = self.expr()?;
+        if self.cur() != Token::LBrace {
+            return Err(ParseError {
+                message: "'{' nach while-Bedingung erwartet".to_string(),
+            });
+        }
+        self.pos += 1;
+        let body = self.block()?;
+        Ok(Stmt::While { cond, body })
+    }
+
     fn expr(&mut self) -> Result<Expr, ParseError> {
-        self.addition()
+        self.comparison()
+    }
+
+    /// Vergleiche: linksassoziativ, unter der Addition (SCR-0128 Stufe 1).
+    fn comparison(&mut self) -> Result<Expr, ParseError> {
+        let mut left = self.addition()?;
+        loop {
+            let op = match self.cur() {
+                Token::Eq => "==",
+                Token::NotEq => "!=",
+                Token::Lt => "<",
+                Token::Gt => ">",
+                Token::LtEq => "<=",
+                Token::GtEq => ">=",
+                _ => break,
+            };
+            self.pos += 1;
+            let right = self.addition()?;
+            left = Expr::Binary {
+                op: op.to_string(),
+                left: Box::new(left),
+                right: Box::new(right),
+            };
+        }
+        Ok(left)
     }
 
     fn addition(&mut self) -> Result<Expr, ParseError> {
@@ -350,6 +427,43 @@ mod tests {
     fn referenz_semantik_return_mit_semi_vor_klammer() {
         // Referenz: 'return;' vor '}' wirft Fehler (parse_expr auf ';')
         assert!(parse_program("fn f() { return; }").is_err());
+    }
+
+    #[test]
+    fn if_else_und_while_json() {
+        let p = parse_program(
+            "fn f(x: u64) { if x < 1 { return 1; } else { while x < 2 { let x = x + 1; } } return 0; }",
+        )
+        .unwrap();
+        let j = p.to_json();
+        assert!(j.contains("\"kind\":\"IfStatement\""));
+        assert!(j.contains("\"kind\":\"WhileStatement\""));
+        assert!(j.contains("\"op\":\"<\""));
+        // Alphabetische Keys (kanonisch): cond vor else_body vor kind vor then_body
+        let idx = j.find("\"kind\":\"IfStatement\"").unwrap();
+        assert!(j[..idx].contains("\"cond\":"));
+        let idx2 = j.find("\"kind\":\"WhileStatement\"").unwrap();
+        assert!(j[..idx2].rfind("\"cond\":").unwrap() > j[..idx2].find("\"body\":").unwrap());
+    }
+
+    #[test]
+    fn else_if_zucker_verschachtelt() {
+        let p = parse_program(
+            "fn f(x: u64) { if x < 1 { return 1; } else if x < 2 { return 2; } return 0; }",
+        )
+        .unwrap();
+        let j = p.to_json();
+        // Genau EIN else_body mit genau EINEM IfStatement darin
+        assert_eq!(j.matches("\"kind\":\"IfStatement\"").count(), 2);
+        assert!(j.contains("\"else_body\":[{\"cond\":"));
+    }
+
+    #[test]
+    fn vergleichs_praezedenz_unter_addition() {
+        let p = parse_program("fn f(a: u64) { return a + 1 < 2; }").unwrap();
+        let j = p.to_json();
+        assert!(j.contains("\"op\":\"<\""));
+        assert!(j.find("\"op\":\"<\"").unwrap() > j.find("\"op\":\"+\"").unwrap());
     }
 
     #[test]

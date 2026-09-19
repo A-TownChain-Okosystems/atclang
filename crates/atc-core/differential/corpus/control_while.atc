@@ -1,0 +1,1 @@
+fn fact(n: i64) -> i64 { let r = 1; let i = 2; while i < n + 1 { let r = r * i; let i = i + 1; } return r; }

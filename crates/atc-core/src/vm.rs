@@ -111,6 +111,37 @@ pub fn execute(prog: &CompiledProgram) -> Result<i64, RunError> {
                         }
                     }
                 }
+                Instruction::Eq
+                | Instruction::Ne
+                | Instruction::Lt
+                | Instruction::Gt
+                | Instruction::Le
+                | Instruction::Ge => {
+                    let (b, a) = pop2(&mut frame.stack);
+                    let v = match instruction {
+                        Instruction::Eq => a == b,
+                        Instruction::Ne => a != b,
+                        Instruction::Lt => a < b,
+                        Instruction::Gt => a > b,
+                        Instruction::Le => a <= b,
+                        _ => a >= b,
+                    };
+                    // Booleans sind i64 0/1 (SCR-0128 Stufe 1, deterministisch).
+                    frame.stack.push(if v { 1 } else { 0 });
+                    Step::Continue
+                }
+                Instruction::Jump(d) => {
+                    // Ziel vom Verifizierer geprueft (Grenzen); Basis: pc + 1.
+                    frame.pc = (pc as i64 + 1 + d as i64) as usize;
+                    Step::Continue
+                }
+                Instruction::JumpIfFalse(d) => {
+                    let v = frame.stack.pop().expect("verifiziert");
+                    if v == 0 {
+                        frame.pc = (pc as i64 + 1 + d as i64) as usize;
+                    }
+                    Step::Continue
+                }
                 Instruction::Neg => {
                     let v = frame.stack.pop().expect("verifiziert");
                     match v.checked_neg() {

@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Michael Wroblewski — Apache-2.0
-//! Lexer-MVP: Tokens fuer eine ATCLang-Teilmenge.
+//! Lexer: Tokens fuer die ATCLang-Teilmenge (SCR-0128 Stufe 1: if/else/while
+//! und Vergleichsoperatoren ==, !=, <, >, <=, >=; Booleans kodiert als i64 0/1).
 //! Token-Modell am Python-Referenz-Lexer (src/atclang/frontend/lexer/lexer.py)
 //! ausgerichtet (SCR-0084/0085). Hinweis: '=' ist im Referenz-Modell EQ und dient
 //! im let-Kontext als Zuweisung; ':' ist COLON; '->' ist ARROW (Return-Type).
@@ -13,7 +14,16 @@ pub enum Token {
     Const,
     Return,
     Fn,
+    If,
+    Else,
+    While,
     Assign,
+    Eq,
+    NotEq,
+    Lt,
+    Gt,
+    LtEq,
+    GtEq,
     Plus,
     Minus,
     Arrow,
@@ -42,7 +52,38 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
     while let Some((pos, ch)) = chars.next() {
         match ch {
             ' ' | '\t' | '\n' | '\r' => {}
-            '=' => tokens.push(Token::Assign),
+            '=' => {
+                if chars.peek().is_some_and(|&(_, c)| c == '=') {
+                    chars.next();
+                    tokens.push(Token::Eq);
+                } else {
+                    tokens.push(Token::Assign);
+                }
+            }
+            '!' => {
+                if chars.peek().is_some_and(|&(_, c)| c == '=') {
+                    chars.next();
+                    tokens.push(Token::NotEq);
+                } else {
+                    return Err(LexError { pos, ch });
+                }
+            }
+            '<' => {
+                if chars.peek().is_some_and(|&(_, c)| c == '=') {
+                    chars.next();
+                    tokens.push(Token::LtEq);
+                } else {
+                    tokens.push(Token::Lt);
+                }
+            }
+            '>' => {
+                if chars.peek().is_some_and(|&(_, c)| c == '=') {
+                    chars.next();
+                    tokens.push(Token::GtEq);
+                } else {
+                    tokens.push(Token::Gt);
+                }
+            }
             '+' => tokens.push(Token::Plus),
             '-' => {
                 if chars.peek().is_some_and(|&(_, c)| c == '>') {
@@ -90,6 +131,9 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
                     "const" => tokens.push(Token::Const),
                     "return" => tokens.push(Token::Return),
                     "fn" => tokens.push(Token::Fn),
+                    "if" => tokens.push(Token::If),
+                    "else" => tokens.push(Token::Else),
+                    "while" => tokens.push(Token::While),
                     _ => tokens.push(Token::Ident(ident)),
                 }
             }

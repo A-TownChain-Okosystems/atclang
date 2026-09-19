@@ -60,6 +60,18 @@ pub enum Stmt {
     },
     /// Nackter Ausdruck — Referenz wrappt als ExprStatement.
     Expr(Expr),
+    /// if/else (SCR-0128 Stufe 1); else_body None = kein else, Some = else-Zweig
+    /// (else-if wird als verschachteltes If im else_body abgebildet).
+    If {
+        cond: Expr,
+        then_body: Vec<Stmt>,
+        else_body: Option<Vec<Stmt>>,
+    },
+    /// while (SCR-0128 Stufe 1).
+    While {
+        cond: Expr,
+        body: Vec<Stmt>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -196,7 +208,42 @@ fn stmt_json(s: &Stmt, out: &mut String) {
             expr_json(e, out);
             out.push_str(",\"kind\":\"ExprStatement\"}");
         }
+        Stmt::If {
+            cond,
+            then_body,
+            else_body,
+        } => {
+            out.push_str("{\"cond\":");
+            expr_json(cond, out);
+            out.push_str(",\"else_body\":");
+            match else_body {
+                None => out.push_str("null"),
+                Some(body) => stmt_list_json(body, out),
+            }
+            out.push_str(",\"kind\":\"IfStatement\",\"then_body\":");
+            stmt_list_json(then_body, out);
+            out.push('}');
+        }
+        Stmt::While { cond, body } => {
+            out.push_str("{\"body\":");
+            stmt_list_json(body, out);
+            out.push_str(",\"cond\":");
+            expr_json(cond, out);
+            out.push_str(",\"kind\":\"WhileStatement\"}");
+        }
     }
+}
+
+/// Gemeinsame Statement-Listen-Serialisierung (alphabetische Keys, bytstabil).
+fn stmt_list_json(stmts: &[Stmt], out: &mut String) {
+    out.push('[');
+    for (i, s) in stmts.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        stmt_json(s, out);
+    }
+    out.push(']');
 }
 
 impl Program {
