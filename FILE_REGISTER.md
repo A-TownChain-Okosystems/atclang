@@ -42,7 +42,12 @@
 - `crates/atc-core/Cargo.toml`
 - `crates/atc-core/differential/corpus/arith_precedence.atc`
 - `crates/atc-core/differential/corpus/calls.atc`
+- `crates/atc-core/differential/corpus/compare_chain.atc`
 - `crates/atc-core/differential/corpus/const_typed.atc`
+- `crates/atc-core/differential/corpus/control_else_if.atc`
+- `crates/atc-core/differential/corpus/control_if.atc`
+- `crates/atc-core/differential/corpus/control_if_else.atc`
+- `crates/atc-core/differential/corpus/control_while.atc`
 - `crates/atc-core/differential/corpus/fn_expr_stmt.atc`
 - `crates/atc-core/differential/corpus/fn_implicit.atc`
 - `crates/atc-core/differential/corpus/fn_mixed_program.atc`
@@ -55,7 +60,12 @@
 - `crates/atc-core/differential/corpus/unary.atc`
 - `crates/atc-core/differential/expected/arith_precedence.json`
 - `crates/atc-core/differential/expected/calls.json`
+- `crates/atc-core/differential/expected/compare_chain.json`
 - `crates/atc-core/differential/expected/const_typed.json`
+- `crates/atc-core/differential/expected/control_else_if.json`
+- `crates/atc-core/differential/expected/control_if.json`
+- `crates/atc-core/differential/expected/control_if_else.json`
+- `crates/atc-core/differential/expected/control_while.json`
 - `crates/atc-core/differential/expected/fn_expr_stmt.json`
 - `crates/atc-core/differential/expected/fn_implicit.json`
 - `crates/atc-core/differential/expected/fn_mixed_program.json`
@@ -119,4 +129,3 @@
 - `tools/.gitkeep`
 - `tools/ci_independent_audit.py`
 - `tools/determinism_check.py`
-- `tools/differential/dump_reference.py`
