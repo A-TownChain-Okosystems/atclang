@@ -95,6 +95,8 @@
 - `docs/ENGINEERING_AUDIT.md`
 - `docs/REPOSITORY_STANDARD.md`
 - `docs/audits/REPOSITORY-AUDIT-2026-09-16.md`
+- `docs/history/CLOSURE-REGISTER-2026-09-16.md`
+- `docs/history/SPRINTS-2026-09-16.md`
 - `docs/reference/python/README.md`
 - `docs/reference/python/src-atclang.md`
 - `docs/reference/python/tests.md`

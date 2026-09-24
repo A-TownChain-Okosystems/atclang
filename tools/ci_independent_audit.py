@@ -164,6 +164,8 @@ def audit_placeholders_and_docs(findings: list[str]) -> None:
     )
     allowed = {
         "docs/audits/REPOSITORY-AUDIT-2026-09-16.md",
+        "docs/history/SPRINTS-2026-09-16.md",
+        "docs/history/CLOSURE-REGISTER-2026-09-16.md",
         "tools/ci_independent_audit.py",
         "docs/reference/python/src-atclang.md",
         "docs/reference/python/tests.md",
