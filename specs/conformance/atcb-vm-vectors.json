@@ -1,0 +1,23 @@
+{
+  "schema": "ATCB-ATVM-CONFORMANCE-001",
+  "version": "0.1.0",
+  "status": "draft",
+  "vectors": [
+    {
+      "id": "V1-arithmetic-7-plus-3-times-2",
+      "stage": "V1",
+      "source": "fn main() { return (7 + 3) * 2; }",
+      "expected_result": {
+        "kind": "i64",
+        "value": 20
+      },
+      "requirements": [
+        "deterministic-ir-bytes",
+        "deterministic-atcb-bytes",
+        "deterministic-artifact-hash",
+        "independent-verification",
+        "canonical-atc-vm-execution"
+      ]
+    }
+  ]
+}
