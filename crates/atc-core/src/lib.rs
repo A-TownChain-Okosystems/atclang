@@ -10,3 +10,4 @@ pub mod lexer;
 pub mod lower;
 pub mod parser;
 pub mod vm;
+pub mod value;
