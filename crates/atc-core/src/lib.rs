@@ -4,8 +4,10 @@
 //! reference tooling and differential-test infrastructure.
 
 pub mod ast;
+pub mod ir;
 pub mod bytecode;
 pub mod lexer;
 pub mod lower;
 pub mod parser;
 pub mod vm;
+pub mod value;
