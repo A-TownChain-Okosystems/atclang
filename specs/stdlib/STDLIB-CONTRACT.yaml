@@ -1,0 +1,33 @@
+schema_version: "1.0.0"
+contract: ATC-STDLIB-CONTRACT-001
+status: canonical-contract
+owner: atclang
+production_boundary: "Rust canonical core once conformance gate is green"
+reference_boundary: "atclang/src/atclang/stdlib"
+abi_version: "1.0.0"
+determinism: required
+modules:
+  crypto:
+    functions: [sha256, verify_signature, canonical_pubkey]
+    host_dependencies: []
+  math:
+    functions: [u256_add, u256_sub, u256_mul, u256_div, checked_cast]
+    overflow: fail_closed
+  collections:
+    functions: [vec, map, set, bounded_push, bounded_insert]
+    ordering: canonical
+  encoding:
+    functions: [encode_u128_be, decode_u128_be, encode_u256_be, canonical_bytes]
+    wire_format: binary
+  chain:
+    functions: [chain_id, block_height, block_timestamp, state_root, caller, balance]
+    wall_clock: forbidden
+  primitives:
+    functions: [assert, require, option, result]
+conformance:
+  golden_vectors_required: true
+  negative_vectors_required: true
+  cross_runtime_required: true
+  rust_reference_differential_required: true
+  exact_sha_release_gate: true
+  forbidden: [ambient_io, wall_clock, nondeterministic_iteration, implicit_randomness]
