@@ -1,0 +1,16 @@
+name: Markdown Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  markdownlint:
+    uses: A-TownChain-Okosystems/.github/.github/workflows/reusable-markdownlint.yml@f7656d5bb9afc0712a9c7d8495a86a46017eafb5
+    permissions:
+      contents: read
