@@ -5,6 +5,7 @@ status = "G1-PASSED (2026-09-07, specs/language/SPEC.md + registry.json)"
 
 [bytecode]
 version = "1.0.0"
+status = "G3-FROZEN (2026-10-06, ATCB v1, specs/bytecode/SPEC.md ATC-BC-001 v1.0.0-FROZEN)"
 
 [abi]
 version = "1.0.0"

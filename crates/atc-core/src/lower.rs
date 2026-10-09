@@ -49,6 +49,34 @@ impl CompiledProgram {
     pub fn function_count(&self) -> u16 {
         self.functions.len() as u16
     }
+
+    /// Re-validates the complete compiled program before execution/trust.
+    pub fn verify(&self) -> Result<(), LowerError> {
+        if self.functions.is_empty() {
+            return Err(LowerError::new("Programm enthaelt keine Funktionen"));
+        }
+        if self.entry as usize >= self.functions.len() {
+            return Err(LowerError::new("ungueltige Entry-Funktion"));
+        }
+        if self.functions.len() > u16::MAX as usize {
+            return Err(LowerError::new("zu viele Funktionen"));
+        }
+        let signatures: Vec<u16> = self.functions.iter().map(|f| f.param_count).collect();
+        for f in &self.functions {
+            if f.param_count > f.local_count {
+                return Err(LowerError::new(format!(
+                    "Funktion {} hat mehr Parameter als lokale Slots",
+                    f.name
+                )));
+            }
+            f.bytecode
+                .verify_with_signatures(f.local_count, &signatures)
+                .map_err(|e| {
+                    LowerError::new(format!("Verifizierer lehnte Funktion {} ab: {e:?}", f.name))
+                })?;
+        }
+        Ok(())
+    }
 }
 
 const ENTRY: &str = "__main__";
@@ -267,6 +295,11 @@ fn finish_function(
     }
     let bytecode = Bytecode { instructions };
     let local_count = l.next_local;
+    if param_count > local_count {
+        return Err(LowerError::new(format!(
+            "Parameterzahl ueberschreitet lokale Slots in Funktion {name}"
+        )));
+    }
     let function_count = l.fn_ids.len() as u16;
     bytecode
         .verify(local_count, function_count)
@@ -314,6 +347,17 @@ pub fn lower_program(prog: &Program) -> Result<CompiledProgram, LowerError> {
     fn_ids.insert(ENTRY.to_string(), (0, 0));
     for s in &prog.statements {
         if let Stmt::Fn(f) = s {
+            if fn_ids.len() >= u16::MAX as usize {
+                return Err(LowerError::new(
+                    "Funktionsanzahl ueberschreitet kanonisches Limit",
+                ));
+            }
+            if f.params.len() >= u16::MAX as usize {
+                return Err(LowerError::new(format!(
+                    "Parameterzahl ueberschreitet kanonisches Limit in Funktion {}",
+                    f.name
+                )));
+            }
             let idx = fn_ids.len() as u16;
             if fn_ids
                 .insert(f.name.clone(), (idx, f.params.len() as u16))
@@ -357,7 +401,9 @@ pub fn lower_program(prog: &Program) -> Result<CompiledProgram, LowerError> {
             functions.push(lower_user_function(f, &fn_ids)?);
         }
     }
-    Ok(CompiledProgram { functions, entry })
+    let compiled = CompiledProgram { functions, entry };
+    compiled.verify()?;
+    Ok(compiled)
 }
 
 #[cfg(test)]

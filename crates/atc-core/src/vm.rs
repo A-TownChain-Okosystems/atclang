@@ -4,19 +4,24 @@
 //! checked-Arithmetik (Overflow ist ein Fehler, kein Wrap) und fester
 //! Aufruftiefe (fail-closed).
 
+use crate::artifact::VerifiedArtifact;
 use crate::bytecode::Instruction;
 use crate::lower::CompiledProgram;
 
 /// Deterministischer Laufzeitfehler (kein Panic-Pfad).
 #[derive(Debug, Clone, PartialEq)]
 pub enum RunError {
+    InvalidProgram { message: String },
     DivisionByZero { function: String, pc: usize },
     ArithmeticOverflow { function: String, pc: usize },
     CallDepthExceeded { max_depth: usize },
+    ExecutionLimitExceeded { max_steps: u64 },
 }
 
 /// Feste maximale Aufruftiefe — kein Stack-Overflow, immer ein Fehler.
 pub const MAX_CALL_DEPTH: usize = 1024;
+/// Hard deterministic execution bound until the canonical gas model is wired in.
+pub const MAX_STEPS: u64 = 1_000_000;
 
 struct Frame {
     function_idx: usize,
@@ -36,10 +41,26 @@ enum Step {
 }
 
 /// Fuehrt das Kompilat ab der Entry-Funktion aus; Ergebnis = Rueckgabewert.
-pub fn execute(prog: &CompiledProgram) -> Result<i64, RunError> {
+/// L1-facing execution entry point. Only a cryptographically and structurally
+/// verified ATCA artifact may cross this boundary.
+pub fn execute_verified(artifact: &VerifiedArtifact) -> Result<i64, RunError> {
+    let program = artifact.clone().into_program();
+    execute(&program)
+}
+
+pub(crate) fn execute(prog: &CompiledProgram) -> Result<i64, RunError> {
+    prog.verify()
+        .map_err(|e| RunError::InvalidProgram { message: e.message })?;
     let entry = prog.entry as usize;
+    let mut steps = 0u64;
     let mut frames: Vec<Frame> = vec![new_frame(entry, 0, Vec::new(), prog)];
     loop {
+        steps = steps.saturating_add(1);
+        if steps > MAX_STEPS {
+            return Err(RunError::ExecutionLimitExceeded {
+                max_steps: MAX_STEPS,
+            });
+        }
         let step = {
             let depth = frames.len();
             let frame = frames.last_mut().expect("mindestens ein Frame aktiv");
@@ -220,4 +241,61 @@ fn pop2(stack: &mut Vec<i64>) -> (i64, i64) {
     let b = stack.pop().expect("verifiziert");
     let a = stack.pop().expect("verifiziert");
     (b, a)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::bytecode::{Bytecode, Instruction};
+    use crate::lower::CompiledFunction;
+
+    fn program(instructions: Vec<Instruction>) -> CompiledProgram {
+        CompiledProgram {
+            functions: vec![CompiledFunction {
+                name: "__main__".into(),
+                param_count: 0,
+                local_count: 0,
+                bytecode: Bytecode { instructions },
+            }],
+            entry: 0,
+        }
+    }
+
+    #[test]
+    fn execute_rejects_invalid_program_without_panicking() {
+        let p = program(vec![Instruction::Add]);
+        assert!(matches!(execute(&p), Err(RunError::InvalidProgram { .. })));
+    }
+
+    #[test]
+    fn execute_bounds_non_terminating_program() {
+        let p = program(vec![
+            Instruction::ConstI64(1),
+            Instruction::Pop,
+            Instruction::Jump(-3),
+        ]);
+        assert_eq!(
+            execute(&p),
+            Err(RunError::ExecutionLimitExceeded {
+                max_steps: MAX_STEPS
+            })
+        );
+    }
+
+    #[test]
+    fn execute_detects_overflow_deterministically() {
+        let p = program(vec![
+            Instruction::ConstI64(i64::MAX),
+            Instruction::ConstI64(1),
+            Instruction::Add,
+            Instruction::Return,
+        ]);
+        assert_eq!(
+            execute(&p),
+            Err(RunError::ArithmeticOverflow {
+                function: "__main__".into(),
+                pc: 2,
+            })
+        );
+    }
 }

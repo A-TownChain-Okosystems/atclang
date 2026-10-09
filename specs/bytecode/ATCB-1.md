@@ -1,8 +1,15 @@
 # ATCLang Canonical Bytecode ATCB-1
 
-**Status:** Draft implementation baseline
-**Authority:** ATC-STD-000 v1.3.0
+**Status:** Implementation baseline. NORMATIVE CARRIER IS
+`specs/bytecode/SPEC.md` (ATC-BC-001 v1.0.0-FROZEN, ATCB v1, frozen
+2026-10-06). In case of conflict, ATC-BC-001 v1.0.0-FROZEN wins.
+**Authority:** ATC-STD-000 v1.3.0 / ATC-BC-001 v1.0.0
 **Scope:** G3 canonical bytecode encoding and structural verification
+
+Corrections against the earlier revision of this file: endianness is
+big-endian (not little-endian), and the opcode catalog has 19 opcodes
+including comparison and jump instructions (Return = 0x21, Pop = 0x40,
+Jump = 0x30 / JumpIfFalse = 0x31). See SPEC.md sections 2 and 3.
 
 ## 1. Deterministic container
 
@@ -11,39 +18,28 @@ Every bytecode stream starts with:
 | Field | Size | Encoding |
 |---|---:|---|
 | Magic | 4 | ASCII `ATCB` |
-| Format version | 2 | unsigned little-endian, currently `1` |
-| Instruction count | 4 | unsigned little-endian |
-| Instructions | variable | opcode-specific canonical encoding |
+| Format version | 2 | unsigned big-endian, currently `1` |
+| Instruction count | 4 | unsigned big-endian |
+| Instructions | variable | opcode-specific canonical encoding (big-endian) |
 
-No host endianness, pointer value, hash-map iteration order, or platform metadata is permitted in the encoding.
+No host endianness, pointer value, hash-map iteration order, or platform
+metadata is permitted in the encoding.
 
-## 2. Opcodes
+## 2. Verification baseline
 
-| Opcode | Instruction | Operand |
-|---:|---|---|
-| `0x01` | `ConstI64` | i64 LE |
-| `0x02` | `LoadLocal` | u16 LE |
-| `0x03` | `StoreLocal` | u16 LE |
-| `0x10` | `Add` | none |
-| `0x11` | `Sub` | none |
-| `0x12` | `Mul` | none |
-| `0x13` | `Div` | none |
-| `0x14` | `Neg` | none |
-| `0x20` | `Call` | function:u16 LE, argc:u16 LE |
-| `0x30` | `Return` | none |
-| `0x31` | `Pop` | none |
+The Rust canonical verifier rejects (fail-closed): magic mismatch, version
+mismatch, count overflow, unknown opcodes, truncated instructions, trailing
+bytes; and structurally: operand-stack underflow, references to undeclared
+locals or function indices, invalid jump targets, missing or inconsistent
+returns, division by constant zero.
 
-## 3. Verification baseline
+This is the structural verifier baseline, **not yet the complete ATVM
+verifier**. Type safety, resource accounting, ABI, storage access and
+cryptographic host capabilities remain open release gates.
 
-The Rust canonical verifier rejects:
+## 3. Canonical evidence
 
-- operand-stack underflow;
-- references to undeclared locals;
-- references to undeclared function indices;
-- `Return` without exactly one result on the operand stack.
-
-This is a structural verifier baseline, **not yet the complete ATVM verifier**. Control-flow joins, type safety, resource accounting, ABI, storage access and cryptographic host capabilities remain open release gates.
-
-## 4. Canonical evidence
-
-The implementation is covered by Rust unit tests for deterministic encoding, valid return programs, stack underflow and invalid local access. These tests are implementation evidence for the G3 baseline; they do not close G3/G4/G9/G10/G11/G13/G14/G18.
+The implementation is covered by Rust unit tests for deterministic encoding,
+canonical vector lock, valid return programs, stack underflow, invalid local
+access and fail-closed decode cases. These tests are implementation evidence
+for the G3 baseline; they do not close G4/G9/G10/G11/G13/G14/G18.

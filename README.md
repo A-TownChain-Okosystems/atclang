@@ -23,7 +23,7 @@ Implementierung definiert Semantik, Bytecode-Encoding und Sicherheits-Gates
 - ATCLang-Frontend mit deterministischer Semantik (Konsens-Pflicht)
 - Rust-Consensus-Core (`crates/atc-core`): Bytecode-Verifizierer mit
   fail-closed Bounds-Checking (Stack, Locals, Functions)
-- Python-Referenz-VM (`src/atclang/vm`) für Tests und Simulation
+- Rust-only implementation path; Python reference VM removed from the active repository on 2026-09-17
 - Security-Gate (Static Analysis, fail-closed): Verbots-Import- und
   Hostcall-Detektion auf Contract-Quellen
 - Determinism-Gate (SCR-0126 Checker v2, allowlist-geprüft)
@@ -35,23 +35,19 @@ Implementierung definiert Semantik, Bytecode-Encoding und Sicherheits-Gates
 (Former: `src/atclang`) ist seit 2026-09-17 vollstaendig dokumentiert unter
 `docs/reference/python/` und aus dem Repository entfernt — Rust-only.
 
-ATCLang is the language and contract-development layer of A-TownChain. The repository deliberately uses a dual-stack model:
+ATCLang is the language and contract-development layer of A-TownChain. The repository documents a **Rust-only active implementation path**. The former Python reference pipeline was removed from the active tree on 2026-09-17; older documentation and historical tests that mention it must not be read as a current runtime component.
 
 ```text
 ATCLang source
-    │
-    ├── Python reference implementation / SDK / differential tests
-    │
-    └── Rust canonical production implementation
-              │
-              ▼
-           ATC-VM
-              │
-              ▼
-        A-TownChain L1
+    ↓
+Rust compiler / verifier / artifact validation
+    ↓
+ATC-VM (canonical implementation: a-townchain/components/vm)
+    ↓
+A-TownChain chain runtime
 ```
 
-Rust is the production/canonical language for consensus-critical compiler, verifier, VM, runtime, ABI/artifact validation and security components. Python is reference/test tooling and must never silently become the production consensus implementation.
+Consensus-critical language semantics and artifact validation must be defined by the current Rust source and canonical standards. Python tooling is not an active production implementation unless reintroduced through an explicit reviewed change.
 
 ## Status
 
@@ -61,12 +57,8 @@ The current release state is determined by the applicable standards, conformance
 
 ## Components
 
-- `src/atclang/frontend/` — Python reference lexer, tokenizer, parser and AST.
-- `src/atclang/semantics/` — reference semantic/type checking.
-- `src/atclang/compiler/` — reference compiler and bytecode generation.
-- `src/atclang/vm/` — reference VM only; not a production trust anchor.
-- `src/atclang/runtime/` — reference runtime integration.
-- `src/atclang/stdlib/` — reference standard library.
+- `src/atclang/` — any remaining Python code is reference/test tooling only and MUST NOT define production semantics.
+- `crates/atc-core/` — Rust canonical compiler/runtime/verifier/ABI core.
 - `crates/atc-core/` — Rust canonical core currently under incremental implementation and differential conformance testing.
 - `specs/` — normative language, ABI, bytecode, IR, semantics, VM and standard-library specifications.
 - `tools/` — deterministic/differential and CI-independent audit tooling.
@@ -152,7 +144,8 @@ ownership:
   organization: A-TownChain-Okosystems
 technology:
   primary_language: Rust
-  reference_language: Python
+  secondary_language: Python
+  secondary_scope: reference, conformance, tests
 governance:
   security_class: S4
   criticality: CRITICAL

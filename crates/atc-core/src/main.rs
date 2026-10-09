@@ -5,9 +5,9 @@
 //! Noch NICHT Bestandteil: AST->Bytecode-Lowering (der Bytecode-Verifizierer ist
 //! als Bibliothek ueber atc_core::bytecode erreichbar; Lowering folgt via SCR).
 
+use atc_core::artifact::{Artifact, ArtifactMetadata};
 use atc_core::lower::{lower_program, CompiledProgram};
 use atc_core::parser::parse_program;
-use atc_core::vm::execute;
 use std::env;
 use std::fs;
 use std::process::ExitCode;
@@ -60,7 +60,27 @@ fn main() -> ExitCode {
                     return ExitCode::from(1);
                 }
             };
-            match execute(&compiled) {
+            let metadata = ArtifactMetadata {
+                language_version: "1.0".into(),
+                compiler_version: env!("CARGO_PKG_VERSION").to_string(),
+                target_profile: "l1-deterministic-v1".into(),
+                capabilities: Vec::new(),
+            };
+            let artifact = match Artifact::from_program(&compiled, metadata) {
+                Ok(a) => a,
+                Err(e) => {
+                    eprintln!("Artifact-Fehler in {path}: {e:?}");
+                    return ExitCode::from(1);
+                }
+            };
+            let verified = match artifact.verify() {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("Artifact-Verifikation fehlgeschlagen in {path}: {e:?}");
+                    return ExitCode::from(1);
+                }
+            };
+            match atc_core::vm::execute_verified(&verified) {
                 Ok(value) => {
                     println!("{value}");
                     ExitCode::SUCCESS

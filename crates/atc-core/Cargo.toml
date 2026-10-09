@@ -6,6 +6,7 @@ license = "Apache-2.0"
 description = "ATCLang Canonical Core (Rust) — Lexer, Parser, AST, Bytecode-Verifizierer, CLI (SCR-0083/0085)"
 
 [dependencies]
+sha2 = "0.10"
 
 [[bin]]
 name = "atc"
