@@ -32,6 +32,7 @@ standard: ATC-STD-MD-001
 - [ ] G10 ATVM/state-transition execution conformance
 
 ### Implemented subset
+
 - [x] atc CLI binary and frontend build/check gate
 - [x] AST → bytecode lowering for the implemented subset
 - [x] Deterministic stack VM and atc run
