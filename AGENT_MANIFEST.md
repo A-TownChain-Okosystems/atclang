@@ -1,4 +1,6 @@
 # AGENT_MANIFEST.md
+
+>
 > **Registry-Stand (GENERIERT aus `atc-standards/registry/standards.yaml`):** 505 Standards — 505 APPROVED · 0 CANDIDATE · 75 Familien · Stand 2026-09-14 · SSOT-Sync erforderlich.
 > Letzte Aktualisierung dieses Manifests muss bei Registry-Änderungen durch den zentralen Generator erfolgen. Historische Stände sind nicht normativ.
 

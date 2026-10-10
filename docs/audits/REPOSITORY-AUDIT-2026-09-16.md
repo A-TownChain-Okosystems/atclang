@@ -13,6 +13,7 @@ Ist-Stand seit Welle 2 (Commit e915589, Evidence-Bindung ba77948):
   (Kontrollstrukturen, SCR-0128 Stufe 1), Stdlib/Gas/Storage (G5/G7/G8).
 Dieser Vermerk korrigiert den Ist-Zustand, ohne den historischen Audittext zu ändern.
 -->
+
 # ATCLang Repository Audit — 2026-09-16
 
 Status: **IN PROGRESS — production release remains blocked until the Rust canonical boundary, reference-VM security boundaries, conformance and CI evidence are complete.**
@@ -41,6 +42,7 @@ This boundary is the correct long-term choice because memory safety, determinist
 ## Findings
 
 ### F-20260916-ATCLANG-001 — P1
+
 - **Category:** Security / cryptographic correctness
 - **Family:** ATCLang / Python reference VM / ECDSA
 - **Tags:** `P1 security crypto ecdsa reference-vm fail-closed`
@@ -49,6 +51,7 @@ This boundary is the correct long-term choice because memory safety, determinist
 - **Status:** **OPEN**. **RESOLVED 2026-09-17: deterministische Bindung sig=H(data|H(priv)), constant-time Verify; beliebige sig_* werden abgelehnt** The audit enforcer still detects the implementation. The safe solution is to fail closed and require the canonical Rust cryptographic implementation rather than silently substituting a fake primitive.
 
 ### F-20260916-ATCLANG-002 — P1
+
 - **Category:** Security / authentication correctness
 - **Family:** ATCLang / Python reference VM / JWT
 - **Tags:** `P1 security jwt authentication validation reference-vm`
@@ -57,6 +60,7 @@ This boundary is the correct long-term choice because memory safety, determinist
 - **Status:** **OPEN**. **RESOLVED 2026-09-17: strukturelle 3-Segment/Base64url/alg-Pruefung, Laengenlimit 4096** Production authentication must use an explicitly tested verifier with algorithm, issuer/audience, time-claims and signature/key validation.
 
 ### F-20260916-ATCLANG-003 — P1
+
 - **Category:** Security / network correctness
 - **Family:** ATCLang / Python reference VM / network boundary
 - **Tags:** `P1 security network false-success reference-vm`
@@ -64,6 +68,7 @@ This boundary is the correct long-term choice because memory safety, determinist
 - **Status:** **OPEN**. **RESOLVED 2026-09-17: net_send fail-closed (kein virtueller Erfolg mehr)** Production networking must be injected and explicit; a reference stub must fail closed rather than return success.
 
 ### F-20260916-ATCLANG-004 — P1
+
 - **Category:** Security / RPC correctness
 - **Family:** ATCLang / Python reference VM / RPC boundary
 - **Tags:** `P1 security rpc false-success reference-vm`
@@ -71,6 +76,7 @@ This boundary is the correct long-term choice because memory safety, determinist
 - **Status:** **OPEN**. **RESOLVED 2026-09-17: rpc_call dispatcht an registrierte Handler, ohne Handler 404 fail-closed** Production RPC must be an injected, policy-controlled transport; no fabricated success is permitted.
 
 ### F-20260916-ATCLANG-005 — P1
+
 - **Category:** Cryptographic / wallet correctness
 - **Family:** ATCLang / Python reference VM / BIP39 / address derivation
 - **Tags:** `P1 crypto wallet bip39 address reference-vm`
@@ -78,6 +84,7 @@ This boundary is the correct long-term choice because memory safety, determinist
 - **Status:** **OPEN**. **RESOLVED 2026-09-17: generate_atc_address deterministisch aus pub_key_data; Mnemonic als vereinfachte Referenz-Ableitung dokumentiert, konforme Impl: atc-wallet** Canonical wallet/crypto code must own protocol primitives; conformance vectors are required before protocol use.
 
 ### F-20260916-ATCLANG-006 — P2
+
 - **Category:** Determinism / consensus boundary
 - **Family:** ATCLang / Python reference VM / host capabilities
 - **Tags:** `P2 determinism consensus random time vm-boundary`
@@ -85,6 +92,7 @@ This boundary is the correct long-term choice because memory safety, determinist
 - **Status:** **OPEN**. **RESOLVED 2026-09-17: Wanduhr aus der Referenz-VM entfernt (Genesis-deterministische Boot-Globals, OP.TIMESTAMP aus Block-Header), CSPRNG via os.urandom dokumentiert** These capabilities must be unreachable from canonical consensus execution and rejected by the production verifier.
 
 ### F-20260916-ATCLANG-007 — P2
+
 - **Category:** Architecture / language-policy enforcement
 - **Family:** ATCLang / Rust-canonical boundary / Python reference
 - **Tags:** `P2 architecture rust-canonical python-reference enforcement`
@@ -92,6 +100,7 @@ This boundary is the correct long-term choice because memory safety, determinist
 - **Status:** **OPEN**. This is acceptable only inside the reference layer. A production entrypoint and integration test must prove that consensus execution resolves to Rust and cannot silently select Python.
 
 ### F-20260916-ATCLANG-008 — P1
+
 - **Category:** Determinism / standard-library correctness
 - **Family:** ATCLang / Chain stdlib / host clock
 - **Tags:** `P1 determinism chain-stdlib wall-clock consensus fail-closed`
@@ -101,6 +110,7 @@ This boundary is the correct long-term choice because memory safety, determinist
 - **Status:** **FIXED IN BRANCH; runtime/CI evidence still pending.**
 
 ### F-20260916-ATCLANG-009 — P1
+
 - **Category:** Governance / evidence integrity
 - **Family:** ATC Evidence / CI traceability
 - **Tags:** `P1 evidence stale binding ci-independent audit`
@@ -109,6 +119,7 @@ This boundary is the correct long-term choice because memory safety, determinist
 - **Status:** **FIXED IN BRANCH.**
 
 ### F-20260916-ATCLANG-010 — P1
+
 - **Category:** License / packaging consistency
 - **Family:** Repository metadata / Python packaging
 - **Tags:** `P1 license apache packaging metadata consistency`
@@ -117,6 +128,7 @@ This boundary is the correct long-term choice because memory safety, determinist
 - **Status:** **FIXED IN BRANCH.**
 
 ### F-20260916-ATCLANG-011 — P1
+
 - **Category:** File inventory / traceability
 - **Family:** ATC-STD-016 / repository inventory
 - **Tags:** `P1 file-register drift generated-inventory standards`
@@ -125,6 +137,7 @@ This boundary is the correct long-term choice because memory safety, determinist
 - **Status:** **OPEN until the register is regenerated and validator passes.**
 
 ### F-20260916-ATCLANG-012 — P1
+
 - **Category:** CI / supply-chain enforcement
 - **Family:** ATC CI / workflow integrity
 - **Tags:** `P1 ci supply-chain immutable-actions independent-audit`

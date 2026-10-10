@@ -8,6 +8,7 @@ und dieses Projekt hält sich an [Semantic Versioning](https://semver.org/spec/v
 ## [Unreleased] - 2026-09-11
 
 ### Added (SCR-0098 — fehlende Kernmodule)
+
 - **ABI:** `atclang.abi` — kanonischer Wert-Codec (UInt8..256/Int256/Bool/Address/Bytes/String/Vec/Map) und 4-Byte-Methoden-Selektoren (SHA3-256 der kanonischen Signatur).
 - **Smart Contract Engine:** `atclang.contracts` — Deploy (deterministische Adressen aus Artifact-ID+Nonce), Call mit ABI-Selektor-Dispatch und msg-Kontext (caller/value/block/chain_id), persistenter `ContractStorage` mit State-Root-Hash, ATC-8300-Transfer-Referenzsemantik, Event-Log.
 - **Host:** `atclang.host` — `HostContext` als einzige deterministische Quelle fuer Umgebung (block_timestamp statt Wanduhr, vm_seed statt random), `HostPolicy` mit Consensus-Pflichten, Gas-Zaehlung, Event-Log.
@@ -22,14 +23,17 @@ und dieses Projekt hält sich an [Semantic Versioning](https://semver.org/spec/v
 ## [1.0.0] - 2026-09-07
 
 ### Added
+
 - **Gate G2 (Semantics):** `src/atclang/semantics/` TypeChecker-Subsystem mit Regeln SEM-001..SEM-012.
 - **Spezifikation:** Normative Spezifikationen `specs/semantics/SPEC.md` und maschinenlesbare `registry.json`.
 - **Governance & Standards:** Dokumentations-Konformität mit `ATC-STD-README-001` und `ATC-STD-MD-001`.
 - **Pflichtdokumente:** `STATUS.md`, `CONTRIBUTING.md`, `ROADMAP.md`, `ARCHITECTURE.md`, `AGENTS.md`, `CODE_OF_CONDUCT.md`, `GOVERNANCE.md`.
 
 ### Fixed
+
 - **Parser:** `parse_type` Korrektur für typ-annotierte Let-Bindings und Rückgabewerte.
 - **Compliance:** Behebung aller MD-01..MD-10 Quality Gate Verstöße.
 
 ### Changed
+
 - **Compiler:** `compile_source` führt standardmäßig semantischen Gate-Check aus.

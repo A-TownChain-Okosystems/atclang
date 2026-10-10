@@ -23,6 +23,7 @@
 - `.github/workflows/determinism-gate.yml`
 - `.github/workflows/evidence-bind.yml`
 - `.github/workflows/governance-ci.yml`
+- `.github/workflows/markdownlint.yml`
 - `.github/workflows/test-suite.yml`
 - `.gitignore`
 - `AGENTS.md`

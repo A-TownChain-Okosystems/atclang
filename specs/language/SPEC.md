@@ -33,7 +33,7 @@ Maschinenlesbares Extrakt: `specs/language/registry.json`.
 | HASH | AT | LPAREN | RPAREN | LBRACE |
 | RBRACE | LBRACKET | RBRACKET | COMMA | COLON |
 | SEMICOLON | DOT | UNDERSCORE | NEWLINE | INDENT |
-| DEDENT | EOF | COMMENT |
+| DEDENT | EOF | COMMENT |  |  |
 
 ### 2.2 Literale
 
@@ -137,12 +137,14 @@ Wallet-Deklarationen erzeugen WalletDef (parallele Struktur zu ContractDef).
 
 | Stufe | Produktion | Operatoren |
 |---|---|---|
-| 1 (niedrigst) | parse_logical | `\\|\\|`, `&&` |
+| 1 (niedrigst) | parse_logical | OR, AND (siehe Hinweis unten) |
 | 2 | parse_comparison | `==`, `!=`, `<`, `>`, `<=`, `>=` |
 | 3 | parse_addition | `+`, `-` |
 | 4 | parse_multiplication | `*`, `/`, `%` |
 | 5 | parse_unary | `!`, unäres `-` |
 | 6 | parse_postfix | Call `(...)`, Index `[...]`, `.`-Zugriff, `::`-Zugriff, `?` |
+
+Hinweis: `parse_logical` behandelt die Operatoren `ODER` (`||` im Quelltext) und `UND` (`&&`); die pipe-Zeichen sind hier ausnahmsweise unescapierbar dargestellt, um die Tabellenstruktur zu erhalten.
 | 7 (höchst) | parse_primary | Literale, Ident, `(expr)`, Match-Expr, Lambda, Range |
 
 Grundformen (parse_primary): IntLiteral, FloatLiteral, StringLiteral,
