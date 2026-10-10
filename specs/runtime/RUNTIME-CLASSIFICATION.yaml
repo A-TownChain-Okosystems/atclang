@@ -1,0 +1,31 @@
+schema_version: "1.0.0"
+contract: ATC-RUNTIME-CLASSIFICATION-001
+status: canonical-contract
+purpose: "Machine-readable separation of runtime roles; only production runtime may execute consensus state transitions."
+roles:
+  production:
+    trust_level: consensus
+    allowed_in_consensus: true
+    required_properties: [deterministic, resource_bounded, version_pinned, exact_sha_ci_verified]
+    canonical_atc_vm_owner: a-townchain/components/vm
+  reference:
+    trust_level: non_consensus
+    allowed_in_consensus: false
+    purpose: differential_conformance_and_development
+    canonical_owner: atclang
+  host_adapter:
+    trust_level: boundary
+    allowed_in_consensus: false
+    purpose: host_io_translation_only
+    rules: [explicit_capabilities, no_ambient_authority, deterministic_inputs]
+  legacy_archive:
+    trust_level: none
+    allowed_in_consensus: false
+    purpose: historical_recovery_only
+    rules: [read_only, never_auto_selected]
+selection:
+  production_entrypoint: "a-townchain/components/vm"
+  reference_entrypoint: "atclang/crates/atc-core"
+  fail_closed_if_multiple_candidates: true
+  runtime_role_must_be_declared: true
+  exact_sha_binding_required: true
