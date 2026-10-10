@@ -12,7 +12,8 @@
     atclang/
     ├── specs/          # NORMATIVE SPEZIFIKATION (VERSION.toml; language/types/abi/bytecode/vm/contracts/consensus)
     ├── docs/           # ERKLÄREND (Sprach-/Typ-/ABI-/VM-/Sicherheits-Doku)
-    ├── src/atclang/    # IMPLEMENTIERUNG (das einzige Architekturzentrum)
+    ├── crates/atc-core/ # IMPLEMENTED: aktueller Rust-Production-Kern und CLI
+    ├── src/atclang/    # LEGACY/UNVERIFIED: historischer Python-Referenzstand
     │   ├── frontend/      # Source → Lexer → Parser → AST (keine Blockchain-Ausführung)
     │   ├── semantics/     # Resolver → TypeChecker → Ownership/Borrow → CapabilityChecker → Validated AST
     │   ├── ir/            # ATC-IR + unabhängiger IR-Verifier
