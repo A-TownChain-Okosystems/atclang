@@ -10,7 +10,6 @@
 
 ![ATC COMPLIANCE](https://img.shields.io/badge/ATC%20COMPLIANCE-R4%20%C2%B7%20ATC--STD--201%2F202%2F203-brightgreen)
 
-
 ## Purpose
 
 ATCLang ist die Vertragssprache des A-TownChain-Ökosystems: deterministisch,

@@ -8,8 +8,8 @@ spec:
   date: "2026-09-07"
   source: "specs/language/SPEC.md §5-6 (G1) + Referenz-Compiler"
   implementation: "src/atclang/semantics/type_checker.py"
-  machine_readable: "specs/semantics/registry.json"
----
+
+## machine_readable: "specs/semantics/registry.json"
 
 ## 1. Geltung und Pipelinestelle
 

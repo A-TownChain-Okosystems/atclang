@@ -13,6 +13,7 @@ standard: ATC-STD-MD-001
 > Kanonische Entwicklungs-Roadmap für Sprache, Compiler, Rust-Canonical-Core und Conformance.
 
 ## Phase 1 — Foundation
+
 - [x] Baseline v1.0 architecture
 - [x] G1 Language Specification
 - [x] G2 Semantics gate
@@ -20,6 +21,7 @@ standard: ATC-STD-MD-001
 - [x] Rust canonical core started in crates/atc-core/
 
 ## Phase 2 — Canonical Rust compiler/VM
+
 - [ ] G3 complete Rust frontend and parser conformance
 - [ ] G4 ATC-IR + independent IR verifier
 - [ ] G5 bytecode format + independent bytecode verifier
@@ -37,6 +39,7 @@ standard: ATC-STD-MD-001
 - [x] Structural bytecode verification, including control-flow/stack-height checks for the implemented subset
 
 ## Phase 3 — Ecosystem integration
+
 - [ ] G11 contracts engine
 - [ ] G12 host boundary
 - [ ] G13 package/lockfile/registry
@@ -45,6 +48,7 @@ standard: ATC-STD-MD-001
 - [ ] G16 fuzzing and negative-test corpus
 
 ## Phase 4 — Security and release
+
 - [ ] G17 independent security audit
 - [ ] G18 reproducible-build and provenance gate
 - [ ] G19 release/mainnet gate
