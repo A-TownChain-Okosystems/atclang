@@ -21,6 +21,7 @@
 - `.github/workflows/codeql.yml`
 - `.github/workflows/dependency-review.yml`
 - `.github/workflows/determinism-gate.yml`
+- `.github/workflows/evidence-bind.yml`
 - `.github/workflows/governance-ci.yml`
 - `.github/workflows/test-suite.yml`
 - `.gitignore`
@@ -79,11 +80,14 @@
 - `crates/atc-core/src/artifact.rs`
 - `crates/atc-core/src/ast.rs`
 - `crates/atc-core/src/bytecode.rs`
+- `crates/atc-core/src/ir.rs`
 - `crates/atc-core/src/lexer.rs`
 - `crates/atc-core/src/lib.rs`
 - `crates/atc-core/src/lower.rs`
 - `crates/atc-core/src/main.rs`
+- `crates/atc-core/src/native.rs`
 - `crates/atc-core/src/parser.rs`
+- `crates/atc-core/src/value.rs`
 - `crates/atc-core/src/vm.rs`
 - `crates/atc-core/tests/cli.rs`
 - `crates/atc-core/tests/differential.rs`
@@ -118,6 +122,8 @@
 - `specs/bytecode/ATCB-1.md`
 - `specs/bytecode/DRAFT.md`
 - `specs/bytecode/SPEC.md`
+- `specs/conformance/atcb-vm-vectors.json`
+- `specs/execution/ATCB-1-ATC-VM-EXECUTION-CONTRACT.md`
 - `specs/gas/DRAFT.md`
 - `specs/ir/SPEC.md`
 - `specs/language/DRAFT.md`

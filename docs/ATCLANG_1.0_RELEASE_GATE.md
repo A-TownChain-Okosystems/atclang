@@ -1,8 +1,8 @@
 # ATCLang 1.0.0 Release Gate
 
-**Status:** `NO-GO` (Stand 2026-09-17, nach Welle 2 aktualisiert)  
+**Status:** NO-GO (Stand 2026-09-24)  
 **Version:** 1.0.0  
-**Date:** 2026-09-14  
+**Date:** 2026-09-24  
 **Authority:** ATC-STD-000 v1.3.0
 
 This document is the machine-reviewable release gate for ATCLang 1.0.0. A version number, documentation claim, or successful unit-test run does not constitute release readiness.
@@ -11,18 +11,18 @@ This document is the machine-reviewable release gate for ATCLang 1.0.0. A versio
 
 | Gate | Requirement | Status |
 |---|---|---|
-| G0 | Repository baseline/build | PASS (documented) |
+| G0 | Repository baseline/build | PASS (documented; current CI evidence must still be refreshed) |
 | G1 | Normative language specification | PASS |
 | G2 | Semantic/type-checking specification | PASS |
-| G3 | Canonical IR, bytecode emission and verification | IMPLEMENTED (i64-Subset) — Lowering + Verifizierer-Zwang je Funktion, `atc run`; Evidence e915589; volle Sprachreife: SCR-0128 |
+| G3 | Canonical frontend/IR/bytecode emission and verification | IMPLEMENTED FOR CURRENT SUBSET — full language conformance remains OPEN |
 | G4 | ATVM integration and execution conformance | OPEN |
 | G5 | Standard library and host API completion | OPEN |
 | G6 | ABI specification and compatibility tests | OPEN |
 | G7 | Storage/state model | OPEN |
 | G8 | Resource/gas model | OPEN |
 | G9 | Deterministic compilation | OPEN |
-| G10 | Deterministic execution | PASS (Referenz-VM) — checked-Arithmetik, feste Aufruftiefe, keine Uhr/RNG; Determinism-Gate grün (e915589); Kreuz-VM-Konformenz: G11 |
-| G11 | Cross-implementation conformance | OPEN |
+| G10 | Deterministic execution/state-transition conformance | PARTIAL — deterministic Rust stack-VM path exists; ecosystem/ATVM conformance remains OPEN |
+| G11 | Cross-component / cross-implementation conformance | OPEN |
 | G12 | Negative/fuzz/malformed-input testing | OPEN |
 | G13 | Security hardening | OPEN |
 | G14 | Reproducible build | OPEN |
@@ -34,14 +34,14 @@ This document is the machine-reviewable release gate for ATCLang 1.0.0. A versio
 
 ## Release rule
 
-ATCLang 1.0.0 MUST NOT be marked production-ready while any P0 gate is OPEN. The current P0 blockers are G3, G4, G9, G10, G11, G13, G14 and G18.
+ATCLang 1.0.0 MUST NOT be marked production-ready while any required production gate is OPEN. The current implementation is a Rust-only canonical development track and is not production-ready.
 
 ## Canonical architecture
 
 ```text
 ATCLang source
     -> lexer/parser
-    -> semantic verifier
+    -> semantic verification
     -> canonical ATC-IR
     -> canonical bytecode
     -> bytecode verifier
@@ -49,19 +49,19 @@ ATCLang source
     -> deterministic state transition
 ```
 
-Rust is the canonical execution/chain-facing implementation boundary. Python reference tooling may be used for development and differential testing, but it MUST NOT be treated as consensus authority.
+Rust is the canonical compiler/execution/chain-facing implementation boundary. The former Python reference implementation has been removed and is not a production or consensus authority.
 
 ## Current implementation evidence
 
-The Rust canonical core now contains an ATCB-1 bytecode container, deterministic opcode encoding, and a structural bytecode verifier. The normative baseline is `specs/bytecode/ATCB-1.md`.
+The Rust canonical core contains a deterministic lexer/parser/lowering path, an ATCB-1 bytecode container, deterministic opcode encoding, control-flow lowering, a deterministic stack VM, and structural bytecode verification for the implemented language subset.
 
-This closes no production gate by itself. The verifier is intentionally limited to structural stack/local/function checks; control-flow, type safety, ABI, storage, gas/resource accounting, host capabilities and ATVM execution remain separate gates.
+The verifier and VM do not by themselves close production gates. Full language conformance, canonical IR, artifact/ABI contracts, capability enforcement, resource/gas accounting, host/state boundaries, ATVM integration, negative/fuzz testing, reproducible builds, and independent security review remain separate release requirements.
 
 ## Evidence required for GO
 
-A GO decision requires committed evidence for every open gate, including:
+A GO decision requires committed, current evidence for every open gate, including:
 
-- normative IR and bytecode specification;
+- normative IR and bytecode specifications;
 - compiler golden fixtures;
 - bytecode verifier tests;
 - ATVM integration/conformance fixtures;
@@ -73,4 +73,4 @@ A GO decision requires committed evidence for every open gate, including:
 - independent security review;
 - release artifact hashes and compatibility statement.
 
-Until those artifacts exist and are independently reviewable, the authoritative release state remains `NO-GO`.
+Until those artifacts exist and are independently reviewable, the authoritative release state remains NO-GO.
