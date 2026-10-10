@@ -25,7 +25,7 @@ roles:
     rules: [read_only, never_auto_selected]
 selection:
   production_entrypoint: "a-townchain/components/vm"
-  reference_entrypoint: "atclang/src/atclang/vm"
+  reference_entrypoint: "atclang/crates/atc-core"
   fail_closed_if_multiple_candidates: true
   runtime_role_must_be_declared: true
   exact_sha_binding_required: true

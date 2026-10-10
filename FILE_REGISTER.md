@@ -88,6 +88,7 @@
 - `crates/atc-core/tests/cli.rs`
 - `crates/atc-core/tests/differential.rs`
 - `crates/atc-core/tests/run.rs`
+- `crates/atc-core/tests/stdlib_reference_conformance.rs`
 - `determinism_allowlist.yaml`
 - `docs/ATCLANG_1.0_ARCHITECTURE.md`
 - `docs/ATCLANG_1.0_CONFORMANCE.md`
@@ -123,10 +124,12 @@
 - `specs/language/SPEC.md`
 - `specs/language/registry.json`
 - `specs/profiles/DRAFT.md`
+- `specs/runtime/RUNTIME-CLASSIFICATION.yaml`
 - `specs/security/DRAFT.md`
 - `specs/semantics/SPEC.md`
 - `specs/semantics/registry.json`
 - `specs/stdlib/SPEC.md`
+- `specs/stdlib/STDLIB-CONTRACT.yaml`
 - `specs/vm/DRAFT.md`
 - `specs/vm/SPEC.md`
 - `tools/.gitkeep`
