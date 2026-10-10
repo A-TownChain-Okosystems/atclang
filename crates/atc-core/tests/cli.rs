@@ -110,8 +110,12 @@ fn production_cli_boundary_is_rust_only() {
     assert!(exe.is_file(), "Rust production CLI fehlt: {exe:?}");
     let manifest = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
     assert!(manifest.ends_with("crates/atc-core"));
-    assert!(exe.starts_with(manifest.join("target")) || exe.starts_with(manifest.join("../..")),
-        "Production-CLI liegt außerhalb des Rust-Crate-Builds: {exe:?}");
-    assert!(!manifest.join("../../src/atclang/vm/atcvm.py").is_file(),
-        "historische Python-VM darf nicht als Produktions-Implementierung vorhanden sein");
+    assert!(
+        exe.starts_with(manifest.join("target")) || exe.starts_with(manifest.join("../..")),
+        "Production-CLI liegt außerhalb des Rust-Crate-Builds: {exe:?}"
+    );
+    assert!(
+        !manifest.join("../../src/atclang/vm/atcvm.py").is_file(),
+        "historische Python-VM darf nicht als Produktions-Implementierung vorhanden sein"
+    );
 }
