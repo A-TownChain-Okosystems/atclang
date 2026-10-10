@@ -31,7 +31,6 @@ standard: ATC-STD-MD-001
 - Consensus-sensitive deterministic execution must not depend on wall-clock time, ambient randomness, network access, or other implicit host state.
 - Evidence claims are not treated as PASS without current commit-bound CI evidence.
 
-
 ## Open blockers
 
 1. Complete the canonical Rust frontend/parser and language conformance surface.
