@@ -121,6 +121,8 @@
 - `specs/bytecode/ATCB-1.md`
 - `specs/bytecode/DRAFT.md`
 - `specs/bytecode/SPEC.md`
+- `specs/conformance/atcb-vm-vectors.json`
+- `specs/execution/ATCB-1-ATC-VM-EXECUTION-CONTRACT.md`
 - `specs/gas/DRAFT.md`
 - `specs/ir/SPEC.md`
 - `specs/language/DRAFT.md`
