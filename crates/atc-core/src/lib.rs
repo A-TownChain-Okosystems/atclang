@@ -5,10 +5,10 @@
 
 pub mod artifact;
 pub mod ast;
-pub mod ir;
 pub mod bytecode;
+pub mod ir;
 pub mod lexer;
 pub mod lower;
 pub mod parser;
-pub mod vm;
 pub mod value;
+pub mod vm;

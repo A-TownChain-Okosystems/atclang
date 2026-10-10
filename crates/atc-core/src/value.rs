@@ -101,7 +101,10 @@ mod tests {
         assert_eq!(AbiType::from_name("u256"), Some(AbiType::U256));
         assert_eq!(AbiType::from_name("Address"), Some(AbiType::Address));
         assert_eq!(AbiType::from_name("bytes"), Some(AbiType::Bytes));
-        assert_eq!(AbiType::from_name("ContractRef"), Some(AbiType::ContractRef));
+        assert_eq!(
+            AbiType::from_name("ContractRef"),
+            Some(AbiType::ContractRef)
+        );
         assert_eq!(AbiType::from_name("height"), None);
     }
 

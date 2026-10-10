@@ -33,10 +33,7 @@ pub enum IrType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IrValue {
     Abi(TypedValue),
-    Protocol {
-        ty: ProtocolType,
-        value: u64,
-    },
+    Protocol { ty: ProtocolType, value: u64 },
 }
 
 impl IrValue {
