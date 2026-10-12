@@ -15,7 +15,8 @@ Beiträge zur ATCLang-Entwicklung folgen den Richtlinien des A-TownChain-Ökosys
 
 ## Entwicklungsrichtlinien
 
-- **Erweiterungen:** Neue Opcodes in `src/atclang/vm/atcvm.py`, Lexer-Token in `src/atclang/frontend/lexer/lexer.py`, Stdlib-Funktionen in `src/atclang/stdlib/`.
-- **Tests:** Jede Änderung erfordert entsprechende Unit- und Integrationstests unter `tests/`.
+- **Erweiterungen:** Die aktive Produktionsimplementierung liegt in `crates/atc-core/`. Lexer, Parser, Lowering, Bytecode, Artefakte und Laufzeit sind anhand des aktuellen Rust-Codes zu ändern. Keine neue Produktions-VM neben `a-townchain/components/vm` einführen. Historische Python-Pfade sind keine gültigen Implementierungsziele.
+- **Tests:** Jede Änderung erfordert passende Rust-Unit- und Integrationstests unter `crates/atc-core/`; bei Sprach-/Bytecode-Änderungen sind Differential-Korpus, Negativtests und kanonische Conformance-Vektoren zu prüfen.
 - **Commits:** Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`).
-- **Standards:** Code und Dokumentation müssen allen ATC-Standards entsprechen.
+- **Katalog:** `docs/COMPONENT_FUNCTION_CATALOG.md` ist der Einstiegspunkt für Komponenten, öffentliche Funktionen, Testflächen und offene Vollständigkeitslücken. Vor Änderungen Quelle und aktuelle SHA prüfen; Implementierung und Verifikation getrennt dokumentieren.
+- **Standards:** Code und Dokumentation müssen allen anwendbaren ATC-Standards entsprechen.
