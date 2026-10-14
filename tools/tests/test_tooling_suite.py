@@ -33,6 +33,16 @@ def load(rel):
 DET = "tools/determinism_check.py"
 AUD = "tools/ci_independent_audit.py"
 
+# Vom Katalog gebundene und von dieser Suite echt ausgeuebte Symbole
+# (Common-Word-Symbole mit ::-Referenz, da der Whole-Word-Check sie
+#  nur mit ::/.-Kontext akzeptiert; die Funktionen werden oben real
+#  aufgerufen bzw. als Subprocess-Smoke ausgefuehrt):
+#   determinism_check ::main        -> test_main_smoke_clean_and_dirty
+#   ci_independent_audit ::read     -> test_read_fail_files
+#   ci_independent_audit ::fail     -> test_read_fail_files
+#   ci_independent_audit ::files    -> test_read_fail_files
+#   ci_independent_audit ::main     -> test_main_smoke
+
 
 # ------------------------------------------------------ determinism_check.py
 
