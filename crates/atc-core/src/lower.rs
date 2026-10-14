@@ -417,6 +417,20 @@ mod tests {
     }
 
     #[test]
+    fn compiled_program_symbol_surface() {
+        // Bound catalog symbols exercised here: CompiledProgram::function_count
+        // und CompiledProgram::verify.
+        let prog = crate::parser::parse_program("fn main() -> i64 { return 1; }")
+            .expect("Parse-Fehler");
+        let compiled = lower_program(&prog).expect("Lowering-Fehler");
+        assert!(compiled.function_count() >= 1);
+        assert!(compiled.verify().is_ok());
+        // Leeres Programm und ungueltige Entry-Funktion schlagen fehl
+        let empty = CompiledProgram { functions: vec![], entry: 0 };
+        assert!(empty.verify().is_err());
+    }
+
+    #[test]
     fn if_ohne_else_waehlt_zweig() {
         // fn m(a) { if a < 0 { return 0 - a; } return a; } — keine main-Nutzerfn,
         // Entry = __main__ leer -> main nutzen

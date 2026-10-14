@@ -440,6 +440,27 @@ mod tests {
     use super::*;
 
     #[test]
+    fn instruction_and_bytecode_symbol_surface() {
+        // Bound catalog symbols exercised here: Instruction::encode,
+        // Bytecode::encode (legacy LE) und Bytecode::verify.
+        let mut buf = Vec::new();
+        Instruction::ConstI64(7).encode(&mut buf);
+        assert_eq!(buf[0], 0x01);
+        assert_eq!(&buf[1..], &7i64.to_le_bytes());
+        let bc = Bytecode {
+            instructions: vec![Instruction::ConstI64(7), Instruction::Return],
+        };
+        let legacy = bc.encode();
+        assert_eq!(&legacy[..4], b"ATCB");
+        assert!(bc.verify(0, 1).is_ok());
+        // LoadLocal ohne deklarierte Locals muss fail-closed durchfallen
+        let bad = Bytecode {
+            instructions: vec![Instruction::LoadLocal(0), Instruction::Return],
+        };
+        assert!(bad.verify(0, 1).is_err());
+    }
+
+    #[test]
     fn encoding_is_deterministic() {
         let bc = Bytecode {
             instructions: vec![Instruction::ConstI64(42), Instruction::Return],

@@ -450,6 +450,17 @@ contract ATownAvatar {
 "#;
 
     #[test]
+    fn validate_contract_semantics() {
+        // Bound catalog symbols exercised here: parse_native_contract und
+        // validate_native_contract.
+        let contract = parse_native_contract(SOURCE).expect("native .atc must parse");
+        assert!(validate_native_contract(&contract).is_ok());
+        let mut broken = contract.clone();
+        broken.version = String::new();
+        assert!(validate_native_contract(&broken).is_err());
+    }
+
+    #[test]
     fn parses_reference_contract_shape() {
         let contract = parse_native_contract(SOURCE).expect("native .atc must parse");
         assert_eq!(contract.version, "1.0");

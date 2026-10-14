@@ -495,6 +495,24 @@ mod tests {
     }
 
     #[test]
+    fn artifact_symbol_surface() {
+        // Bound catalog symbols exercised here: Artifact::canonical_payload,
+        // Artifact::compute_hash, Artifact::encode, Artifact::verify,
+        // Artifact::metadata.
+        let a = Artifact::from_program(&sample_program(), metadata()).unwrap();
+        let payload = a.canonical_payload().unwrap();
+        assert_eq!(&payload[..4], ATCA_MAGIC);
+        assert_eq!(a.compute_hash().unwrap(), a.hash);
+        let bytes = a.encode().unwrap();
+        assert!(bytes.len() > payload.len());
+        assert!(bytes.ends_with(&a.hash));
+        let verified = a.verify().unwrap();
+        assert_eq!(verified.artifact_hash(), a.hash);
+        assert_eq!(verified.metadata().language_version, "1.0");
+        assert!(!verified.metadata().capabilities.is_empty());
+    }
+
+    #[test]
     fn capabilities_must_be_canonical() {
         let mut m = metadata();
         m.capabilities.reverse();
