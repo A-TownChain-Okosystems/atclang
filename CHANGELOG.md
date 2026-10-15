@@ -5,7 +5,12 @@ Alle wesentlichen Änderungen an diesem Projekt werden in dieser Datei dokumenti
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 und dieses Projekt hält sich an [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-09-11
+## [Unreleased] - 2026-10-15
+
+### Fixed
+
+- Reject decimal integer literals that exceed the Rust lexer's `u64` value range instead of allowing debug overflow panics or release-mode wrapping; added boundary regression tests for `u64::MAX` and `u64::MAX + 1`. Validation remains pending until the canonical Rust test workflow runs on the exact PR head.
+
 
 ### Added (SCR-0098 — fehlende Kernmodule)
 
