@@ -155,9 +155,13 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
             }
             '0'..='9' => {
                 let mut n: u64 = (ch as u64) - ('0' as u64);
-                while let Some(&(_, c)) = chars.peek() {
+                while let Some(&(digit_pos, c)) = chars.peek() {
                     if c.is_ascii_digit() {
-                        n = (n * 10) + ((c as u64) - ('0' as u64));
+                        let digit = (c as u64) - ('0' as u64);
+                        n = match n.checked_mul(10).and_then(|value| value.checked_add(digit)) {
+                            Some(value) => value,
+                            None => return Err(LexError { pos: digit_pos, ch: c }),
+                        };
                         chars.next();
                     } else {
                         break;
@@ -274,6 +278,22 @@ mod tests {
                 Token::Semi,
                 Token::Eof,
             ]
+        );
+    }
+
+    #[test]
+    fn u64_max_decimal_literal_is_accepted() {
+        assert_eq!(
+            tokenize("18446744073709551615").unwrap(),
+            vec![Token::Int(u64::MAX), Token::Eof]
+        );
+    }
+
+    #[test]
+    fn decimal_literal_overflow_is_rejected_without_wrapping() {
+        assert_eq!(
+            tokenize("18446744073709551616"),
+            Err(LexError { pos: 19, ch: '6' })
         );
     }
 
