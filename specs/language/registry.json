@@ -2,8 +2,8 @@
   "gate": "G1",
   "status": "PASSED",
   "date": "2026-09-07",
-  "source_of_truth": "src/atclang (Python-Referenz, Commit a7e1bd4)",
-  "normativity": "SPEC folgt der Referenz-Implementierung; Abweichung = Fehler",
+  "source_of_truth": "Python-Referenz a7e1bd4 (historisch, aus dem Tree entfernt in 34be28f per Rust-only-Politik; vollstaendiges Inventar: docs/reference/python/). Kanonische Implementierung: Rust Canonical Core (crates/atc-core).",
+  "normativity": "SPEC folgt der Referenz-Sprachdefinition (historisch a7e1bd4, Inventar docs/reference/python/); Abweichung = Fehler. Die Implementierungs-Konformanz des vollen Sprachumfangs ist Gate G3 (OPEN); der Rust Canonical Core implementiert die SCR-0128-Teilmenge.",
   "tokens": [
     "INT",
     "FLOAT",

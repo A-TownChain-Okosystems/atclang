@@ -1,6 +1,6 @@
 # ATCLang 1.0 — Language Specification
 
-**Gate:** G1 (AD-022) · **Status:** PASSED, 07.09.2026 · **Referenz-Implementierung:** Python, src/atclang (Commit a7e1bd4)
+**Gate:** G1 (AD-022) · **Status:** PASSED, 07.09.2026 · **Referenz-Definition:** Python-Referenz a7e1bd4 (historisch; Inventar: docs/reference/python/, entfernt in 34be28f per Rust-only-Politik). **Kanonische Implementierung:** Rust Canonical Core (crates/atc-core, SCR-0128-Teilmenge); volle Sprachkonformanz = Gate G3 (OPEN)
 
 **Normativitäts-Regel:** Diese Spezifikation ist aus der Referenz-Implementierung
 extrahiert und muss mit ihr uebereinstimmen. Abweichungen zwischen SPEC und
