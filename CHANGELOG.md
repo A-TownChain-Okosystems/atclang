@@ -10,6 +10,7 @@ und dieses Projekt hält sich an [Semantic Versioning](https://semver.org/spec/v
 ### Fixed
 
 - Reject decimal integer literals that exceed the Rust lexer's `u64` value range instead of allowing debug overflow panics or release-mode wrapping; added boundary regression tests for `u64::MAX` and `u64::MAX + 1`. Validation remains pending until the canonical Rust test workflow runs on the exact PR head.
+- Support checked hexadecimal (`0x`), octal (`0o`), and binary (`0b`) integer literals; reject empty or malformed radix literals and overflow. Regression tests added; validation remains pending until CI runs on the exact PR head.
 
 
 ### Added (SCR-0098 — fehlende Kernmodule)
