@@ -154,16 +154,54 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
                 tokens.push(Token::String(value));
             }
             '0'..='9' => {
-                let mut n: u64 = (ch as u64) - ('0' as u64);
-                while let Some(&(_, c)) = chars.peek() {
-                    if c.is_ascii_digit() {
-                        n = (n * 10) + ((c as u64) - ('0' as u64));
+                let (base, first_digit) = match (ch, chars.peek().copied()) {
+                    ('0', Some((_, 'x' | 'X'))) => {
                         chars.next();
-                    } else {
-                        break;
+                        (16u32, None)
+                    }
+                    ('0', Some((_, 'o' | 'O'))) => {
+                        chars.next();
+                        (8u32, None)
+                    }
+                    ('0', Some((_, 'b' | 'B'))) => {
+                        chars.next();
+                        (2u32, None)
+                    }
+                    _ => (10u32, Some(ch)),
+                };
+
+                let mut value = 0u64;
+                let mut digits = 0usize;
+                if let Some(first) = first_digit {
+                    value = (first as u64) - ('0' as u64);
+                    digits = 1;
+                }
+
+                while let Some(&(digit_pos, c)) = chars.peek() {
+                    match c.to_digit(base) {
+                        Some(digit) => {
+                            value = match value
+                                .checked_mul(base as u64)
+                                .and_then(|n| n.checked_add(digit as u64))
+                            {
+                                Some(n) => n,
+                                None => return Err(LexError { pos: digit_pos, ch: c }),
+                            };
+                            digits += 1;
+                            chars.next();
+                        }
+                        None if base != 10 && c.is_ascii_alphanumeric() => {
+                            return Err(LexError { pos: digit_pos, ch: c });
+                        }
+                        _ => break,
                     }
                 }
-                tokens.push(Token::Int(n));
+
+                if digits == 0 {
+                    let (digit_pos, digit_ch) = chars.peek().copied().unwrap_or((pos, ch));
+                    return Err(LexError { pos: digit_pos, ch: digit_ch });
+                }
+                tokens.push(Token::Int(value));
             }
             _ if ch.is_alphabetic() || ch == '_' => {
                 let mut ident = String::new();
@@ -274,6 +312,36 @@ mod tests {
                 Token::Semi,
                 Token::Eof,
             ]
+        );
+    }
+
+    #[test]
+    fn radix_integer_literals_are_accepted() {
+        assert_eq!(tokenize("0xFF").unwrap()[0], Token::Int(255));
+        assert_eq!(tokenize("0o755").unwrap()[0], Token::Int(493));
+        assert_eq!(tokenize("0b1010").unwrap()[0], Token::Int(10));
+    }
+
+    #[test]
+    fn malformed_radix_integer_literals_are_rejected() {
+        assert!(tokenize("0x").is_err());
+        assert!(tokenize("0b102").is_err());
+        assert!(tokenize("0o8").is_err());
+    }
+
+    #[test]
+    fn u64_max_decimal_literal_is_accepted() {
+        assert_eq!(
+            tokenize("18446744073709551615").unwrap(),
+            vec![Token::Int(u64::MAX), Token::Eof]
+        );
+    }
+
+    #[test]
+    fn decimal_literal_overflow_is_rejected_without_wrapping() {
+        assert_eq!(
+            tokenize("18446744073709551616"),
+            Err(LexError { pos: 19, ch: '6' })
         );
     }
 
