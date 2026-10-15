@@ -15,8 +15,6 @@ import os
 import subprocess
 import sys
 
-import pytest
-
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
@@ -131,7 +129,6 @@ class TestDeterminismCheck:
         assert raw == b"3 passed in Xs"
 
     def test_main_smoke_clean_and_dirty(self, tmp_path):
-        env = dict(os.environ)
         proc = subprocess.run(
             [sys.executable, os.path.join(REPO, DET), "--lang", "python"],
             capture_output=True, text=True, cwd=str(tmp_path),

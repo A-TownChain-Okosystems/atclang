@@ -345,8 +345,7 @@
     "TypeAnnotation",
     "UnaryOp",
     "WalletDef",
-    "WhileStatement",
-    "X"
+    "WhileStatement"
   ],
   "builtins": [
     {
