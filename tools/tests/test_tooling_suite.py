@@ -120,7 +120,7 @@ print(random.random())
     def test_run_tests_and_normalize_output(self, tmp_path):
         m = load(DET)
         out = m.run_tests(
-            'python3 -c "print(\'ok in 0.42s\')"'
+            'python3 -c "print(\'ok in 0.42s\')"',
             str(tmp_path),
         )
         assert b"ok" in out
