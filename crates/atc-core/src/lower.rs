@@ -199,12 +199,23 @@ impl<'a> FnLowerer<'a> {
                 "Funktionsdefinition ist nur auf Programmebene erlaubt (in {})",
                 self.function_name
             ))),
+            Stmt::Use { .. }
+            | Stmt::Struct { .. }
+            | Stmt::Enum { .. }
+            | Stmt::Contract { .. } => Err(LowerError::new(
+                "Native Deklaration ist nur Metadatum und kann nicht als Statement ausgefuehrt werden",
+            )),
         }
     }
 
     fn lower_expr(&mut self, e: &Expr) -> Result<(), LowerError> {
         match e {
             Expr::Int(v) => self.out.push(Instruction::ConstI64(*v)),
+            Expr::BigInt(_) => {
+                return Err(LowerError::new(
+                    "Integerliteral liegt ausserhalb des aktuellen i64-VM-Ausfuehrungsbereichs",
+                ))
+            }
             Expr::Ident(name) => match self.locals.get(name) {
                 Some(i) => self.out.push(Instruction::LoadLocal(*i)),
                 None => {
@@ -380,7 +391,14 @@ pub fn lower_program(prog: &Program) -> Result<CompiledProgram, LowerError> {
     };
     let mut main_has_code = false;
     for s in &prog.statements {
-        if let Stmt::Fn(_) = s {
+        if matches!(
+            s,
+            Stmt::Fn(_)
+                | Stmt::Use { .. }
+                | Stmt::Struct { .. }
+                | Stmt::Enum { .. }
+                | Stmt::Contract { .. }
+        ) {
             continue;
         }
         main_has_code = true;
