@@ -700,6 +700,37 @@ mod tests {
     }
 
     #[test]
+    fn native_import_struct_enum_and_contract_ast() {
+        let source = r#"
+            use ATC::Types::Address
+            enum Status { Open, Closed }
+            struct Entry { owner: Address, balances: Map<Address, u128> }
+            contract Vault {
+                state balances: Map<Address, u128>
+                fn transfer(to: Address, amount: u128) -> bool {
+                    if amount > 0 { self.balances[to] += amount }
+                    return true
+                }
+            }
+        "#;
+        let program = parse_program(source).expect("native declarations must parse");
+        let json = program.to_json();
+        assert!(json.contains("\"kind\":\"UseDeclaration\",\"path\":\"ATC::Types::Address\""));
+        assert!(json.contains("\"kind\":\"EnumDeclaration\",\"name\":\"Status\""));
+        assert!(json.contains("\"kind\":\"StructDeclaration\",\"name\":\"Entry\""));
+        assert!(json.contains("\"name\":\"Map<Address, u128>\""));
+        assert!(json.contains("\"kind\":\"ContractDeclaration\",\"name\":\"Vault\""));
+    }
+
+    #[test]
+    fn large_contract_integer_is_preserved_without_i64_wraparound() {
+        let program = parse_program(
+            "const MAX_SUPPLY: u128 = 100_000_000_000_000_000_000_000_000",
+        ).expect("u128 contract literal must parse");
+        assert!(program.to_json().contains("\"value\":100000000000000000000000000"));
+    }
+
+    #[test]
     fn fehlerfaelle() {
         assert!(parse_program("let $ = 1;").is_err());
         assert!(parse_program("let x = ;").is_err());
