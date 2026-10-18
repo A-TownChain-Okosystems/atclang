@@ -13,7 +13,7 @@ scr: SCR-0071
 depends: []
 ---
 
-# ATC-IR Specification (Intermediate Representation) (ATC-IR-001)
+## ATC-IR Specification (Intermediate Representation) (ATC-IR-001)
 
 > **Ehrlicher Status:** Spezifikations-Grundgerüst (SCR-0071, Owner-Audit-Backlog).
 > Implementierung, Tests und Evidence PENDING — gemäß „No status without
