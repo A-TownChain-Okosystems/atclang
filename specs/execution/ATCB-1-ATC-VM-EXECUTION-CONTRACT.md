@@ -9,7 +9,7 @@ owner: A-TownChain-Okosystems
 license: Apache-2.0
 ---
 
-# ATCB-1 / ATC-VM Execution Contract
+## ATCB-1 / ATC-VM Execution Contract
 
 ## 1. Purpose
 
