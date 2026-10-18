@@ -8,7 +8,7 @@
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
-    Int(u64),
+    Int(u128),
     Ident(String),
     Let,
     Const,
@@ -54,6 +54,7 @@ pub enum Token {
     Eof,
     At,
     Dot,
+    Question,
     String(String),
 }
 
@@ -131,6 +132,7 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
             ':' => tokens.push(Token::Colon),
             '@' => tokens.push(Token::At),
             '.' => tokens.push(Token::Dot),
+            '?' => tokens.push(Token::Question),
             '(' => tokens.push(Token::LParen),
             ')' => tokens.push(Token::RParen),
             '[' => tokens.push(Token::LBracket),
@@ -165,12 +167,12 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
                 tokens.push(Token::String(value));
             }
             '0'..='9' => {
-                let mut n: u64 = (ch as u64) - ('0' as u64);
+                let mut n: u128 = (ch as u128) - ('0' as u128);
                 while let Some(&(_, c)) = chars.peek() {
                     if c.is_ascii_digit() {
                         let digit_pos = chars.peek().map(|(p, _)| *p).unwrap_or(pos);
                         n = n.checked_mul(10)
-                            .and_then(|value| value.checked_add((c as u64) - ('0' as u64)))
+                            .and_then(|value| value.checked_add((c as u128) - ('0' as u128)))
                             .ok_or(LexError { pos: digit_pos, ch: c })?;
                         chars.next();
                     } else if c == '_' {
