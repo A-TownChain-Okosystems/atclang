@@ -43,7 +43,7 @@ fn ident(token: Option<&Token>) -> Option<&str> {
 fn skip_type(tokens: &[Token], mut i: usize, terminators: &[Token]) -> Result<usize> {
     let mut angle = 0i32;
     while i < tokens.len() {
-        if angle == 0 && terminators.iter().any(|t| t == &tokens[i]) { break; }
+        if angle == 0 && (terminators.iter().any(|t| t == &tokens[i]) || ident(Some(&tokens[i])) == Some("event")) { break; }
         match tokens[i] {
             Token::Lt => angle += 1,
             Token::Gt if angle > 0 => angle -= 1,
@@ -162,7 +162,7 @@ fn validate_members(tokens: &[Token], start: usize, end: usize) -> Result<()> {
                 i += 1;
                 if tokens.get(i) == Some(&Token::Colon) {
                     i += 1;
-                    let next = skip_type(tokens, i, &[Token::Semi, Token::Comma, Token::RBrace])?;
+                    let next = skip_type(tokens, i, &[Token::Semi, Token::Comma, Token::RBrace, Token::State, Token::Fn, Token::Function])?;
                     if next == i { return Err(error("State-Feldtyp fehlt")); }
                     i = next;
                 }
