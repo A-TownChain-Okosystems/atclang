@@ -14,7 +14,7 @@ depends: [ATC-STD-000]
 supersedes: 0.1.0-DRAFT (Geometrie-Konflikt mit ATCB-1.md aufgeloest)
 ---
 
-# Bytecode Specification (ATC-BC-001) - ATCB v1
+## Bytecode Specification (ATC-BC-001) - ATCB v1
 
 > **Normativitaet:** Diese Spezifikation ist der normative Traeger von ATCB v1
 > (ATC-STD-000 §21). Referenzimplementierungen sind
