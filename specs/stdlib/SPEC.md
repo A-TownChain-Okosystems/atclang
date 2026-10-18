@@ -13,7 +13,7 @@ scr: SCR-0071
 depends: []
 ---
 
-# Standard Library Specification & Trust-Klassifikation (ATC-STDLIB-001)
+## Standard Library Specification & Trust-Klassifikation (ATC-STDLIB-001)
 
 > **Ehrlicher Status:** Spezifikations-Grundgerüst (SCR-0071, Owner-Audit-Backlog).
 > Implementierung, Tests und Evidence PENDING — gemäß „No status without

@@ -38,10 +38,21 @@ impl Parser {
         while self.cur() != Token::Eof {
             let s = match self.cur() {
                 Token::Let | Token::Const => Stmt::Let(self.let_stmt()?),
-                Token::Fn => Stmt::Fn(self.function()?),
+                Token::Fn => self.function_decl()?,
+                Token::Use => self.use_decl()?,
+                Token::Struct => self.struct_decl()?,
+                Token::Enum => self.enum_decl()?,
+                Token::Contract => self.contract_decl()?,
+                // File-level annotations (for example @version and @name) are
+                // metadata, not executable statements. Consume them up to the
+                // next recognized declaration without changing runtime semantics.
+                Token::At => {
+                    self.skip_file_annotations();
+                    continue;
+                }
                 other => {
                     return Err(ParseError {
-                        message: format!("let/const/fn am Top-Level erwartet, fand {:?}", other),
+                        message: format!("Deklaration am Top-Level erwartet, fand {:?}", other),
                     })
                 }
             };
@@ -50,15 +61,404 @@ impl Parser {
         Ok(Program { statements })
     }
 
+    fn function_decl(&mut self) -> Result<Stmt, ParseError> {
+        let start = self.pos;
+        match self.function() {
+            Ok(function) => Ok(Stmt::Fn(function)),
+            Err(_) => {
+                self.pos = start;
+                self.native_function_decl()
+            }
+        }
+    }
+
+    fn native_function_decl(&mut self) -> Result<Stmt, ParseError> {
+        let start = self.pos;
+        self.pos += 1; // fn
+        let name = self.expect_name("Funktionsname")?;
+        let mut signature_tokens = Vec::new();
+        while self.cur() != Token::LBrace {
+            let token = self.cur();
+            if token == Token::Eof {
+                self.pos = start;
+                return Err(ParseError {
+                    message: format!("'{{' in Signatur von {name} erwartet"),
+                });
+            }
+            self.pos += 1;
+            signature_tokens.push(token);
+        }
+        // Preserve unsupported native syntax as metadata, but only for a
+        // recognizable native shape. Generic signatures plus indexed access
+        // cover list helpers such as cat(a: List<string>, b: List<string>)
+        // without accepting arbitrary ordinary functions.
+        let has_generic_signature = signature_tokens.contains(&Token::Lt);
+        self.pos += 1; // function body opening brace
+        let mut depth = 1usize;
+        let mut body_tokens = Vec::new();
+        let mut has_native_string = false;
+        let mut has_index_access = false;
+        let mut has_struct_literal = false;
+        let mut previous_token: Option<Token> = None;
+        while depth > 0 {
+            let token = self.cur();
+            if token == Token::Eof {
+                self.pos = start;
+                return Err(ParseError {
+                    message: format!("Nicht geschlossener Funktionsblock {name}"),
+                });
+            }
+            self.pos += 1;
+            match token {
+                Token::LBrace => {
+                    if previous_token
+                        .as_ref()
+                        .is_some_and(|previous| matches!(previous, Token::Ident(_)))
+                    {
+                        has_struct_literal = true;
+                    }
+                    depth += 1;
+                    body_tokens.push(Self::token_text(&Token::LBrace));
+                }
+                Token::RBrace => {
+                    depth -= 1;
+                    if depth > 0 {
+                        body_tokens.push(Self::token_text(&Token::RBrace));
+                    }
+                }
+                Token::String(_) => {
+                    has_native_string = true;
+                    body_tokens.push(Self::token_text(&token));
+                }
+                Token::LBracket => {
+                    has_index_access = true;
+                    body_tokens.push(Self::token_text(&token));
+                }
+                _ => body_tokens.push(Self::token_text(&token)),
+            }
+            previous_token = Some(token);
+        }
+        let has_typed_return = signature_tokens.contains(&Token::Arrow);
+        if !has_native_string
+            && !(has_generic_signature && has_index_access)
+            && !(has_typed_return && has_struct_literal)
+        {
+            self.pos = start;
+            return Err(ParseError {
+                message: format!(
+                    "Funktionsdeklaration {name} ist außerhalb des unterstützten Parsers"
+                ),
+            });
+        }
+        Ok(Stmt::NativeFunction {
+            name,
+            signature_tokens: signature_tokens.iter().map(Self::token_text).collect(),
+            body_tokens,
+        })
+    }
     fn simple_type(&mut self) -> Result<TypeHint, ParseError> {
-        match self.cur() {
+        let mut name = match self.cur() {
             Token::Ident(n) => {
                 self.pos += 1;
-                Ok(TypeHint { name: n })
+                n
+            }
+            other => {
+                return Err(ParseError {
+                    message: format!("Typ erwartet, fand {:?}", other),
+                })
+            }
+        };
+
+        // Preserve generic types such as Map<Address, Map<Address, u128>>.
+        if self.cur() == Token::Lt {
+            name.push('<');
+            self.pos += 1;
+            let mut depth = 1usize;
+            while depth > 0 {
+                let token = self.cur();
+                if token == Token::Eof {
+                    return Err(ParseError {
+                        message: "Unvollständiger generischer Typ".to_string(),
+                    });
+                }
+                self.pos += 1;
+                match token {
+                    Token::Lt => {
+                        depth += 1;
+                        name.push('<');
+                    }
+                    Token::Gt => {
+                        depth -= 1;
+                        name.push('>');
+                    }
+                    _ => name.push_str(&Self::token_text(&token)),
+                }
+            }
+        }
+        Ok(TypeHint { name })
+    }
+
+    fn token_text(token: &Token) -> String {
+        match token {
+            Token::Ident(value) => value.clone(),
+            Token::Int(value) => value.to_string(),
+            Token::String(value) => format!("{:?}", value),
+            Token::Let => "let".into(),
+            Token::Const => "const".into(),
+            Token::Return => "return".into(),
+            Token::Fn => "fn".into(),
+            Token::If => "if".into(),
+            Token::Else => "else".into(),
+            Token::While => "while".into(),
+            Token::Contract => "contract".into(),
+            Token::State => "state".into(),
+            Token::Function => "function".into(),
+            Token::Capability => "capability".into(),
+            Token::Policy => "policy".into(),
+            Token::Require => "require".into(),
+            Token::Use => "use".into(),
+            Token::Struct => "struct".into(),
+            Token::Enum => "enum".into(),
+            Token::Pipe => "|".into(),
+            Token::Ampersand => "&".into(),
+            Token::Assign => "=".into(),
+            Token::Eq => "==".into(),
+            Token::NotEq => "!=".into(),
+            Token::Bang => "!".into(),
+            Token::Lt => "<".into(),
+            Token::Gt => ">".into(),
+            Token::LtEq => "<=".into(),
+            Token::GtEq => ">=".into(),
+            Token::Plus => "+".into(),
+            Token::Minus => "-".into(),
+            Token::Arrow => "->".into(),
+            Token::Star => "*".into(),
+            Token::Slash => "/".into(),
+            Token::Percent => "%".into(),
+            Token::Colon => ":".into(),
+            Token::LParen => "(".into(),
+            Token::RParen => ")".into(),
+            Token::LBracket => "[".into(),
+            Token::RBracket => "]".into(),
+            Token::LBrace => "{".into(),
+            Token::RBrace => "}".into(),
+            Token::Comma => ", ".into(),
+            Token::Semi => ";".into(),
+            Token::At => "@".into(),
+            Token::Dot => ".".into(),
+            Token::Question => "?".into(),
+            Token::Eof => String::new(),
+        }
+    }
+
+    fn expect_name(&mut self, what: &str) -> Result<String, ParseError> {
+        match self.cur() {
+            Token::Ident(name) => {
+                self.pos += 1;
+                Ok(name)
             }
             other => Err(ParseError {
-                message: format!("Typ erwartet, fand {:?}", other),
+                message: format!("{what} erwartet, fand {:?}", other),
             }),
+        }
+    }
+
+    fn use_decl(&mut self) -> Result<Stmt, ParseError> {
+        self.pos += 1;
+        let mut path = self.expect_name("Importpfad")?;
+        while self.cur() == Token::Colon {
+            self.pos += 1;
+            if self.cur() != Token::Colon {
+                return Err(ParseError {
+                    message: "':' erwartet in Importpfad '::'".into(),
+                });
+            }
+            self.pos += 1;
+            path.push_str("::");
+            path.push_str(&self.expect_name("Importpfadsegment")?);
+        }
+        if self.cur() == Token::Semi {
+            self.pos += 1;
+        }
+        Ok(Stmt::Use { path })
+    }
+
+    fn struct_decl(&mut self) -> Result<Stmt, ParseError> {
+        self.pos += 1;
+        let name = self.expect_name("Struct-Name")?;
+        if self.cur() != Token::LBrace {
+            return Err(ParseError {
+                message: "'{' nach struct erwartet".into(),
+            });
+        }
+        self.pos += 1;
+        let mut fields = Vec::new();
+        while self.cur() != Token::RBrace {
+            if self.cur() == Token::Eof {
+                return Err(ParseError {
+                    message: "'}' in struct erwartet".into(),
+                });
+            }
+            let field = self.expect_name("Struct-Feld")?;
+            if self.cur() != Token::Colon {
+                return Err(ParseError {
+                    message: "':' nach Struct-Feld erwartet".into(),
+                });
+            }
+            self.pos += 1;
+            let ty = self.simple_type()?;
+            fields.push((field, ty));
+            match self.cur() {
+                Token::Comma | Token::Semi => self.pos += 1,
+                Token::RBrace => {}
+                other => {
+                    return Err(ParseError {
+                        message: format!(
+                            "',' oder '}}' nach Struct-Feld erwartet, fand {:?}",
+                            other
+                        ),
+                    })
+                }
+            }
+        }
+        self.pos += 1;
+        if self.cur() == Token::Semi {
+            self.pos += 1;
+        }
+        Ok(Stmt::Struct { name, fields })
+    }
+
+    fn enum_decl(&mut self) -> Result<Stmt, ParseError> {
+        self.pos += 1;
+        let name = self.expect_name("Enum-Name")?;
+        if self.cur() != Token::LBrace {
+            return Err(ParseError {
+                message: "'{' nach enum erwartet".into(),
+            });
+        }
+        self.pos += 1;
+        let mut variants = Vec::new();
+        while self.cur() != Token::RBrace {
+            if self.cur() == Token::Eof {
+                return Err(ParseError {
+                    message: "'}' in enum erwartet".into(),
+                });
+            }
+            variants.push(self.expect_name("Enum-Variante")?);
+            if self.cur() == Token::LParen {
+                let mut depth = 0usize;
+                while self.cur() != Token::Eof {
+                    let token = self.cur();
+                    self.pos += 1;
+                    if token == Token::LParen {
+                        depth += 1;
+                    }
+                    if token == Token::RParen {
+                        depth = depth.saturating_sub(1);
+                        if depth == 0 {
+                            break;
+                        }
+                    }
+                }
+            }
+            match self.cur() {
+                Token::Comma | Token::Semi => self.pos += 1,
+                Token::RBrace => {}
+                other => {
+                    return Err(ParseError {
+                        message: format!(
+                            "',' oder '}}' nach Enum-Variante erwartet, fand {:?}",
+                            other
+                        ),
+                    })
+                }
+            }
+        }
+        self.pos += 1;
+        if self.cur() == Token::Semi {
+            self.pos += 1;
+        }
+        Ok(Stmt::Enum { name, variants })
+    }
+
+    fn contract_decl(&mut self) -> Result<Stmt, ParseError> {
+        self.pos += 1;
+        let name = self.expect_name("Contract-Name")?;
+        let mut bases = Vec::new();
+        if self.cur() == Token::Colon {
+            self.pos += 1;
+            loop {
+                bases.push(self.expect_name("Contract-Basis")?);
+                while self.cur() == Token::Colon {
+                    self.pos += 1;
+                    if self.cur() != Token::Colon {
+                        return Err(ParseError {
+                            message: "'::' erwartet im Contract-Basispfad".into(),
+                        });
+                    }
+                    self.pos += 1;
+                    let segment = self.expect_name("Contract-Basispfadsegment")?;
+                    bases.last_mut().unwrap().push_str("::");
+                    bases.last_mut().unwrap().push_str(&segment);
+                }
+                if self.cur() != Token::Comma {
+                    break;
+                }
+                self.pos += 1;
+            }
+        }
+        if self.cur() != Token::LBrace {
+            return Err(ParseError {
+                message: "'{' nach contract erwartet".into(),
+            });
+        }
+        self.pos += 1;
+        let mut depth = 1usize;
+        let mut body_tokens = Vec::new();
+        while depth > 0 {
+            let token = self.cur();
+            if token == Token::Eof {
+                return Err(ParseError {
+                    message: "Nicht geschlossener contract-Block".into(),
+                });
+            }
+            self.pos += 1;
+            match token {
+                Token::LBrace => {
+                    depth += 1;
+                    body_tokens.push(Self::token_text(&Token::LBrace));
+                }
+                Token::RBrace => {
+                    depth -= 1;
+                    if depth > 0 {
+                        body_tokens.push(Self::token_text(&Token::RBrace));
+                    }
+                }
+                _ => body_tokens.push(Self::token_text(&token)),
+            }
+        }
+        Ok(Stmt::Contract {
+            name,
+            bases,
+            body_tokens,
+        })
+    }
+
+    fn skip_file_annotations(&mut self) {
+        while self.cur() != Token::Eof {
+            if matches!(
+                self.cur(),
+                Token::Let
+                    | Token::Const
+                    | Token::Fn
+                    | Token::Use
+                    | Token::Struct
+                    | Token::Enum
+                    | Token::Contract
+            ) {
+                break;
+            }
+            self.pos += 1;
         }
     }
 
@@ -368,7 +768,15 @@ impl Parser {
         match self.cur() {
             Token::Int(v) => {
                 self.pos += 1;
-                Ok(Expr::Int(v as i64))
+                if v <= i64::MAX as u128 {
+                    Ok(Expr::Int(v as i64))
+                } else {
+                    Ok(Expr::BigInt(v))
+                }
+            }
+            Token::String(value) => {
+                self.pos += 1;
+                Ok(Expr::String(value))
             }
             Token::Ident(n) => {
                 self.pos += 1;
@@ -464,6 +872,64 @@ mod tests {
         let j = p.to_json();
         assert!(j.contains("\"op\":\"<\""));
         assert!(j.find("\"op\":\"<\"").unwrap() > j.find("\"op\":\"+\"").unwrap());
+    }
+
+    #[test]
+    fn native_import_struct_enum_and_contract_ast() {
+        let source = r#"
+            use ATC::Types::Address
+            enum Status { Open, Closed }
+            struct Entry { owner: Address, balances: Map<Address, u128> }
+            contract Vault : BaseVault {
+                state balances: Map<Address, u128>
+                fn transfer(to: Address, amount: u128) -> bool {
+                    if amount > 0 { self.balances[to] += amount }
+                    return true
+                }
+            }
+        "#;
+        let program = parse_program(source).expect("native declarations must parse");
+        let json = program.to_json();
+        assert!(json.contains("\"kind\":\"UseDeclaration\",\"path\":\"ATC::Types::Address\""));
+        assert!(json.contains("\"kind\":\"EnumDeclaration\",\"name\":\"Status\""));
+        assert!(json.contains("\"kind\":\"StructDeclaration\",\"name\":\"Entry\""));
+        assert!(json.contains("\"name\":\"Map<Address, u128>\""));
+        assert!(json.contains("\"kind\":\"ContractDeclaration\",\"name\":\"Vault\""));
+        assert!(json.contains("\"bases\":[\"BaseVault\"]"));
+    }
+
+    #[test]
+    fn native_function_body_falls_back_to_balanced_token_ast() {
+        let source = r#"
+            fn tokenize(s: string) -> ScanResult {
+                let tokens: List<string> = []
+                if s.len() > 0 && s.slice(0, 1) == "0" {
+                    tokens.push("zero")
+                }
+                return tokens
+            }
+        "#;
+        let program = parse_program(source).expect("native function body must parse");
+        assert!(program
+            .to_json()
+            .contains("\"kind\":\"NativeFunctionDef\",\"name\":\"tokenize\""));
+    }
+
+    #[test]
+    fn string_literal_is_preserved_in_ast_json() {
+        let program = parse_program("const LABEL: string = \"A-Town\"").unwrap();
+        assert!(program
+            .to_json()
+            .contains("\"kind\":\"StringLiteral\",\"value\":\"A-Town\""));
+    }
+
+    #[test]
+    fn large_contract_integer_is_preserved_without_i64_wraparound() {
+        let program = parse_program("const MAX_SUPPLY: u128 = 100_000_000_000_000_000_000_000_000")
+            .expect("u128 contract literal must parse");
+        assert!(program
+            .to_json()
+            .contains("\"value\":100000000000000000000000000"));
     }
 
     #[test]

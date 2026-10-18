@@ -8,7 +8,7 @@
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
-    Int(u64),
+    Int(u128),
     Ident(String),
     Let,
     Const,
@@ -23,6 +23,11 @@ pub enum Token {
     Capability,
     Policy,
     Require,
+    Use,
+    Struct,
+    Enum,
+    Pipe,
+    Ampersand,
     Assign,
     Eq,
     NotEq,
@@ -40,6 +45,8 @@ pub enum Token {
     Colon,
     LParen,
     RParen,
+    LBracket,
+    RBracket,
     LBrace,
     RBrace,
     Comma,
@@ -47,6 +54,7 @@ pub enum Token {
     Eof,
     At,
     Dot,
+    Question,
     String(String),
 }
 
@@ -119,11 +127,16 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
                 }
             }
             '%' => tokens.push(Token::Percent),
+            '|' => tokens.push(Token::Pipe),
+            '&' => tokens.push(Token::Ampersand),
             ':' => tokens.push(Token::Colon),
             '@' => tokens.push(Token::At),
             '.' => tokens.push(Token::Dot),
+            '?' => tokens.push(Token::Question),
             '(' => tokens.push(Token::LParen),
             ')' => tokens.push(Token::RParen),
+            '[' => tokens.push(Token::LBracket),
+            ']' => tokens.push(Token::RBracket),
             '{' => tokens.push(Token::LBrace),
             '}' => tokens.push(Token::RBrace),
             ',' => tokens.push(Token::Comma),
@@ -154,11 +167,30 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
                 tokens.push(Token::String(value));
             }
             '0'..='9' => {
-                let mut n: u64 = (ch as u64) - ('0' as u64);
+                let mut n: u128 = (ch as u128) - ('0' as u128);
                 while let Some(&(_, c)) = chars.peek() {
                     if c.is_ascii_digit() {
-                        n = (n * 10) + ((c as u64) - ('0' as u64));
+                        let digit_pos = chars.peek().map(|(p, _)| *p).unwrap_or(pos);
+                        n = n
+                            .checked_mul(10)
+                            .and_then(|value| value.checked_add((c as u128) - ('0' as u128)))
+                            .ok_or(LexError {
+                                pos: digit_pos,
+                                ch: c,
+                            })?;
                         chars.next();
+                    } else if c == '_' {
+                        let underscore_pos = chars.peek().map(|(p, _)| *p).unwrap_or(pos);
+                        chars.next();
+                        match chars.peek() {
+                            Some((_, next)) if next.is_ascii_digit() => {}
+                            _ => {
+                                return Err(LexError {
+                                    pos: underscore_pos,
+                                    ch: '_',
+                                })
+                            }
+                        }
                     } else {
                         break;
                     }
@@ -190,6 +222,9 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
                     "capability" => tokens.push(Token::Capability),
                     "policy" => tokens.push(Token::Policy),
                     "require" => tokens.push(Token::Require),
+                    "use" => tokens.push(Token::Use),
+                    "struct" => tokens.push(Token::Struct),
+                    "enum" => tokens.push(Token::Enum),
                     _ => tokens.push(Token::Ident(ident)),
                 }
             }
@@ -274,6 +309,48 @@ mod tests {
                 Token::Semi,
                 Token::Eof,
             ]
+        );
+    }
+
+    #[test]
+    fn native_contract_operators_and_declarations() {
+        let tokens = tokenize("use ATC::Types::Address; struct Entry { value: u128 } enum Status { Open, Closed } let mask = a | b & c;").unwrap();
+        assert!(tokens.contains(&Token::Use));
+        assert!(tokens.contains(&Token::Struct));
+        assert!(tokens.contains(&Token::Enum));
+        assert!(tokens.contains(&Token::Pipe));
+        assert!(tokens.contains(&Token::Ampersand));
+    }
+
+    #[test]
+    fn integer_literals_allow_digit_separators() {
+        assert!(tokenize("let supply = 21_000_000;")
+            .unwrap()
+            .contains(&Token::Int(21000000)));
+        assert_eq!(
+            tokenize("let bad = 1_;"),
+            Err(LexError { pos: 11, ch: '_' })
+        );
+    }
+
+    #[test]
+    fn square_brackets_support_list_literals_and_indexing() {
+        let tokens = tokenize("let xs: List<Hash> = []; xs[addr] = entry;").unwrap();
+        assert!(tokens.contains(&Token::LBracket));
+        assert!(tokens.contains(&Token::RBracket));
+        assert_eq!(
+            tokens
+                .iter()
+                .filter(|token| **token == Token::LBracket)
+                .count(),
+            2
+        );
+        assert_eq!(
+            tokens
+                .iter()
+                .filter(|token| **token == Token::RBracket)
+                .count(),
+            2
         );
     }
 

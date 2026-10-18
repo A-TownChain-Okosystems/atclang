@@ -195,16 +195,32 @@ impl<'a> FnLowerer<'a> {
                 self.out[jif] = Instruction::JumpIfFalse(d_fwd);
                 Ok(())
             }
-            Stmt::Fn(_) => Err(LowerError::new(format!(
+            Stmt::Fn(_) | Stmt::NativeFunction { .. } => Err(LowerError::new(format!(
                 "Funktionsdefinition ist nur auf Programmebene erlaubt (in {})",
                 self.function_name
             ))),
+            Stmt::Use { .. }
+            | Stmt::Struct { .. }
+            | Stmt::Enum { .. }
+            | Stmt::Contract { .. } => Err(LowerError::new(
+                "Native Deklaration ist nur Metadatum und kann nicht als Statement ausgefuehrt werden",
+            )),
         }
     }
 
     fn lower_expr(&mut self, e: &Expr) -> Result<(), LowerError> {
         match e {
             Expr::Int(v) => self.out.push(Instruction::ConstI64(*v)),
+            Expr::BigInt(_) => {
+                return Err(LowerError::new(
+                    "Integerliteral liegt ausserhalb des aktuellen i64-VM-Ausfuehrungsbereichs",
+                ))
+            }
+            Expr::String(_) => {
+                return Err(LowerError::new(
+                    "Stringliteral wird vom aktuellen i64-VM-Ausfuehrungsprofil nicht ausgefuehrt",
+                ))
+            }
             Expr::Ident(name) => match self.locals.get(name) {
                 Some(i) => self.out.push(Instruction::LoadLocal(*i)),
                 None => {
@@ -380,7 +396,15 @@ pub fn lower_program(prog: &Program) -> Result<CompiledProgram, LowerError> {
     };
     let mut main_has_code = false;
     for s in &prog.statements {
-        if let Stmt::Fn(_) = s {
+        if matches!(
+            s,
+            Stmt::Fn(_)
+                | Stmt::NativeFunction { .. }
+                | Stmt::Use { .. }
+                | Stmt::Struct { .. }
+                | Stmt::Enum { .. }
+                | Stmt::Contract { .. }
+        ) {
             continue;
         }
         main_has_code = true;
@@ -420,13 +444,16 @@ mod tests {
     fn compiled_program_symbol_surface() {
         // Bound catalog symbols exercised here: CompiledProgram::function_count
         // und CompiledProgram::verify.
-        let prog = crate::parser::parse_program("fn main() -> i64 { return 1; }")
-            .expect("Parse-Fehler");
+        let prog =
+            crate::parser::parse_program("fn main() -> i64 { return 1; }").expect("Parse-Fehler");
         let compiled = lower_program(&prog).expect("Lowering-Fehler");
         assert!(compiled.function_count() >= 1);
         assert!(compiled.verify().is_ok());
         // Leeres Programm und ungueltige Entry-Funktion schlagen fehl
-        let empty = CompiledProgram { functions: vec![], entry: 0 };
+        let empty = CompiledProgram {
+            functions: vec![],
+            entry: 0,
+        };
         assert!(empty.verify().is_err());
     }
 
