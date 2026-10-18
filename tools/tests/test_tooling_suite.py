@@ -44,6 +44,7 @@ AUD = "tools/ci_independent_audit.py"
 
 # ------------------------------------------------------ determinism_check.py
 
+
 class TestDeterminismCheck:
     def test_load_allowlist(self, tmp_path):
         m = load(DET)
@@ -51,10 +52,7 @@ class TestDeterminismCheck:
         assert m.load_allowlist(str(tmp_path)) == []
         al = tmp_path / "determinism_allowlist.yaml"
         al.write_text(
-            "allowlist:\n"
-            "  - file: src/foo.rs\n"
-            "    line: 42\n"
-            "  - file: src/bar.rs\n",
+            "allowlist:\n  - file: src/foo.rs\n    line: 42\n  - file: src/bar.rs\n",
             encoding="utf-8",
         )
         entries = m.load_allowlist(str(tmp_path))
@@ -85,9 +83,7 @@ class TestDeterminismCheck:
         m = load(DET)
         src = tmp_path / "sample.rs"
         src.write_text(
-            "// Instant::now nur im Kommentar\n"
-            'let s = "rand:: im String";\n'
-            "fn main() {}\n",
+            '// Instant::now nur im Kommentar\nlet s = "rand:: im String";\nfn main() {}\n',
             encoding="utf-8",
         )
         views = m.code_view_rust(str(src))
@@ -98,8 +94,7 @@ class TestDeterminismCheck:
     def test_scan_sources_finds_real_violations_only(self, tmp_path):
         m = load(DET)
         (tmp_path / "dirty.py").write_text(
-            "import random\n"
-            "print(random.random())\n",
+            "import random\nprint(random.random())\n",
             encoding="utf-8",
         )
         findings = m.scan_sources(str(tmp_path), "python")
@@ -117,13 +112,11 @@ class TestDeterminismCheck:
 
     def test_run_tests_and_normalize_output(self, tmp_path):
         m = load(DET)
-        out = m.run_tests(
-            'python3 -c "print(\'ok in 0.42s\')"', str(tmp_path)
-        )
+        out = m.run_tests("python3 -c \"print('ok in 0.42s')\"", str(tmp_path))
         assert b"ok" in out
         assert b"in Xs" in out  # Laufzeit normalisiert
         # byte-identisch bei zweitem Lauf (REQ-ENG-012)
-        out2 = m.run_tests('python3 -c "print(\'ok in 9.99s\')"', str(tmp_path))
+        out2 = m.run_tests("python3 -c \"print('ok in 9.99s')\"", str(tmp_path))
         assert out == out2
         raw = m.normalize_output(b"3 passed in 1.23s")
         assert raw == b"3 passed in Xs"
@@ -131,7 +124,9 @@ class TestDeterminismCheck:
     def test_main_smoke_clean_and_dirty(self, tmp_path):
         proc = subprocess.run(
             [sys.executable, os.path.join(REPO, DET), "--lang", "python"],
-            capture_output=True, text=True, cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
+            cwd=str(tmp_path),
         )
         assert proc.returncode == 0, proc.stdout + proc.stderr
         (tmp_path / "dirty.py").write_text("import random\n", encoding="utf-8")
@@ -143,6 +138,7 @@ class TestDeterminismCheck:
 
 
 # --------------------------------------------------- ci_independent_audit.py
+
 
 class TestCiIndependentAudit:
     def test_read_fail_files(self):
@@ -175,7 +171,9 @@ class TestCiIndependentAudit:
     def test_main_smoke(self):
         proc = subprocess.run(
             [sys.executable, os.path.join(REPO, AUD)],
-            capture_output=True, text=True, cwd=REPO,
+            capture_output=True,
+            text=True,
+            cwd=REPO,
         )
         assert proc.returncode in (0, 1), proc.stdout + proc.stderr
         assert "Findings:" in proc.stdout
