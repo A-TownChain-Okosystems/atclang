@@ -59,15 +59,31 @@ pub enum Stmt {
     Let(LetStmt),
     Fn(FunctionDef),
     /// Native function syntax preserved when it exceeds the executable subset.
-    NativeFunction { name: String, signature_tokens: Vec<String>, body_tokens: Vec<String> },
+    NativeFunction {
+        name: String,
+        signature_tokens: Vec<String>,
+        body_tokens: Vec<String>,
+    },
     /// Import path from a native `use A::B` declaration.
-    Use { path: String },
+    Use {
+        path: String,
+    },
     /// Native data declaration; generic field types are preserved textually.
-    Struct { name: String, fields: Vec<(String, TypeHint)> },
+    Struct {
+        name: String,
+        fields: Vec<(String, TypeHint)>,
+    },
     /// Native enum declaration and its variant names.
-    Enum { name: String, variants: Vec<String> },
+    Enum {
+        name: String,
+        variants: Vec<String>,
+    },
     /// Contract body retained as a balanced token stream until semantic lowering exists.
-    Contract { name: String, bases: Vec<String>, body_tokens: Vec<String> },
+    Contract {
+        name: String,
+        bases: Vec<String>,
+        body_tokens: Vec<String>,
+    },
     Return {
         value: Option<Expr>,
     },
@@ -224,18 +240,30 @@ fn stmt_json(s: &Stmt, out: &mut String) {
     match s {
         Stmt::Let(l) => let_json(l, out),
         Stmt::Fn(f) => fn_json(f, out),
-        Stmt::NativeFunction { name, signature_tokens, body_tokens } => {
+        Stmt::NativeFunction {
+            name,
+            signature_tokens,
+            body_tokens,
+        } => {
             out.push_str("{\"body_tokens\":[");
             for (i, token) in body_tokens.iter().enumerate() {
-                if i > 0 { out.push(','); }
-                out.push('"'); out.push_str(&esc(token)); out.push('"');
+                if i > 0 {
+                    out.push(',');
+                }
+                out.push('"');
+                out.push_str(&esc(token));
+                out.push('"');
             }
             out.push_str("],\"kind\":\"NativeFunctionDef\",\"name\":\"");
             out.push_str(&esc(name));
             out.push_str("\",\"signature_tokens\":[");
             for (i, token) in signature_tokens.iter().enumerate() {
-                if i > 0 { out.push(','); }
-                out.push('"'); out.push_str(&esc(token)); out.push('"');
+                if i > 0 {
+                    out.push(',');
+                }
+                out.push('"');
+                out.push_str(&esc(token));
+                out.push('"');
             }
             out.push_str("]}");
         }
@@ -247,7 +275,9 @@ fn stmt_json(s: &Stmt, out: &mut String) {
         Stmt::Struct { name, fields } => {
             out.push_str("{\"fields\":[");
             for (i, (field, ty)) in fields.iter().enumerate() {
-                if i > 0 { out.push(','); }
+                if i > 0 {
+                    out.push(',');
+                }
                 out.push_str("{\"kind\":\"FieldDeclaration\",\"name\":\"");
                 out.push_str(&esc(field));
                 out.push_str("\",\"type_hint\":");
@@ -263,22 +293,34 @@ fn stmt_json(s: &Stmt, out: &mut String) {
             out.push_str(&esc(name));
             out.push_str("\",\"variants\":[");
             for (i, variant) in variants.iter().enumerate() {
-                if i > 0 { out.push(','); }
+                if i > 0 {
+                    out.push(',');
+                }
                 out.push('"');
                 out.push_str(&esc(variant));
                 out.push('"');
             }
             out.push_str("]}");
         }
-        Stmt::Contract { name, bases, body_tokens } => {
+        Stmt::Contract {
+            name,
+            bases,
+            body_tokens,
+        } => {
             out.push_str("{\"bases\":[");
             for (i, base) in bases.iter().enumerate() {
-                if i > 0 { out.push(','); }
-                out.push('"'); out.push_str(&esc(base)); out.push('"');
+                if i > 0 {
+                    out.push(',');
+                }
+                out.push('"');
+                out.push_str(&esc(base));
+                out.push('"');
             }
             out.push_str("],\"body_tokens\":[");
             for (i, token) in body_tokens.iter().enumerate() {
-                if i > 0 { out.push(','); }
+                if i > 0 {
+                    out.push(',');
+                }
                 out.push('"');
                 out.push_str(&esc(token));
                 out.push('"');

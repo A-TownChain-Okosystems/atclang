@@ -248,7 +248,9 @@ impl Parser {
         while self.cur() == Token::Colon {
             self.pos += 1;
             if self.cur() != Token::Colon {
-                return Err(ParseError { message: "':' erwartet in Importpfad '::'".into() });
+                return Err(ParseError {
+                    message: "':' erwartet in Importpfad '::'".into(),
+                });
             }
             self.pos += 1;
             path.push_str("::");
@@ -264,17 +266,23 @@ impl Parser {
         self.pos += 1;
         let name = self.expect_name("Struct-Name")?;
         if self.cur() != Token::LBrace {
-            return Err(ParseError { message: "'{' nach struct erwartet".into() });
+            return Err(ParseError {
+                message: "'{' nach struct erwartet".into(),
+            });
         }
         self.pos += 1;
         let mut fields = Vec::new();
         while self.cur() != Token::RBrace {
             if self.cur() == Token::Eof {
-                return Err(ParseError { message: "'}' in struct erwartet".into() });
+                return Err(ParseError {
+                    message: "'}' in struct erwartet".into(),
+                });
             }
             let field = self.expect_name("Struct-Feld")?;
             if self.cur() != Token::Colon {
-                return Err(ParseError { message: "':' nach Struct-Feld erwartet".into() });
+                return Err(ParseError {
+                    message: "':' nach Struct-Feld erwartet".into(),
+                });
             }
             self.pos += 1;
             let ty = self.simple_type()?;
@@ -282,11 +290,20 @@ impl Parser {
             match self.cur() {
                 Token::Comma | Token::Semi => self.pos += 1,
                 Token::RBrace => {}
-                other => return Err(ParseError { message: format!("',' oder '}}' nach Struct-Feld erwartet, fand {:?}", other) }),
+                other => {
+                    return Err(ParseError {
+                        message: format!(
+                            "',' oder '}}' nach Struct-Feld erwartet, fand {:?}",
+                            other
+                        ),
+                    })
+                }
             }
         }
         self.pos += 1;
-        if self.cur() == Token::Semi { self.pos += 1; }
+        if self.cur() == Token::Semi {
+            self.pos += 1;
+        }
         Ok(Stmt::Struct { name, fields })
     }
 
@@ -294,13 +311,17 @@ impl Parser {
         self.pos += 1;
         let name = self.expect_name("Enum-Name")?;
         if self.cur() != Token::LBrace {
-            return Err(ParseError { message: "'{' nach enum erwartet".into() });
+            return Err(ParseError {
+                message: "'{' nach enum erwartet".into(),
+            });
         }
         self.pos += 1;
         let mut variants = Vec::new();
         while self.cur() != Token::RBrace {
             if self.cur() == Token::Eof {
-                return Err(ParseError { message: "'}' in enum erwartet".into() });
+                return Err(ParseError {
+                    message: "'}' in enum erwartet".into(),
+                });
             }
             variants.push(self.expect_name("Enum-Variante")?);
             if self.cur() == Token::LParen {
@@ -308,21 +329,34 @@ impl Parser {
                 while self.cur() != Token::Eof {
                     let token = self.cur();
                     self.pos += 1;
-                    if token == Token::LParen { depth += 1; }
+                    if token == Token::LParen {
+                        depth += 1;
+                    }
                     if token == Token::RParen {
                         depth = depth.saturating_sub(1);
-                        if depth == 0 { break; }
+                        if depth == 0 {
+                            break;
+                        }
                     }
                 }
             }
             match self.cur() {
                 Token::Comma | Token::Semi => self.pos += 1,
                 Token::RBrace => {}
-                other => return Err(ParseError { message: format!("',' oder '}}' nach Enum-Variante erwartet, fand {:?}", other) }),
+                other => {
+                    return Err(ParseError {
+                        message: format!(
+                            "',' oder '}}' nach Enum-Variante erwartet, fand {:?}",
+                            other
+                        ),
+                    })
+                }
             }
         }
         self.pos += 1;
-        if self.cur() == Token::Semi { self.pos += 1; }
+        if self.cur() == Token::Semi {
+            self.pos += 1;
+        }
         Ok(Stmt::Enum { name, variants })
     }
 
@@ -353,7 +387,9 @@ impl Parser {
             }
         }
         if self.cur() != Token::LBrace {
-            return Err(ParseError { message: "'{' nach contract erwartet".into() });
+            return Err(ParseError {
+                message: "'{' nach contract erwartet".into(),
+            });
         }
         self.pos += 1;
         let mut depth = 1usize;
@@ -361,7 +397,9 @@ impl Parser {
         while depth > 0 {
             let token = self.cur();
             if token == Token::Eof {
-                return Err(ParseError { message: "Nicht geschlossener contract-Block".into() });
+                return Err(ParseError {
+                    message: "Nicht geschlossener contract-Block".into(),
+                });
             }
             self.pos += 1;
             match token {
@@ -371,17 +409,32 @@ impl Parser {
                 }
                 Token::RBrace => {
                     depth -= 1;
-                    if depth > 0 { body_tokens.push(Self::token_text(&Token::RBrace)); }
+                    if depth > 0 {
+                        body_tokens.push(Self::token_text(&Token::RBrace));
+                    }
                 }
                 _ => body_tokens.push(Self::token_text(&token)),
             }
         }
-        Ok(Stmt::Contract { name, bases, body_tokens })
+        Ok(Stmt::Contract {
+            name,
+            bases,
+            body_tokens,
+        })
     }
 
     fn skip_file_annotations(&mut self) {
         while self.cur() != Token::Eof {
-            if matches!(self.cur(), Token::Let | Token::Const | Token::Fn | Token::Use | Token::Struct | Token::Enum | Token::Contract) {
+            if matches!(
+                self.cur(),
+                Token::Let
+                    | Token::Const
+                    | Token::Fn
+                    | Token::Use
+                    | Token::Struct
+                    | Token::Enum
+                    | Token::Contract
+            ) {
                 break;
             }
             self.pos += 1;
@@ -836,21 +889,26 @@ mod tests {
             }
         "#;
         let program = parse_program(source).expect("native function body must parse");
-        assert!(program.to_json().contains("\"kind\":\"NativeFunctionDef\",\"name\":\"tokenize\""));
+        assert!(program
+            .to_json()
+            .contains("\"kind\":\"NativeFunctionDef\",\"name\":\"tokenize\""));
     }
 
     #[test]
     fn string_literal_is_preserved_in_ast_json() {
         let program = parse_program("const LABEL: string = \"A-Town\"").unwrap();
-        assert!(program.to_json().contains("\"kind\":\"StringLiteral\",\"value\":\"A-Town\""));
+        assert!(program
+            .to_json()
+            .contains("\"kind\":\"StringLiteral\",\"value\":\"A-Town\""));
     }
 
     #[test]
     fn large_contract_integer_is_preserved_without_i64_wraparound() {
-        let program = parse_program(
-            "const MAX_SUPPLY: u128 = 100_000_000_000_000_000_000_000_000",
-        ).expect("u128 contract literal must parse");
-        assert!(program.to_json().contains("\"value\":100000000000000000000000000"));
+        let program = parse_program("const MAX_SUPPLY: u128 = 100_000_000_000_000_000_000_000_000")
+            .expect("u128 contract literal must parse");
+        assert!(program
+            .to_json()
+            .contains("\"value\":100000000000000000000000000"));
     }
 
     #[test]

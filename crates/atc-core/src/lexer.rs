@@ -171,16 +171,25 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
                 while let Some(&(_, c)) = chars.peek() {
                     if c.is_ascii_digit() {
                         let digit_pos = chars.peek().map(|(p, _)| *p).unwrap_or(pos);
-                        n = n.checked_mul(10)
+                        n = n
+                            .checked_mul(10)
                             .and_then(|value| value.checked_add((c as u128) - ('0' as u128)))
-                            .ok_or(LexError { pos: digit_pos, ch: c })?;
+                            .ok_or(LexError {
+                                pos: digit_pos,
+                                ch: c,
+                            })?;
                         chars.next();
                     } else if c == '_' {
                         let underscore_pos = chars.peek().map(|(p, _)| *p).unwrap_or(pos);
                         chars.next();
                         match chars.peek() {
                             Some((_, next)) if next.is_ascii_digit() => {}
-                            _ => return Err(LexError { pos: underscore_pos, ch: '_' }),
+                            _ => {
+                                return Err(LexError {
+                                    pos: underscore_pos,
+                                    ch: '_',
+                                })
+                            }
                         }
                     } else {
                         break;
@@ -303,7 +312,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn native_contract_operators_and_declarations() {
         let tokens = tokenize("use ATC::Types::Address; struct Entry { value: u128 } enum Status { Open, Closed } let mask = a | b & c;").unwrap();
@@ -316,18 +324,34 @@ mod tests {
 
     #[test]
     fn integer_literals_allow_digit_separators() {
-        assert!(tokenize("let supply = 21_000_000;").unwrap().contains(&Token::Int(21000000)));
-        assert_eq!(tokenize("let bad = 1_;"), Err(LexError { pos: 11, ch: '_' }));
+        assert!(tokenize("let supply = 21_000_000;")
+            .unwrap()
+            .contains(&Token::Int(21000000)));
+        assert_eq!(
+            tokenize("let bad = 1_;"),
+            Err(LexError { pos: 11, ch: '_' })
+        );
     }
-
 
     #[test]
     fn square_brackets_support_list_literals_and_indexing() {
         let tokens = tokenize("let xs: List<Hash> = []; xs[addr] = entry;").unwrap();
         assert!(tokens.contains(&Token::LBracket));
         assert!(tokens.contains(&Token::RBracket));
-        assert_eq!(tokens.iter().filter(|token| **token == Token::LBracket).count(), 2);
-        assert_eq!(tokens.iter().filter(|token| **token == Token::RBracket).count(), 2);
+        assert_eq!(
+            tokens
+                .iter()
+                .filter(|token| **token == Token::LBracket)
+                .count(),
+            2
+        );
+        assert_eq!(
+            tokens
+                .iter()
+                .filter(|token| **token == Token::RBracket)
+                .count(),
+            2
+        );
     }
 
     #[test]
