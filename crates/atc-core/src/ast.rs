@@ -10,6 +10,7 @@ pub enum Expr {
     Int(i64),
     /// Exact unsigned literals beyond the VM's current i64 execution subset.
     BigInt(u128),
+    String(String),
     Ident(String),
     Unary {
         op: String,
@@ -57,6 +58,8 @@ pub struct FunctionDef {
 pub enum Stmt {
     Let(LetStmt),
     Fn(FunctionDef),
+    /// Native function syntax preserved when it exceeds the executable subset.
+    NativeFunction { name: String, signature_tokens: Vec<String>, body_tokens: Vec<String> },
     /// Import path from a native `use A::B` declaration.
     Use { path: String },
     /// Native data declaration; generic field types are preserved textually.
@@ -64,7 +67,7 @@ pub enum Stmt {
     /// Native enum declaration and its variant names.
     Enum { name: String, variants: Vec<String> },
     /// Contract body retained as a balanced token stream until semantic lowering exists.
-    Contract { name: String, body_tokens: Vec<String> },
+    Contract { name: String, bases: Vec<String>, body_tokens: Vec<String> },
     Return {
         value: Option<Expr>,
     },
@@ -95,6 +98,12 @@ fn esc(s: &str) -> String {
         match c {
             '"' => out.push_str("\\\""),
             '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if c.is_control() => {
+                out.push_str(&format!("\\u{:04x}", c as u32));
+            }
             _ => out.push(c),
         }
     }
@@ -112,6 +121,11 @@ fn expr_json(e: &Expr, out: &mut String) {
             out.push_str("{\"kind\":\"IntLiteral\",\"value\":");
             out.push_str(&v.to_string());
             out.push('}');
+        }
+        Expr::String(value) => {
+            out.push_str("{\"kind\":\"StringLiteral\",\"value\":\"");
+            out.push_str(&esc(value));
+            out.push_str("\"}");
         }
         Expr::Ident(name) => {
             out.push_str("{\"kind\":\"Identifier\",\"name\":\"");
@@ -210,6 +224,21 @@ fn stmt_json(s: &Stmt, out: &mut String) {
     match s {
         Stmt::Let(l) => let_json(l, out),
         Stmt::Fn(f) => fn_json(f, out),
+        Stmt::NativeFunction { name, signature_tokens, body_tokens } => {
+            out.push_str("{\"body_tokens\":[");
+            for (i, token) in body_tokens.iter().enumerate() {
+                if i > 0 { out.push(','); }
+                out.push('"'); out.push_str(&esc(token)); out.push('"');
+            }
+            out.push_str("],\"kind\":\"NativeFunctionDef\",\"name\":\"");
+            out.push_str(&esc(name));
+            out.push_str("\",\"signature_tokens\":[");
+            for (i, token) in signature_tokens.iter().enumerate() {
+                if i > 0 { out.push(','); }
+                out.push('"'); out.push_str(&esc(token)); out.push('"');
+            }
+            out.push_str("]}");
+        }
         Stmt::Use { path } => {
             out.push_str("{\"kind\":\"UseDeclaration\",\"path\":\"");
             out.push_str(&esc(path));
@@ -241,8 +270,13 @@ fn stmt_json(s: &Stmt, out: &mut String) {
             }
             out.push_str("]}");
         }
-        Stmt::Contract { name, body_tokens } => {
-            out.push_str("{\"body_tokens\":[");
+        Stmt::Contract { name, bases, body_tokens } => {
+            out.push_str("{\"bases\":[");
+            for (i, base) in bases.iter().enumerate() {
+                if i > 0 { out.push(','); }
+                out.push('"'); out.push_str(&esc(base)); out.push('"');
+            }
+            out.push_str("],\"body_tokens\":[");
             for (i, token) in body_tokens.iter().enumerate() {
                 if i > 0 { out.push(','); }
                 out.push('"');
