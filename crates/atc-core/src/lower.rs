@@ -195,7 +195,7 @@ impl<'a> FnLowerer<'a> {
                 self.out[jif] = Instruction::JumpIfFalse(d_fwd);
                 Ok(())
             }
-            Stmt::Fn(_) => Err(LowerError::new(format!(
+            Stmt::Fn(_) | Stmt::NativeFunction { .. } => Err(LowerError::new(format!(
                 "Funktionsdefinition ist nur auf Programmebene erlaubt (in {})",
                 self.function_name
             ))),
@@ -214,6 +214,11 @@ impl<'a> FnLowerer<'a> {
             Expr::BigInt(_) => {
                 return Err(LowerError::new(
                     "Integerliteral liegt ausserhalb des aktuellen i64-VM-Ausfuehrungsbereichs",
+                ))
+            }
+            Expr::String(_) => {
+                return Err(LowerError::new(
+                    "Stringliteral wird vom aktuellen i64-VM-Ausfuehrungsprofil nicht ausgefuehrt",
                 ))
             }
             Expr::Ident(name) => match self.locals.get(name) {
@@ -394,6 +399,7 @@ pub fn lower_program(prog: &Program) -> Result<CompiledProgram, LowerError> {
         if matches!(
             s,
             Stmt::Fn(_)
+                | Stmt::NativeFunction { .. }
                 | Stmt::Use { .. }
                 | Stmt::Struct { .. }
                 | Stmt::Enum { .. }
