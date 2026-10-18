@@ -165,6 +165,11 @@ def main():
 
     if args.test_cmd:
         print("== Saeule 2: Reproduzierbare Testlaeufe (2x, Byte-Vergleich, PYTHONHASHSEED=0) ==")
+        # Cargo may emit one-time compiler diagnostics during the first build.
+        # Warm up Rust test commands before comparing two actual test executions,
+        # so build-cache state is not mistaken for nondeterministic test output.
+        if args.lang == "rust":
+            run_tests(args.test_cmd, root)
         out1 = run_tests(args.test_cmd, root)
         out2 = run_tests(args.test_cmd, root)
         if out1 == out2:
