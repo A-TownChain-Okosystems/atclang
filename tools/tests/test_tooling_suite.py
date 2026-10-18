@@ -85,9 +85,10 @@ class TestDeterminismCheck:
         m = load(DET)
         src = tmp_path / "sample.rs"
         src.write_text(
-            "// Instant::now nur im Kommentar\n"
-            'let s = "rand:: im String";\n'
-            "fn main() {}\n",
+            """// Instant::now nur im Kommentar
+let s = "rand:: im String";
+fn main() {}
+""",
             encoding="utf-8",
         )
         views = m.code_view_rust(str(src))
