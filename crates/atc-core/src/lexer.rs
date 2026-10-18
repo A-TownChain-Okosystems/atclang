@@ -42,6 +42,8 @@ pub enum Token {
     RParen,
     LBrace,
     RBrace,
+    LBracket,
+    RBracket,
     Comma,
     Semi,
     Eof,
@@ -126,6 +128,8 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
             ')' => tokens.push(Token::RParen),
             '{' => tokens.push(Token::LBrace),
             '}' => tokens.push(Token::RBrace),
+            '[' => tokens.push(Token::LBracket),
+            ']' => tokens.push(Token::RBracket),
             ',' => tokens.push(Token::Comma),
             ';' => tokens.push(Token::Semi),
             '"' => {
@@ -259,6 +263,21 @@ mod tests {
         assert!(ts.contains(&Token::Capability));
         assert!(ts.contains(&Token::Function));
         assert!(ts.contains(&Token::Require));
+    }
+
+    #[test]
+    fn square_brackets_support_list_literals_and_indexing() {
+        let tokens = tokenize("let xs: List<Hash> = []; xs[addr] = entry;").unwrap();
+        assert!(tokens.contains(&Token::LBracket));
+        assert!(tokens.contains(&Token::RBracket));
+        assert_eq!(
+            tokens.iter().filter(|token| **token == Token::LBracket).count(),
+            2
+        );
+        assert_eq!(
+            tokens.iter().filter(|token| **token == Token::RBracket).count(),
+            2
+        );
     }
 
     #[test]
