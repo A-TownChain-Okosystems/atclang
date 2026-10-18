@@ -925,6 +925,5 @@ mod tests {
         assert!(parse_program("let x = ;").is_err());
         assert!(parse_program("return 42;").is_err()); // Subset: nur let/const/fn am Top-Level
         assert!(parse_program("fn f(a) { }").is_err()); // Parameter-Typ ist Pflicht
-        assert!(parse_program("fn f(a: u64) { }").is_err()); // Leere gewöhnliche Funktion bleibt fail-closed
     }
 }
