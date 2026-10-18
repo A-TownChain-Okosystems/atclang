@@ -45,6 +45,8 @@ pub enum Token {
     Colon,
     LParen,
     RParen,
+    LBracket,
+    RBracket,
     LBrace,
     RBrace,
     Comma,
@@ -131,6 +133,8 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, LexError> {
             '.' => tokens.push(Token::Dot),
             '(' => tokens.push(Token::LParen),
             ')' => tokens.push(Token::RParen),
+            '[' => tokens.push(Token::LBracket),
+            ']' => tokens.push(Token::RBracket),
             '{' => tokens.push(Token::LBrace),
             '}' => tokens.push(Token::RBrace),
             ',' => tokens.push(Token::Comma),
@@ -312,6 +316,16 @@ mod tests {
     fn integer_literals_allow_digit_separators() {
         assert!(tokenize("let supply = 21_000_000;").unwrap().contains(&Token::Int(21000000)));
         assert_eq!(tokenize("let bad = 1_;"), Err(LexError { pos: 11, ch: '_' }));
+    }
+
+
+    #[test]
+    fn square_brackets_support_list_literals_and_indexing() {
+        let tokens = tokenize("let xs: List<Hash> = []; xs[addr] = entry;").unwrap();
+        assert!(tokens.contains(&Token::LBracket));
+        assert!(tokens.contains(&Token::RBracket));
+        assert_eq!(tokens.iter().filter(|token| **token == Token::LBracket).count(), 2);
+        assert_eq!(tokens.iter().filter(|token| **token == Token::RBracket).count(), 2);
     }
 
     #[test]
