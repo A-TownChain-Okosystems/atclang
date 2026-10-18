@@ -9,7 +9,7 @@ updated: 2026-09-07
 standard: ATC-STD-MD-001
 ---
 
-# Contributing to ATCLang
+## Contributing to ATCLang
 
 Beiträge zur ATCLang-Entwicklung folgen den Richtlinien des A-TownChain-Ökosystems.
 
