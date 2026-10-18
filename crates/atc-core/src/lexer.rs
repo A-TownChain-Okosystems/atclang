@@ -271,11 +271,17 @@ mod tests {
         assert!(tokens.contains(&Token::LBracket));
         assert!(tokens.contains(&Token::RBracket));
         assert_eq!(
-            tokens.iter().filter(|token| **token == Token::LBracket).count(),
+            tokens
+                .iter()
+                .filter(|token| **token == Token::LBracket)
+                .count(),
             2
         );
         assert_eq!(
-            tokens.iter().filter(|token| **token == Token::RBracket).count(),
+            tokens
+                .iter()
+                .filter(|token| **token == Token::RBracket)
+                .count(),
             2
         );
     }
