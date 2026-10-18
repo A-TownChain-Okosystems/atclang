@@ -202,6 +202,23 @@ mod tests {
     #[test] fn accepts_state_block_and_legacy_fields() {
         assert!(validate_contract_source("contract C { state { owner: Address, count: u128 } fn init() {} }").is_ok());
     }
+    #[test] fn accepts_realistic_semicolon_free_contract_members() {
+        let source = r#"
+            contract BaseContract {
+                state owner: Address
+                state events: List<Hash>
+                event Paused(by: Address)
+                fn init() {
+                    self.owner = msg_sender()
+                    self.events = []
+                }
+                fn info() -> (Address, bool, u64) {
+                    return (self.owner, false, 0)
+                }
+            }
+        "#;
+        assert!(validate_contract_source(source).is_ok(), "{:?}", validate_contract_source(source));
+    }
     #[test] fn rejects_unbalanced_contract() {
         assert!(validate_contract_source("contract C { fn f() {").is_err());
     }
