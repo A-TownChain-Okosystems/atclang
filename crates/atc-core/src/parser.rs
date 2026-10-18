@@ -789,7 +789,7 @@ mod tests {
             use ATC::Types::Address
             enum Status { Open, Closed }
             struct Entry { owner: Address, balances: Map<Address, u128> }
-            contract Vault {
+            contract Vault : BaseVault {
                 state balances: Map<Address, u128>
                 fn transfer(to: Address, amount: u128) -> bool {
                     if amount > 0 { self.balances[to] += amount }
@@ -804,6 +804,28 @@ mod tests {
         assert!(json.contains("\"kind\":\"StructDeclaration\",\"name\":\"Entry\""));
         assert!(json.contains("\"name\":\"Map<Address, u128>\""));
         assert!(json.contains("\"kind\":\"ContractDeclaration\",\"name\":\"Vault\""));
+        assert!(json.contains("\"bases\":[\"BaseVault\"]"));
+    }
+
+    #[test]
+    fn native_function_body_falls_back_to_balanced_token_ast() {
+        let source = r#"
+            fn tokenize(s: string) -> ScanResult {
+                let tokens: List<string> = []
+                if s.len() > 0 && s.slice(0, 1) == "0" {
+                    tokens.push("zero")
+                }
+                return tokens
+            }
+        "#;
+        let program = parse_program(source).expect("native function body must parse");
+        assert!(program.to_json().contains("\"kind\":\"NativeFunctionDef\",\"name\":\"tokenize\""));
+    }
+
+    #[test]
+    fn string_literal_is_preserved_in_ast_json() {
+        let program = parse_program("const LABEL: string = \"A-Town\"").unwrap();
+        assert!(program.to_json().contains("\"kind\":\"StringLiteral\",\"value\":\"A-Town\""));
     }
 
     #[test]
