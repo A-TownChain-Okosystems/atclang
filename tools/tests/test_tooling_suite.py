@@ -120,14 +120,14 @@ print(random.random())
     def test_run_tests_and_normalize_output(self, tmp_path):
         m = load(DET)
         out = m.run_tests(
-            'python3 -c "print(\'ok in 0.42s\')"',
+            "python3 -c \"print('ok in 0.42s')\"",
             str(tmp_path),
         )
         assert b"ok" in out
         assert b"in Xs" in out  # Laufzeit normalisiert
         # byte-identisch bei zweitem Lauf (REQ-ENG-012)
         out2 = m.run_tests(
-            'python3 -c "print(\'ok in 9.99s\')"',
+            "python3 -c \"print('ok in 9.99s')\"",
             str(tmp_path),
         )
         assert out == out2
