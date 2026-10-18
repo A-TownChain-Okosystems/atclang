@@ -9,7 +9,7 @@ updated: 2026-09-07
 standard: ATC-STD-MD-001
 ---
 
-# ATCLang Architecture
+## ATCLang Architecture
 
 > Technische Architektur der proprietären System- und Contract-Sprache ATCLang.
 
