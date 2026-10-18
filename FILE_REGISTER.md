@@ -142,4 +142,4 @@
 - `tools/.gitkeep`
 - `tools/ci_independent_audit.py`
 - `tools/determinism_check.py`
-- `tools/tests/test_tooling_suite.py` (pytest, Pass 15: determinism_check + ci_independent_audit, kein Netzwerk)
+- `tools/tests/test_tooling_suite.py`
