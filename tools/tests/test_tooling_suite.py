@@ -145,7 +145,9 @@ print(random.random())
         (tmp_path / "dirty.py").write_text("import random\n", encoding="utf-8")
         proc = subprocess.run(
             [sys.executable, os.path.join(REPO, DET), "--lang", "python"],
-            capture_output=True, text=True, cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
+            cwd=str(tmp_path),
         )
         assert proc.returncode != 0  # fail-closed bei Verstoß
 
