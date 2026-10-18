@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: A-TownChain-Okosystems/.github
-          ref: main
+          ref: 1c198f3c6a73105f7e68f69e59c21f502362dbe1
           path: .org-github-policy
           persist-credentials: false
 
