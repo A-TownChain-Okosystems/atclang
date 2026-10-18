@@ -99,8 +99,9 @@ fn main() {}
     def test_scan_sources_finds_real_violations_only(self, tmp_path):
         m = load(DET)
         (tmp_path / "dirty.py").write_text(
-            "import random\n"
-            "print(random.random())\n",
+            """import random
+print(random.random())
+""",
             encoding="utf-8",
         )
         findings = m.scan_sources(str(tmp_path), "python")
