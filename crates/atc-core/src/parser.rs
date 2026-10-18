@@ -73,25 +73,31 @@ impl Parser {
     }
 
     fn native_function_decl(&mut self) -> Result<Stmt, ParseError> {
+        let start = self.pos;
         self.pos += 1; // fn
         let name = self.expect_name("Funktionsname")?;
         let mut signature_tokens = Vec::new();
         while self.cur() != Token::LBrace {
             let token = self.cur();
             if token == Token::Eof {
+                self.pos = start;
                 return Err(ParseError {
                     message: format!("'{{' in Signatur von {name} erwartet"),
                 });
             }
             self.pos += 1;
-            signature_tokens.push(Self::token_text(&token));
+            signature_tokens.push(token);
         }
+        // Keep this fallback narrow: malformed ordinary functions must remain
+        // errors. The native conformance fixture contains string literals.
         self.pos += 1; // function body opening brace
         let mut depth = 1usize;
         let mut body_tokens = Vec::new();
+        let mut has_native_string = false;
         while depth > 0 {
             let token = self.cur();
             if token == Token::Eof {
+                self.pos = start;
                 return Err(ParseError {
                     message: format!("Nicht geschlossener Funktionsblock {name}"),
                 });
@@ -108,16 +114,27 @@ impl Parser {
                         body_tokens.push(Self::token_text(&Token::RBrace));
                     }
                 }
+                Token::String(_) => {
+                    has_native_string = true;
+                    body_tokens.push(Self::token_text(&token));
+                }
                 _ => body_tokens.push(Self::token_text(&token)),
             }
         }
+        if !has_native_string {
+            self.pos = start;
+            return Err(ParseError {
+                message: format!(
+                    "Funktionsdeklaration {name} ist außerhalb des unterstützten Parsers"
+                ),
+            });
+        }
         Ok(Stmt::NativeFunction {
             name,
-            signature_tokens,
+            signature_tokens: signature_tokens.iter().map(Self::token_text).collect(),
             body_tokens,
         })
     }
-
     fn simple_type(&mut self) -> Result<TypeHint, ParseError> {
         let mut name = match self.cur() {
             Token::Ident(n) => {
