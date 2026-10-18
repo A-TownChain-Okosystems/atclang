@@ -8,7 +8,7 @@ updated: 2026-09-24
 standard: ATC-STD-MD-001
 ---
 
-# ATCLang Roadmap
+## ATCLang Roadmap
 
 > Kanonische Entwicklungs-Roadmap für Sprache, Compiler, Rust-Canonical-Core und Conformance.
 
