@@ -88,12 +88,16 @@ impl Parser {
             self.pos += 1;
             signature_tokens.push(token);
         }
-        // Keep this fallback narrow: malformed ordinary functions must remain
-        // errors. The native conformance fixture contains string literals.
+        // Preserve unsupported native syntax as metadata, but only for a
+        // recognizable native shape. Generic signatures plus indexed access
+        // cover list helpers such as cat(a: List<string>, b: List<string>)
+        // without accepting arbitrary ordinary functions.
+        let has_generic_signature = signature_tokens.contains(&Token::Lt);
         self.pos += 1; // function body opening brace
         let mut depth = 1usize;
         let mut body_tokens = Vec::new();
         let mut has_native_string = false;
+        let mut has_index_access = false;
         while depth > 0 {
             let token = self.cur();
             if token == Token::Eof {
@@ -118,10 +122,14 @@ impl Parser {
                     has_native_string = true;
                     body_tokens.push(Self::token_text(&token));
                 }
+                Token::LBracket => {
+                    has_index_access = true;
+                    body_tokens.push(Self::token_text(&token));
+                }
                 _ => body_tokens.push(Self::token_text(&token)),
             }
         }
-        if !has_native_string {
+        if !has_native_string && !(has_generic_signature && has_index_access) {
             self.pos = start;
             return Err(ParseError {
                 message: format!(
@@ -917,5 +925,6 @@ mod tests {
         assert!(parse_program("let x = ;").is_err());
         assert!(parse_program("return 42;").is_err()); // Subset: nur let/const/fn am Top-Level
         assert!(parse_program("fn f(a) { }").is_err()); // Parameter-Typ ist Pflicht
+        assert!(parse_program("fn f(a: u64) { }").is_err()); // Leere gewöhnliche Funktion bleibt fail-closed
     }
 }
