@@ -8,6 +8,8 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Int(i64),
+    /// Exact unsigned literals beyond the VM's current i64 execution subset.
+    BigInt(u128),
     Ident(String),
     Unary {
         op: String,
@@ -55,6 +57,14 @@ pub struct FunctionDef {
 pub enum Stmt {
     Let(LetStmt),
     Fn(FunctionDef),
+    /// Import path from a native `use A::B` declaration.
+    Use { path: String },
+    /// Native data declaration; generic field types are preserved textually.
+    Struct { name: String, fields: Vec<(String, TypeHint)> },
+    /// Native enum declaration and its variant names.
+    Enum { name: String, variants: Vec<String> },
+    /// Contract body retained as a balanced token stream until semantic lowering exists.
+    Contract { name: String, body_tokens: Vec<String> },
     Return {
         value: Option<Expr>,
     },
@@ -94,6 +104,11 @@ fn esc(s: &str) -> String {
 fn expr_json(e: &Expr, out: &mut String) {
     match e {
         Expr::Int(v) => {
+            out.push_str("{\"kind\":\"IntLiteral\",\"value\":");
+            out.push_str(&v.to_string());
+            out.push('}');
+        }
+        Expr::BigInt(v) => {
             out.push_str("{\"kind\":\"IntLiteral\",\"value\":");
             out.push_str(&v.to_string());
             out.push('}');
@@ -195,6 +210,49 @@ fn stmt_json(s: &Stmt, out: &mut String) {
     match s {
         Stmt::Let(l) => let_json(l, out),
         Stmt::Fn(f) => fn_json(f, out),
+        Stmt::Use { path } => {
+            out.push_str("{\"kind\":\"UseDeclaration\",\"path\":\"");
+            out.push_str(&esc(path));
+            out.push_str("\"}");
+        }
+        Stmt::Struct { name, fields } => {
+            out.push_str("{\"fields\":[");
+            for (i, (field, ty)) in fields.iter().enumerate() {
+                if i > 0 { out.push(','); }
+                out.push_str("{\"kind\":\"FieldDeclaration\",\"name\":\"");
+                out.push_str(&esc(field));
+                out.push_str("\",\"type_hint\":");
+                type_json(ty, out);
+                out.push('}');
+            }
+            out.push_str("],\"kind\":\"StructDeclaration\",\"name\":\"");
+            out.push_str(&esc(name));
+            out.push_str("\"}");
+        }
+        Stmt::Enum { name, variants } => {
+            out.push_str("{\"kind\":\"EnumDeclaration\",\"name\":\"");
+            out.push_str(&esc(name));
+            out.push_str("\",\"variants\":[");
+            for (i, variant) in variants.iter().enumerate() {
+                if i > 0 { out.push(','); }
+                out.push('"');
+                out.push_str(&esc(variant));
+                out.push('"');
+            }
+            out.push_str("]}");
+        }
+        Stmt::Contract { name, body_tokens } => {
+            out.push_str("{\"body_tokens\":[");
+            for (i, token) in body_tokens.iter().enumerate() {
+                if i > 0 { out.push(','); }
+                out.push('"');
+                out.push_str(&esc(token));
+                out.push('"');
+            }
+            out.push_str("],\"kind\":\"ContractDeclaration\",\"name\":\"");
+            out.push_str(&esc(name));
+            out.push_str("\"}");
+        }
         Stmt::Return { value } => {
             out.push_str("{\"kind\":\"ReturnStatement\",\"value\":");
             match value {
