@@ -38,7 +38,7 @@ impl Parser {
         while self.cur() != Token::Eof {
             let s = match self.cur() {
                 Token::Let | Token::Const => Stmt::Let(self.let_stmt()?),
-                Token::Fn => Stmt::Fn(self.function()?),
+                Token::Fn => self.function_decl()?,
                 Token::Use => self.use_decl()?,
                 Token::Struct => self.struct_decl()?,
                 Token::Enum => self.enum_decl()?,
@@ -59,6 +59,63 @@ impl Parser {
             statements.push(s);
         }
         Ok(Program { statements })
+    }
+
+    fn function_decl(&mut self) -> Result<Stmt, ParseError> {
+        let start = self.pos;
+        match self.function() {
+            Ok(function) => Ok(Stmt::Fn(function)),
+            Err(_) => {
+                self.pos = start;
+                self.native_function_decl()
+            }
+        }
+    }
+
+    fn native_function_decl(&mut self) -> Result<Stmt, ParseError> {
+        self.pos += 1; // fn
+        let name = self.expect_name("Funktionsname")?;
+        let mut signature_tokens = Vec::new();
+        while self.cur() != Token::LBrace {
+            let token = self.cur();
+            if token == Token::Eof {
+                return Err(ParseError {
+                    message: format!("'{{' in Signatur von {name} erwartet"),
+                });
+            }
+            self.pos += 1;
+            signature_tokens.push(Self::token_text(&token));
+        }
+        self.pos += 1; // function body opening brace
+        let mut depth = 1usize;
+        let mut body_tokens = Vec::new();
+        while depth > 0 {
+            let token = self.cur();
+            if token == Token::Eof {
+                return Err(ParseError {
+                    message: format!("Nicht geschlossener Funktionsblock {name}"),
+                });
+            }
+            self.pos += 1;
+            match token {
+                Token::LBrace => {
+                    depth += 1;
+                    body_tokens.push(Self::token_text(&Token::LBrace));
+                }
+                Token::RBrace => {
+                    depth -= 1;
+                    if depth > 0 {
+                        body_tokens.push(Self::token_text(&Token::RBrace));
+                    }
+                }
+                _ => body_tokens.push(Self::token_text(&token)),
+            }
+        }
+        Ok(Stmt::NativeFunction {
+            name,
+            signature_tokens,
+            body_tokens,
+        })
     }
 
     fn simple_type(&mut self) -> Result<TypeHint, ParseError> {
@@ -255,6 +312,29 @@ impl Parser {
     fn contract_decl(&mut self) -> Result<Stmt, ParseError> {
         self.pos += 1;
         let name = self.expect_name("Contract-Name")?;
+        let mut bases = Vec::new();
+        if self.cur() == Token::Colon {
+            self.pos += 1;
+            loop {
+                bases.push(self.expect_name("Contract-Basis")?);
+                while self.cur() == Token::Colon {
+                    self.pos += 1;
+                    if self.cur() != Token::Colon {
+                        return Err(ParseError {
+                            message: "'::' erwartet im Contract-Basispfad".into(),
+                        });
+                    }
+                    self.pos += 1;
+                    let segment = self.expect_name("Contract-Basispfadsegment")?;
+                    bases.last_mut().unwrap().push_str("::");
+                    bases.last_mut().unwrap().push_str(&segment);
+                }
+                if self.cur() != Token::Comma {
+                    break;
+                }
+                self.pos += 1;
+            }
+        }
         if self.cur() != Token::LBrace {
             return Err(ParseError { message: "'{' nach contract erwartet".into() });
         }
@@ -279,7 +359,7 @@ impl Parser {
                 _ => body_tokens.push(Self::token_text(&token)),
             }
         }
-        Ok(Stmt::Contract { name, body_tokens })
+        Ok(Stmt::Contract { name, bases, body_tokens })
     }
 
     fn skip_file_annotations(&mut self) {
@@ -602,6 +682,10 @@ impl Parser {
                 } else {
                     Ok(Expr::BigInt(v))
                 }
+            }
+            Token::String(value) => {
+                self.pos += 1;
+                Ok(Expr::String(value))
             }
             Token::Ident(n) => {
                 self.pos += 1;
