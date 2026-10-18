@@ -131,7 +131,9 @@ class TestDeterminismCheck:
     def test_main_smoke_clean_and_dirty(self, tmp_path):
         proc = subprocess.run(
             [sys.executable, os.path.join(REPO, DET), "--lang", "python"],
-            capture_output=True, text=True, cwd=str(tmp_path),
+            capture_output=True,
+            text=True,
+            cwd=str(tmp_path),
         )
         assert proc.returncode == 0, proc.stdout + proc.stderr
         (tmp_path / "dirty.py").write_text("import random\n", encoding="utf-8")
@@ -175,7 +177,9 @@ class TestCiIndependentAudit:
     def test_main_smoke(self):
         proc = subprocess.run(
             [sys.executable, os.path.join(REPO, AUD)],
-            capture_output=True, text=True, cwd=REPO,
+            capture_output=True,
+            text=True,
+            cwd=REPO,
         )
         assert proc.returncode in (0, 1), proc.stdout + proc.stderr
         assert "Findings:" in proc.stdout
