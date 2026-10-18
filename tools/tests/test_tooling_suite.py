@@ -43,7 +43,6 @@ AUD = "tools/ci_independent_audit.py"
 
 
 # ------------------------------------------------------ determinism_check.py
-
 class TestDeterminismCheck:
     def test_load_allowlist(self, tmp_path):
         m = load(DET)
@@ -145,7 +144,6 @@ class TestDeterminismCheck:
 
 
 # --------------------------------------------------- ci_independent_audit.py
-
 class TestCiIndependentAudit:
     def test_read_fail_files(self):
         m = load(AUD)
