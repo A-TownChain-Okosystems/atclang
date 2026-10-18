@@ -98,6 +98,8 @@ impl Parser {
         let mut body_tokens = Vec::new();
         let mut has_native_string = false;
         let mut has_index_access = false;
+        let mut has_struct_literal = false;
+        let mut previous_token: Option<Token> = None;
         while depth > 0 {
             let token = self.cur();
             if token == Token::Eof {
@@ -109,6 +111,12 @@ impl Parser {
             self.pos += 1;
             match token {
                 Token::LBrace => {
+                    if previous_token
+                        .as_ref()
+                        .is_some_and(|previous| matches!(previous, Token::Ident(_)))
+                    {
+                        has_struct_literal = true;
+                    }
                     depth += 1;
                     body_tokens.push(Self::token_text(&Token::LBrace));
                 }
@@ -128,8 +136,13 @@ impl Parser {
                 }
                 _ => body_tokens.push(Self::token_text(&token)),
             }
+            previous_token = Some(token);
         }
-        if !has_native_string && !(has_generic_signature && has_index_access) {
+        let has_typed_return = signature_tokens.contains(&Token::Arrow);
+        if !has_native_string
+            && !(has_generic_signature && has_index_access)
+            && !(has_typed_return && has_struct_literal)
+        {
             self.pos = start;
             return Err(ParseError {
                 message: format!(
