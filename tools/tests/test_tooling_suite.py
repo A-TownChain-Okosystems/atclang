@@ -50,10 +50,11 @@ class TestDeterminismCheck:
         assert m.load_allowlist(str(tmp_path)) == []
         al = tmp_path / "determinism_allowlist.yaml"
         al.write_text(
-            "allowlist:\n"
-            "  - file: src/foo.rs\n"
-            "    line: 42\n"
-            "  - file: src/bar.rs\n",
+            """allowlist:
+  - file: src/foo.rs
+    line: 42
+  - file: src/bar.rs
+""",
             encoding="utf-8",
         )
         entries = m.load_allowlist(str(tmp_path))
