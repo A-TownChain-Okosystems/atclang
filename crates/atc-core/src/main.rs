@@ -8,6 +8,7 @@
 use atc_core::artifact::{Artifact, ArtifactMetadata};
 use atc_core::lower::{lower_program, CompiledProgram};
 use atc_core::parser::parse_program;
+use atc_core::conformance::validate_contract_source;
 use std::env;
 use std::fs;
 use std::process::ExitCode;
@@ -42,13 +43,6 @@ fn main() -> ExitCode {
         Err(e) => {
             eprintln!("Fehler: Datei nicht lesbar ({path}): {e}");
             return ExitCode::from(2);
-        }
-    };
-    let program = match parse_program(&src) {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("Kompilierfehler in {path}: {}", e.message);
-            return ExitCode::from(1);
         }
     };
     match mode {
@@ -92,6 +86,10 @@ fn main() -> ExitCode {
             }
         }
         "compile" => {
+            let program = match parse_program(&src) {
+                Ok(p) => p,
+                Err(e) => { eprintln!("Kompilierfehler in {path}: {}", e.message); return ExitCode::from(1); }
+            };
             println!("{}", program.to_json());
             let mut fns = 0;
             let mut stmts = 0;
@@ -106,8 +104,10 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         "check" => {
-            eprintln!("OK: {path} validiert");
-            ExitCode::SUCCESS
+            match validate_contract_source(&src) {
+                Ok(()) => { eprintln!("OK: {path} validiert"); ExitCode::SUCCESS }
+                Err(e) => { eprintln!("Validierungsfehler in {path}: {}", e.message); ExitCode::from(1) }
+            }
         }
         _ => {
             eprintln!("{USAGE}");
