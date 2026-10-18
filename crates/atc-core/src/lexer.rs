@@ -336,7 +336,7 @@ mod tests {
     #[test]
     fn integer_literals_allow_digit_separators() {
         assert!(tokenize("let supply = 21_000_000;").unwrap().contains(&Token::Int(21000000)));
-        assert_eq!(tokenize("let bad = 1_;"), Err(LexError { pos: 12, ch: '_' }));
+        assert_eq!(tokenize("let bad = 1_;"), Err(LexError { pos: 11, ch: '_' }));
     }
 
     #[test]
