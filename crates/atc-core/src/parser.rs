@@ -147,7 +147,7 @@ impl Parser {
             Token::RBracket => "]".into(),
             Token::LBrace => "{".into(),
             Token::RBrace => "}".into(),
-            Token::Comma => ",".into(),
+            Token::Comma => ", ".into(),
             Token::Semi => ";".into(),
             Token::At => "@".into(),
             Token::Dot => ".".into(),
