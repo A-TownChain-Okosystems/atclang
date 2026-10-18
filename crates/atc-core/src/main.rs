@@ -104,9 +104,22 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         "check" => {
-            match validate_contract_source(&src) {
-                Ok(()) => { eprintln!("OK: {path} validiert"); ExitCode::SUCCESS }
-                Err(e) => { eprintln!("Validierungsfehler in {path}: {}", e.message); ExitCode::from(1) }
+            // Keep the classic language frontend and native contract syntax on
+            // the same CLI path: differential corpus files use let/fn syntax,
+            // while native contracts are validated by the structural checker.
+            let validation = match parse_program(&src) {
+                Ok(_) => Ok(()),
+                Err(_) => validate_contract_source(&src),
+            };
+            match validation {
+                Ok(()) => {
+                    eprintln!("OK: {path} validiert");
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("Validierungsfehler in {path}: {}", e.message);
+                    ExitCode::from(1)
+                }
             }
         }
         _ => {
