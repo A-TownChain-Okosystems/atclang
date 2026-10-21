@@ -521,4 +521,88 @@ mod tests {
             Err(ArtifactError::CapabilitiesNotCanonical)
         );
     }
+
+    fn bytecode_container(version: u16, count: u32, instructions: &[u8]) -> Vec<u8> {
+        let mut raw = Vec::with_capacity(10 + instructions.len());
+        raw.extend_from_slice(b"ATCB");
+        raw.extend_from_slice(&version.to_be_bytes());
+        raw.extend_from_slice(&count.to_be_bytes());
+        raw.extend_from_slice(instructions);
+        raw
+    }
+
+    #[test]
+    fn bytecode_decoder_rejects_magic_mismatch() {
+        let mut raw = bytecode_container(1, 1, &[0x21]);
+        raw[..4].copy_from_slice(b"ATC1");
+        assert_eq!(decode_bytecode(&raw), Err(ArtifactError::InvalidMagic));
+    }
+
+    #[test]
+    fn bytecode_decoder_rejects_unsupported_version() {
+        let raw = bytecode_container(2, 1, &[0x21]);
+        assert_eq!(
+            decode_bytecode(&raw),
+            Err(ArtifactError::UnsupportedVersion(2))
+        );
+    }
+
+    #[test]
+    fn bytecode_decoder_bounds_instruction_count_before_allocation() {
+        // The header claims two instructions but only one opcode byte remains.
+        let raw = bytecode_container(1, u32::MAX, &[0x21]);
+        assert_eq!(decode_bytecode(&raw), Err(ArtifactError::InvalidCount));
+    }
+
+    #[test]
+    fn bytecode_decoder_rejects_unknown_opcode() {
+        let raw = bytecode_container(1, 1, &[0xFF]);
+        assert_eq!(decode_bytecode(&raw), Err(ArtifactError::InvalidInstruction));
+    }
+
+    #[test]
+    fn bytecode_decoder_rejects_truncated_operands() {
+        // Each operand-bearing opcode is tested with an incomplete operand.
+        let cases: &[&[u8]] = &[
+            &[0x01],             // ConstI64: missing i64
+            &[0x02, 0x00],       // LoadLocal: missing one byte of u16
+            &[0x03, 0x00],       // StoreLocal: missing one byte of u16
+            &[0x20, 0x00, 0x00], // Call: missing argc and/or operand bytes
+            &[0x30, 0x00],       // Jump: missing one byte of i16
+            &[0x31, 0x00],       // JumpIfFalse: missing one byte of i16
+        ];
+
+        for instructions in cases {
+            let raw = bytecode_container(1, 1, instructions);
+            assert_eq!(
+                decode_bytecode(&raw),
+                Err(ArtifactError::Truncated),
+                "expected truncated operand rejection for {instructions:02x?}"
+            );
+        }
+    }
+
+    #[test]
+    fn bytecode_decoder_rejects_trailing_bytes() {
+        let raw = bytecode_container(1, 1, &[0x21, 0x40]);
+        assert_eq!(decode_bytecode(&raw), Err(ArtifactError::TrailingBytes));
+    }
+
+    #[test]
+    fn bytecode_decoder_reads_header_and_operands_as_big_endian() {
+        let raw = bytecode_container(
+            1,
+            2,
+            &[0x01, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x21],
+        );
+        assert_eq!(
+            decode_bytecode(&raw),
+            Ok(Bytecode {
+                instructions: vec![
+                    Instruction::ConstI64(0x0102030405060708),
+                    Instruction::Return,
+                ],
+            })
+        );
+    }
 }
