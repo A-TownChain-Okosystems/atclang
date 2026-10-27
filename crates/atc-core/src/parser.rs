@@ -737,29 +737,48 @@ impl Parser {
 
     fn postfix(&mut self) -> Result<Expr, ParseError> {
         let mut node = self.primary()?;
-        while self.cur() == Token::LParen {
-            self.pos += 1;
-            let mut args = Vec::new();
-            if self.cur() != Token::RParen {
-                loop {
-                    args.push(self.expr()?);
-                    if self.cur() == Token::Comma {
-                        self.pos += 1;
-                    } else {
-                        break;
+        loop {
+            match self.cur() {
+                Token::LParen => {
+                    self.pos += 1;
+                    let mut args = Vec::new();
+                    if self.cur() != Token::RParen {
+                        loop {
+                            args.push(self.expr()?);
+                            if self.cur() == Token::Comma {
+                                self.pos += 1;
+                            } else {
+                                break;
+                            }
+                        }
                     }
+                    if self.cur() != Token::RParen {
+                        return Err(ParseError {
+                            message: "')' erwartet".to_string(),
+                        });
+                    }
+                    self.pos += 1;
+                    node = Expr::Call {
+                        target: Box::new(node),
+                        args,
+                    };
                 }
+                Token::LBracket => {
+                    self.pos += 1;
+                    let index = self.expr()?;
+                    if self.cur() != Token::RBracket {
+                        return Err(ParseError {
+                            message: "']' erwartet nach Index-Ausdruck".to_string(),
+                        });
+                    }
+                    self.pos += 1;
+                    node = Expr::IndexAccess {
+                        target: Box::new(node),
+                        index: Box::new(index),
+                    };
+                }
+                _ => break,
             }
-            if self.cur() != Token::RParen {
-                return Err(ParseError {
-                    message: "')' erwartet".to_string(),
-                });
-            }
-            self.pos += 1;
-            node = Expr::Call {
-                target: Box::new(node),
-                args,
-            };
         }
         Ok(node)
     }
@@ -803,6 +822,28 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn index_access_parses_to_canonical_ast() {
+        let p = parse_program("let xs = items[index + 1];").unwrap();
+        let json = p.to_json();
+        assert!(json.contains("\\"kind\\":\\"IndexAccess\\""));
+        assert!(json.contains("\\"index\\":{\\"kind\\":\\"BinaryOp\\""));
+        assert!(json.contains("\\"target\\":{\\"kind\\":\\"Identifier\\",\\"name\\":\\"items\\"}"));
+    }
+
+    #[test]
+    fn chained_index_access_and_calls_parse() {
+        let p = parse_program("let value = get_items()[outer[inner]];").unwrap();
+        let json = p.to_json();
+        assert!(json.contains("\\"kind\\":\\"FunctionCall\\""));
+        assert_eq!(json.matches("\\"kind\\":\\"IndexAccess\\"").count(), 2);
+    }
+
+    #[test]
+    fn index_access_requires_closing_bracket() {
+        assert!(parse_program("let value = items[index;").is_err());
+    }
 
     #[test]
     fn praecedenz_und_assoziativitaet() {
