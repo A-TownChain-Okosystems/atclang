@@ -446,6 +446,17 @@ mod tests {
     }
 
     #[test]
+    fn index_access_lowering_fails_closed_until_vm_semantics_exist() {
+        let prog = crate::parser::parse_program("let value = items[0];")
+            .expect("IndexAccess syntax should parse");
+        let err = lower_program(&prog).expect_err("IndexAccess must not silently lower");
+        assert!(
+            err.to_string().contains("Indexzugriff ist geparst"),
+            "unexpected lowering error: {err}"
+        );
+    }
+
+    #[test]
     fn compiled_program_symbol_surface() {
         // Bound catalog symbols exercised here: CompiledProgram::function_count
         // und CompiledProgram::verify.
