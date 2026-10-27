@@ -451,8 +451,8 @@ mod tests {
             .expect("IndexAccess syntax should parse");
         let err = lower_program(&prog).expect_err("IndexAccess must not silently lower");
         assert!(
-            err.to_string().contains("Indexzugriff ist geparst"),
-            "unexpected lowering error: {err}"
+            err.message.contains("Indexzugriff ist geparst"),
+            "unexpected lowering error: {:?}", err
         );
     }
 
