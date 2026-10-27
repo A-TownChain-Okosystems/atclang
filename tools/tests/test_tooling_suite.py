@@ -44,8 +44,8 @@ AUD = "tools/ci_independent_audit.py"
 
 # ------------------------------------------------------ determinism_check.py
 
-class TestDeterminismCheck:
 
+class TestDeterminismCheck:
     def test_load_allowlist(self, tmp_path):
         m = load(DET)
         # keine Allowlist-Datei -> leere Liste
@@ -139,6 +139,7 @@ class TestDeterminismCheck:
 
 
 # --------------------------------------------------- ci_independent_audit.py
+
 
 class TestCiIndependentAudit:
     def test_read_fail_files(self):
