@@ -827,17 +827,17 @@ mod tests {
     fn index_access_parses_to_canonical_ast() {
         let p = parse_program("let xs = items[index + 1];").unwrap();
         let json = p.to_json();
-        assert!(json.contains("\\"kind\\":\\"IndexAccess\\""));
-        assert!(json.contains("\\"index\\":{\\"kind\\":\\"BinaryOp\\""));
-        assert!(json.contains("\\"target\\":{\\"kind\\":\\"Identifier\\",\\"name\\":\\"items\\"}"));
+        assert!(json.contains("\"kind\":\"IndexAccess\""));
+        assert!(json.contains("\"index\":{\"kind\":\"BinaryOp\""));
+        assert!(json.contains("\"target\":{\"kind\":\"Identifier\",\"name\":\"items\"}"));
     }
 
     #[test]
     fn chained_index_access_and_calls_parse() {
         let p = parse_program("let value = get_items()[outer[inner]];").unwrap();
         let json = p.to_json();
-        assert!(json.contains("\\"kind\\":\\"FunctionCall\\""));
-        assert_eq!(json.matches("\\"kind\\":\\"IndexAccess\\"").count(), 2);
+        assert!(json.contains("\"kind\":\"FunctionCall\""));
+        assert_eq!(json.matches("\"kind\":\"IndexAccess\"").count(), 2);
     }
 
     #[test]
