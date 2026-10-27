@@ -25,6 +25,11 @@ pub enum Expr {
         target: Box<Expr>,
         args: Vec<Expr>,
     },
+    /// Indexed access node. Runtime lowering remains gated pending storage semantics.
+    IndexAccess {
+        target: Box<Expr>,
+        index: Box<Expr>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -173,6 +178,13 @@ fn expr_json(e: &Expr, out: &mut String) {
                 expr_json(a, out);
             }
             out.push_str("],\"kind\":\"FunctionCall\",\"target\":");
+            expr_json(target, out);
+            out.push('}');
+        }
+        Expr::IndexAccess { target, index } => {
+            out.push_str("{\"index\":");
+            expr_json(index, out);
+            out.push_str(",\"kind\":\"IndexAccess\",\"target\":");
             expr_json(target, out);
             out.push('}');
         }
