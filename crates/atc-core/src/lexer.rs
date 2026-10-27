@@ -313,6 +313,28 @@ mod tests {
     }
 
     #[test]
+    fn square_brackets_tokenize_list_literals_and_index_access() {
+        let tokens = tokenize("let xs: List<Hash> = []; xs[addr] = entry;").unwrap();
+
+        assert_eq!(
+            tokens
+                .iter()
+                .filter(|token| **token == Token::LBracket)
+                .count(),
+            2
+        );
+        assert_eq!(
+            tokens
+                .iter()
+                .filter(|token| **token == Token::RBracket)
+                .count(),
+            2
+        );
+        assert!(tokens.contains(&Token::Ident("xs".to_string())));
+        assert!(tokens.contains(&Token::Ident("addr".to_string())));
+    }
+
+    #[test]
     fn native_contract_operators_and_declarations() {
         let tokens = tokenize("use ATC::Types::Address; struct Entry { value: u128 } enum Status { Open, Closed } let mask = a | b & c;").unwrap();
         assert!(tokens.contains(&Token::Use));
