@@ -293,6 +293,11 @@ impl<'a> FnLowerer<'a> {
                     argc: args.len() as u16,
                 });
             }
+            Expr::IndexAccess { .. } => {
+                return Err(LowerError::new(
+                    "Indexzugriff ist geparst, aber im aktuellen VM-Profil noch nicht lowerbar",
+                ));
+            }
         }
         Ok(())
     }
