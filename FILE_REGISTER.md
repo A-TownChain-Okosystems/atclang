@@ -141,4 +141,5 @@
 - `specs/vm/SPEC.md`
 - `tools/.gitkeep`
 - `tools/ci_independent_audit.py`
+- `tools/tests/test_tooling_suite.py`
 - `tools/determinism_check.py`
