@@ -737,29 +737,48 @@ impl Parser {
 
     fn postfix(&mut self) -> Result<Expr, ParseError> {
         let mut node = self.primary()?;
-        while self.cur() == Token::LParen {
-            self.pos += 1;
-            let mut args = Vec::new();
-            if self.cur() != Token::RParen {
-                loop {
-                    args.push(self.expr()?);
-                    if self.cur() == Token::Comma {
-                        self.pos += 1;
-                    } else {
-                        break;
+        loop {
+            match self.cur() {
+                Token::LParen => {
+                    self.pos += 1;
+                    let mut args = Vec::new();
+                    if self.cur() != Token::RParen {
+                        loop {
+                            args.push(self.expr()?);
+                            if self.cur() == Token::Comma {
+                                self.pos += 1;
+                            } else {
+                                break;
+                            }
+                        }
                     }
+                    if self.cur() != Token::RParen {
+                        return Err(ParseError {
+                            message: "')' erwartet".to_string(),
+                        });
+                    }
+                    self.pos += 1;
+                    node = Expr::Call {
+                        target: Box::new(node),
+                        args,
+                    };
                 }
+                Token::LBracket => {
+                    self.pos += 1;
+                    let index = self.expr()?;
+                    if self.cur() != Token::RBracket {
+                        return Err(ParseError {
+                            message: "']' erwartet nach Index-Ausdruck".to_string(),
+                        });
+                    }
+                    self.pos += 1;
+                    node = Expr::IndexAccess {
+                        target: Box::new(node),
+                        index: Box::new(index),
+                    };
+                }
+                _ => break,
             }
-            if self.cur() != Token::RParen {
-                return Err(ParseError {
-                    message: "')' erwartet".to_string(),
-                });
-            }
-            self.pos += 1;
-            node = Expr::Call {
-                target: Box::new(node),
-                args,
-            };
         }
         Ok(node)
     }
@@ -803,6 +822,62 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn index_access_has_exact_canonical_ast_shape() {
+        let p = parse_program("let xs = items[index + 1];").unwrap();
+        let Stmt::Let(stmt) = &p.statements[0] else {
+            panic!("expected let statement");
+        };
+        let Some(Expr::IndexAccess { target, index }) = &stmt.value else {
+            panic!("expected IndexAccess expression");
+        };
+        assert_eq!(**target, Expr::Ident("items".to_string()));
+        assert_eq!(
+            **index,
+            Expr::Binary {
+                op: "+".to_string(),
+                left: Box::new(Expr::Ident("index".to_string())),
+                right: Box::new(Expr::Int(1)),
+            }
+        );
+        assert_eq!(
+            p.to_json(),
+            "{\"statements\":[{\"is_const\":false,\"kind\":\"LetStatement\",\"name\":\"xs\",\"type_hint\":null,\"value\":{\"index\":{\"kind\":\"BinaryOp\",\"left\":{\"kind\":\"Identifier\",\"name\":\"index\"},\"op\":\"+\",\"right\":{\"kind\":\"IntLiteral\",\"value\":1}},\"kind\":\"IndexAccess\",\"target\":{\"kind\":\"Identifier\",\"name\":\"items\"}}}]}"
+        );
+    }
+
+    #[test]
+    fn chained_index_access_and_calls_parse() {
+        let p = parse_program("let value = get_items()[outer[inner]];").unwrap();
+        let Stmt::Let(stmt) = &p.statements[0] else {
+            panic!("expected let statement");
+        };
+        let Some(Expr::IndexAccess { target, index }) = &stmt.value else {
+            panic!("expected outer IndexAccess expression");
+        };
+        assert_eq!(
+            **target,
+            Expr::Call {
+                target: Box::new(Expr::Ident("get_items".to_string())),
+                args: vec![],
+            }
+        );
+        assert_eq!(
+            **index,
+            Expr::IndexAccess {
+                target: Box::new(Expr::Ident("outer".to_string())),
+                index: Box::new(Expr::Ident("inner".to_string())),
+            }
+        );
+    }
+
+    #[test]
+    fn index_access_requires_closing_bracket() {
+        assert!(parse_program("let value = items[index;").is_err());
+        assert!(parse_program("let value = items[];").is_err());
+        assert!(parse_program("let value = items[outer[inner];").is_err());
+    }
 
     #[test]
     fn praecedenz_und_assoziativitaet() {

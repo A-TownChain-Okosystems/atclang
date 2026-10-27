@@ -293,6 +293,11 @@ impl<'a> FnLowerer<'a> {
                     argc: args.len() as u16,
                 });
             }
+            Expr::IndexAccess { .. } => {
+                return Err(LowerError::new(
+                    "Indexzugriff ist geparst, aber im aktuellen VM-Profil noch nicht lowerbar",
+                ));
+            }
         }
         Ok(())
     }
@@ -438,6 +443,17 @@ mod tests {
         let prog = crate::parser::parse_program(src).expect("Parse-Fehler");
         let compiled = lower_program(&prog).expect("Lowering-Fehler");
         crate::vm::execute(&compiled).expect("Run-Fehler")
+    }
+
+    #[test]
+    fn index_access_lowering_fails_closed_until_vm_semantics_exist() {
+        let prog = crate::parser::parse_program("let value = items[0];")
+            .expect("IndexAccess syntax should parse");
+        let err = lower_program(&prog).expect_err("IndexAccess must not silently lower");
+        assert!(
+            err.message.contains("Indexzugriff ist geparst"),
+            "unexpected lowering error: {:?}", err
+        );
     }
 
     #[test]
