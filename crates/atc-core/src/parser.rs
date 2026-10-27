@@ -824,25 +824,59 @@ mod tests {
     use super::*;
 
     #[test]
-    fn index_access_parses_to_canonical_ast() {
+    fn index_access_has_exact_canonical_ast_shape() {
         let p = parse_program("let xs = items[index + 1];").unwrap();
-        let json = p.to_json();
-        assert!(json.contains("\"kind\":\"IndexAccess\""));
-        assert!(json.contains("\"index\":{\"kind\":\"BinaryOp\""));
-        assert!(json.contains("\"target\":{\"kind\":\"Identifier\",\"name\":\"items\"}"));
+        let Stmt::Let(stmt) = &p.statements[0] else {
+            panic!("expected let statement");
+        };
+        let Some(Expr::IndexAccess { target, index }) = &stmt.value else {
+            panic!("expected IndexAccess expression");
+        };
+        assert_eq!(**target, Expr::Ident("items".to_string()));
+        assert_eq!(
+            **index,
+            Expr::Binary {
+                op: "+".to_string(),
+                left: Box::new(Expr::Ident("index".to_string())),
+                right: Box::new(Expr::Int(1)),
+            }
+        );
+        assert_eq!(
+            p.to_json(),
+            "{\"statements\":[{\"is_const\":false,\"kind\":\"LetStatement\",\"name\":\"xs\",\"type_hint\":null,\"value\":{\"index\":{\"kind\":\"BinaryOp\",\"left\":{\"kind\":\"Identifier\",\"name\":\"index\"},\"op\":\"+\",\"right\":{\"kind\":\"IntLiteral\",\"value\":1}},\"kind\":\"IndexAccess\",\"target\":{\"kind\":\"Identifier\",\"name\":\"items\"}}}]}"
+        );
     }
 
     #[test]
     fn chained_index_access_and_calls_parse() {
         let p = parse_program("let value = get_items()[outer[inner]];").unwrap();
-        let json = p.to_json();
-        assert!(json.contains("\"kind\":\"FunctionCall\""));
-        assert_eq!(json.matches("\"kind\":\"IndexAccess\"").count(), 2);
+        let Stmt::Let(stmt) = &p.statements[0] else {
+            panic!("expected let statement");
+        };
+        let Some(Expr::IndexAccess { target, index }) = &stmt.value else {
+            panic!("expected outer IndexAccess expression");
+        };
+        assert_eq!(
+            **target,
+            Expr::Call {
+                target: Box::new(Expr::Ident("get_items".to_string())),
+                args: vec![],
+            }
+        );
+        assert_eq!(
+            **index,
+            Expr::IndexAccess {
+                target: Box::new(Expr::Ident("outer".to_string())),
+                index: Box::new(Expr::Ident("inner".to_string())),
+            }
+        );
     }
 
     #[test]
     fn index_access_requires_closing_bracket() {
         assert!(parse_program("let value = items[index;").is_err());
+        assert!(parse_program("let value = items[];").is_err());
+        assert!(parse_program("let value = items[outer[inner];").is_err());
     }
 
     #[test]
