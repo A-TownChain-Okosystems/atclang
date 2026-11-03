@@ -201,42 +201,41 @@ def audit_placeholders_and_docs(findings: list[str]) -> None:
 
 
 def audit_evidence(findings: list[str]) -> None:
-    """SCR-0086-Bindungspruefung (Revision 2026-09-17).
+    """Fail-closed validation for positive test-evidence claims.
 
-    EVD-001 wie urspruenglich formuliert war selbst-referentiell nie erfuellbar
-    (evidence.yaml kann nicht an den Commit gebunden sein, der sie enthaelt).
-    Neue Semantik, fail-closed gegenueber ungedeckten Quell-Aenderungen:
-    - frische Bindung: bound_commit == aktueller Stand -> OK
-    - Folge-Bindung (SCR-0086): Evidence-Commit folgt dem Code-Commit -> OK,
-      wenn zwischen bound..HEAD keine Quell-Aenderung liegt (nur .atc/ + Audit-Doku)
-    - PASS-Claim ohne gueltige Bindung -> FAIL (EVD-002, stale claim)
-    - ehrlicher Zustand not_run/UNVERIFIED blockiert das statische Audit nicht;
-      die Bindung traegt der Audit-Workflow nach bestandenem Lauf nach.
+    A main-branch commit binder is not a test run. A PASS claim is accepted
+    only when the evidence bundle records a successful test run for the exact
+    checked-out commit and identifies its immutable source-tree evidence.
     """
     evidence = read(ROOT / ".atc/evidence/evidence.yaml")
     expected = os.environ.get("GITHUB_SHA")
-    bound = re.search(r"(?m)^bound_commit:\s*([^\s]+)", evidence)
-    status = re.search(r"(?m)^tests:\s*\n\s*status:\s*([^\s]+)", evidence)
     if not expected:
         return
-    b = bound.group(1) if bound else ""
-    if b == expected:
+
+    bound = re.search(r"(?m)^bound_commit:\s*([^\s]+)", evidence)
+    status = re.search(r"(?m)^tests:\s*\n\s*status:\s*([^\s]+)", evidence)
+    status_value = status.group(1) if status else ""
+
+    if status_value not in {"pass", "pass_with_evidence"}:
         return
-    if b and b != "UNVERIFIED":
-        try:
-            chk = subprocess.run(
-                ["git", "cat-file", "-e", b + "^{commit}"],
-                capture_output=True,
-                cwd=ROOT,
-            )
-            if chk.returncode == 0:
-                return  # gueltiger historischer Eintrag; Bindung wird von diesem Lauf nachgezogen
-        except Exception:
-            pass
-    if status and status.group(1) in {"pass", "pass_with_evidence"}:
+
+    bound_sha = bound.group(1) if bound else ""
+    run_match = re.search(r"(?m)^test_run:\n((?:  [^\n]*\n)+)", evidence)
+    run_fields = (
+        dict(re.findall(r"(?m)^  ([a-z_]+):\s*(.*?)\s*$", run_match.group(1)))
+        if run_match
+        else {}
+    )
+    if (
+        bound_sha != expected
+        or run_fields.get("commit") != expected
+        or run_fields.get("result") != "PASS"
+        or not run_fields.get("run_id")
+        or not run_fields.get("source_tree_sha256")
+    ):
         fail(
             findings,
-            "F-ATCLANG-EVD-002 P1 evidence: PASS claim is stale for current commit (keine gueltige Bindung an diesen Stand)",
+            "F-ATCLANG-EVD-002 P1 evidence: PASS claim requires exact-commit test_run, run_id, PASS result and source_tree_sha256",
         )
 
 
