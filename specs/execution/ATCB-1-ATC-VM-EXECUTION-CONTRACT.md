@@ -29,7 +29,11 @@ Canonical path:
       -> execution context
       -> state transition
 
-This is a contract baseline. It does not claim that the complete compiler-to-VM path is implemented.
+This is a draft execution-boundary contract. It does not claim that the complete compiler-to-VM path is implemented.
+
+**Normative precedence (blocking clarification):** `specs/bytecode/SPEC.md` (ATC-BC-001 v1.0.0-FROZEN) is the sole normative definition of ATCB v1 container geometry and instruction encoding. This draft MUST NOT redefine those bytes. In particular, ATCB v1 is a flat `ATCB` + big-endian version/count + instruction stream; it has no module-section envelope. The module/function/ABI/capability model below is therefore a *proposed execution/ABI design only*, not an ATCB v1 wire format. It MUST NOT be serialized into or assumed present in an ATCB v1 stream without an approved, versioned normative change.
+
+Until that separate ABI/container decision is approved, only the frozen ATCB v1 bytecode contract is normative for encoding. Any richer module metadata must remain outside the ATCB v1 byte stream and be explicitly specified by the owning artifact/ABI contract. No production VM behavior is implied by this draft.
 
 ## 2. Explicit non-goals
 
@@ -42,38 +46,39 @@ This contract does not authorize:
 - bypassing the canonical state-transition execution gate;
 - deleting the existing ATCLang reference VM before differential conformance exists.
 
-## 3. Module envelope
+## 3. ATCB v1 encoding boundary
 
-An ATCB-1 module MUST contain these logical fields in canonical order:
+ATCB v1 byte encoding is defined exclusively by `specs/bytecode/SPEC.md` (ATC-BC-001 v1.0.0-FROZEN). This section records the cross-boundary constraints and does not define a second encoding.
 
-| Field | Type |
-|---|---|
-| magic | 4 bytes |
-| format_version | u16 |
-| abi_version | u16 |
-| vm_version | u16 |
-| entry_function | u16 |
-| function_count | u16 |
-| capability_count | u16 |
-| functions | sequence |
-| capabilities | sequence |
+The frozen container is:
 
-Integer fields use little-endian encoding. No pointer, timestamp, host metadata, hash-map order, or other nondeterministic data may enter the artifact.
+| Field | Size | Encoding |
+|---|---:|---|
+| Magic | 4 bytes | ASCII `ATCB` |
+| Format version | u16 | Big-endian; currently 1 |
+| Instruction count | u32 | Big-endian |
+| Instructions | variable | Frozen opcode-specific encoding; all multi-byte operands big-endian |
 
-### 3.1 Function record
+Requirements:
 
-Each function record contains:
+- A producer MUST emit the canonical bytes defined by the frozen bytecode specification and `Bytecode::encode_canonical()`.
+- A consumer MUST reject invalid or non-canonical ATCB v1 input according to the frozen specification; it MUST NOT silently reinterpret the stream as a different module format.
+- `Bytecode::encode()` is documented as legacy/non-canonical and MUST NOT be used as the canonical artifact encoding.
+- Function tables, ABI version, VM version, entry function, capabilities, and other module metadata are **not fields in the frozen ATCB v1 container**. Their transport and validation remain unresolved in a separately versioned ABI/artifact contract.
+- The proposed function-record and module-envelope layout from earlier drafts is withdrawn as an ATCB v1 wire-format definition. It may only return through a normative, versioned change with updated golden vectors and cross-runtime conformance evidence.
 
-- function_id: u16
-- param_count: u16
-- local_count: u16
-- return_arity: u16
-- code_len: u32
-- code: canonical instruction sequence
+## 3.1 Unresolved module/ABI design (non-normative)
 
-Function IDs MUST be unique. entry_function MUST reference an existing function.
+The following items remain design questions, not claims about the ATCB v1 byte stream:
 
-The initial ABI baseline permits return_arity 0 or 1. Multi-value returns require an ABI revision.
+- function identifiers and function table representation;
+- parameter/local counts and return arity;
+- entry-function selection;
+- ABI and VM version binding;
+- capability declarations and their canonical encoding;
+- the boundary between the ATCA artifact envelope and ATCB bytecode payload.
+
+No implementation may assume these fields are present in ATCB v1 until the normative owner has specified and versioned them.
 
 ## 4. Execution model
 
@@ -136,7 +141,7 @@ Jumps use the established PC-relative model:
 
     target = pc + 1 + displacement
 
-The displacement is signed and little-endian.
+The displacement is signed and big-endian, consistent with the frozen ATCB v1 opcode encoding.
 
 Conditional jumps consume their condition from the operand stack. Zero is false; non-zero is true.
 
@@ -284,7 +289,7 @@ The ATCLang VM remains a reference/differential backend until the canonical ATC-
 
 ## 15. Compatibility
 
-Changes to module layout, ABI semantics, numeric semantics, instruction encoding, capability identifiers, or error classes require explicit versioning.
+Changes to module layout, ABI semantics, numeric semantics, instruction encoding, capability identifiers, or error classes require explicit versioning. Any change to ATCB v1 bytes must go through the normative change process for `specs/bytecode/SPEC.md`; this draft alone cannot amend the frozen format.
 
 A runtime MUST NOT silently reinterpret an existing ATCB artifact.
 
