@@ -188,7 +188,7 @@ class TestCiIndependentAudit:
         monkeypatch.setattr(
             m,
             "read",
-            lambda _path: "bound_commit: exact-head\\ntests:\\n  status: pass_with_evidence\\n",
+            lambda _path: "bound_commit: exact-head\ntests:\n  status: pass_with_evidence\n",
         )
         findings = []
         m.audit_evidence(findings)
@@ -199,14 +199,14 @@ class TestCiIndependentAudit:
         monkeypatch.setenv("EXECUTION_SHA", "exact-head")
         monkeypatch.setenv("GITHUB_SHA", "synthetic-merge")
         evidence = (
-            "bound_commit: exact-head\\n"
-            "tests:\\n"
-            "  status: pass_with_evidence\\n"
-            "test_run:\\n"
-            "  run_id: 12345\\n"
-            "  commit: exact-head\\n"
-            "  result: PASS\\n"
-            "  source_tree_sha256: " + ("a" * 64) + "\\n"
+            "bound_commit: exact-head\n"
+            "tests:\n"
+            "  status: pass_with_evidence\n"
+            "test_run:\n"
+            "  run_id: 12345\n"
+            "  commit: exact-head\n"
+            "  result: PASS\n"
+            "  source_tree_sha256: " + ("a" * 64) + "\n"
         )
         monkeypatch.setattr(m, "read", lambda _path: evidence)
         findings = []
