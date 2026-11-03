@@ -221,9 +221,7 @@ def audit_evidence(findings: list[str]) -> None:
     bound_sha = bound.group(1) if bound else ""
     run_match = re.search(r"(?m)^test_run:\n((?:  [^\n]*\n)+)", evidence)
     run_fields = (
-        dict(re.findall(r"(?m)^  ([a-z_]+):\s*(.*?)\s*$", run_match.group(1)))
-        if run_match
-        else {}
+        dict(re.findall(r"(?m)^  ([a-z_]+):\s*(.*?)\s*$", run_match.group(1))) if run_match else {}
     )
     if (
         bound_sha != expected
