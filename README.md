@@ -13,9 +13,12 @@
 ## Purpose
 
 ATCLang ist die Vertragssprache des A-TownChain-Ökosystems: deterministisch,
-verifizierbar und auf die ATC-VM als Konsens-Ziel kompiliert. Diese Referenz-
-Implementierung definiert Semantik, Bytecode-Encoding und Sicherheits-Gates
-(verifizierte Konsens-Tauglichkeit statt Vertrauen in Audits).
+verifizierbar und auf die ATC-VM als Konsens-Ziel ausgerichtet. Der kanonische
+Implementierungspfad ist Rust unter `crates/atc-core/`; der aktuell umgesetzte
+Teilumfang befindet sich weiterhin in Entwicklung. Normative Semantik und
+Bytecode-/ABI-Verträge werden durch versionierte Spezifikationen definiert.
+Weder vorhandener Quellcode noch bestandene Tests begründen allein eine
+Konsens- oder Produktionsfreigabe.
 
 ## Features
 
@@ -56,18 +59,17 @@ The current release state is determined by the applicable standards, conformance
 
 ## Components
 
-- `src/atclang/` — any remaining Python code is reference/test tooling only and MUST NOT define production semantics.
-- `crates/atc-core/` — Rust canonical compiler/runtime/verifier/ABI core.
-- `crates/atc-core/` — Rust canonical core currently under incremental implementation and differential conformance testing.
+- `crates/atc-core/` — kanonischer Rust-Compiler-/Verifier-Core für den derzeit implementierten Teilumfang; weiterhin in Entwicklung.
+- `docs/reference/python/` — archivierte, aus dem früheren Python-Quellbestand erzeugte Referenzdokumentation; kein aktiver Runtime-Code.
+- `tools/` — Python-basierte Audit-, Conformance- und CI-Werkzeuge; keine Konsens-Ausführungsinstanz.
 - `specs/` — normative language, ABI, bytecode, IR, semantics, VM and standard-library specifications.
 - `tools/` — deterministic/differential and CI-independent audit tooling.
 
 ## Requirements
 
-- Python >= 3.10
-- setuptools >= 68
-- Git >= 2.30
-- Rust stable for the canonical core
+- Rust stable — Build und Tests des kanonischen Rust-Cores.
+- Python >= 3.10 und setuptools >= 68 — ausschließlich für Audit-/CI-Werkzeuge unter `tools/`.
+- Git >= 2.30.
 
 ## Installation
 
@@ -110,7 +112,7 @@ The standards taxonomy uses family-scoped canonical IDs. Standard IDs are not in
 
 ## Security
 
-The Python VM contains reference-only boundaries and must not be used as a production cryptographic, authentication, network or RPC trust anchor. Consensus execution must use the canonical Rust path and reject non-deterministic host capabilities.
+Die frühere Python-Referenzimplementierung wurde aus dem aktiven Quellbaum entfernt; unter `docs/reference/python/` verbleibt ausschließlich archivierte Dokumentation. Python-Skripte unter `tools/` dienen Audit-, Conformance- und CI-Zwecken und besitzen keine Runtime- oder Konsensautorität. Konsensrelevante Compiler- und Ausführungspfade müssen über den kanonischen Rust-Pfad laufen und nichtdeterministische Host-Capabilities fail-closed ablehnen.
 
 Security issues must not be disclosed through public GitHub Issues. Follow `SECURITY.md` and the organization's approved security-disclosure process.
 
@@ -144,7 +146,7 @@ ownership:
 technology:
   primary_language: Rust
   secondary_language: Python
-  secondary_scope: reference, conformance, tests
+  secondary_scope: audit, conformance, CI tooling
 governance:
   security_class: S4
   criticality: CRITICAL
