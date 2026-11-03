@@ -181,6 +181,38 @@ class TestCiIndependentAudit:
         assert isinstance(findings, list)
         assert all(isinstance(f, str) for f in findings)
 
+    def test_audit_evidence_rejects_pass_without_exact_run(self, monkeypatch):
+        m = load(AUD)
+        monkeypatch.setenv("EXECUTION_SHA", "exact-head")
+        monkeypatch.setenv("GITHUB_SHA", "synthetic-merge")
+        monkeypatch.setattr(
+            m,
+            "read",
+            lambda _path: "bound_commit: exact-head\ntests:\n  status: pass_with_evidence\n",
+        )
+        findings = []
+        m.audit_evidence(findings)
+        assert any("F-ATCLANG-EVD-002" in finding for finding in findings)
+
+    def test_audit_evidence_accepts_exact_run_manifest(self, monkeypatch):
+        m = load(AUD)
+        monkeypatch.setenv("EXECUTION_SHA", "exact-head")
+        monkeypatch.setenv("GITHUB_SHA", "synthetic-merge")
+        evidence = (
+            "bound_commit: exact-head\n"
+            "tests:\n"
+            "  status: pass_with_evidence\n"
+            "test_run:\n"
+            "  run_id: 12345\n"
+            "  commit: exact-head\n"
+            "  result: PASS\n"
+            "  source_tree_sha256: " + ("a" * 64) + "\n"
+        )
+        monkeypatch.setattr(m, "read", lambda _path: evidence)
+        findings = []
+        m.audit_evidence(findings)
+        assert findings == []
+
     def test_main_smoke(self):
         proc = subprocess.run(
             [sys.executable, os.path.join(REPO, AUD)],

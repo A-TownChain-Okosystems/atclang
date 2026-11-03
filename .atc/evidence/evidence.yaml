@@ -3,17 +3,16 @@
 # Regel: Kein Status-Claim ohne Evidence-Bundle.
 schema_version: "1.0.0"
 repository: atclang
-generated: "2026-09-16"
-generated_by: "CI-independent audit"
-bound_commit: 8db5ba27f38e619c068d754bdb103080cefc16cf
+generated: "2026-11-03"
+generated_by: "evidence reconciliation"
+bound_commit: UNVERIFIED
 maturity_class: A
 r_level: R4
 implementation:
   status: partial
-  summary: "Python-Referenz substanziell; Rust-Canonical-Core gestartet und durch Differential-Tests abgesichert."
+  summary: "Rust ist der kanonische Implementierungspfad für den derzeit implementierten Teilumfang. Die frühere Python-Referenzquelle ist aus dem aktiven Quellbaum entfernt; docs/reference/python enthält nur archivierte Dokumentation. Python unter tools/ bleibt Audit-/CI-Werkzeug."
 tests:
-  status: pass_with_evidence
-  evidence: CI-Independent ATCLang Audit run 40555311548 @ 2026-10-27T17:56:51.436443+00:00
+  status: not_run
 security:
   status: not_audited
 conformance:

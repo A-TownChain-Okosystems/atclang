@@ -172,25 +172,43 @@ jobs:
           fi
       - name: Build immutable evidence artifact
         run: |
+          set -euo pipefail
           mkdir -p evidence
+          git ls-tree -r --full-tree "$EXECUTION_SHA" crates/atc-core > source-tree.txt
           python3 - <<'PY'
-          import os, datetime, re
-          sha = os.environ["GITHUB_SHA"]
+          import datetime, hashlib, os, re
+          sha = os.environ["EXECUTION_SHA"]
           rid = os.environ["GITHUB_RUN_ID"]
           wf = os.environ.get("GITHUB_WORKFLOW", "ATC Test Suite")
           ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+          source_tree_sha256 = hashlib.sha256(open("source-tree.txt", "rb").read()).hexdigest()
           t = open(".atc/evidence/evidence.yaml", encoding="utf-8").read()
-          t = re.sub(r"bound_commit: [^\n]*", "bound_commit: " + sha, t)
-          block = ("test_run:\n  workflow: " + wf + "\n  run_id: " + rid + "\n  commit: " + sha + "\n  timestamp: " + ts + "\n  result: PASS\n  runner: github-actions\n")
+          t = re.sub(r"(?m)^bound_commit: [^\n]*", "bound_commit: " + sha, t)
+          t = re.sub(r"(?m)^(tests:\n  status:) [^\n]*", r"\1 pass_with_evidence", t)
+          t = re.sub(r"(?m)^  evidence: [^\n]*\n?", "", t)
+          block = (
+              "test_run:\n"
+              "  workflow: " + wf + "\n"
+              "  run_id: " + rid + "\n"
+              "  commit: " + sha + "\n"
+              "  timestamp: " + ts + "\n"
+              "  result: PASS\n"
+              "  runner: github-actions\n"
+              "  jobs: npm-tests,rust-core,differential\n"
+              "  source_tree_file: source-tree.txt\n"
+              "  source_tree_sha256: " + source_tree_sha256 + "\n"
+          )
           if re.search(r"(?m)^test_run:\n(?:  [^\n]*\n)+", t):
               t = re.sub(r"(?m)^test_run:\n(?:  [^\n]*\n)+", block, t)
           else:
               t = t.rstrip() + "\n" + block
           open("evidence/evidence.yaml", "w", encoding="utf-8").write(t)
+          digest = hashlib.sha256(open("evidence/evidence.yaml", "rb").read()).hexdigest()
+          open("evidence/evidence.yaml.sha256", "w", encoding="utf-8").write(digest + "  evidence.yaml\n")
           PY
       - name: Upload immutable evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: atclang-evidence-${{ github.sha }}
-          path: evidence/evidence.yaml
+          name: atclang-evidence-${{ github.event.pull_request.head.sha }}
+          path: evidence/
           if-no-files-found: error
