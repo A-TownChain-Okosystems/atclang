@@ -174,14 +174,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p evidence
-          git ls-tree -r --full-tree "$EXECUTION_SHA" crates/atc-core > evidence/source-tree.txt
+          git ls-tree -r --full-tree "$EXECUTION_SHA" crates/atc-core > source-tree.txt
           python3 - <<'PY'
           import datetime, hashlib, os, re
           sha = os.environ["EXECUTION_SHA"]
           rid = os.environ["GITHUB_RUN_ID"]
           wf = os.environ.get("GITHUB_WORKFLOW", "ATC Test Suite")
           ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
-          source_tree_sha256 = hashlib.sha256(open("evidence/source-tree.txt", "rb").read()).hexdigest()
+          source_tree_sha256 = hashlib.sha256(open("source-tree.txt", "rb").read()).hexdigest()
           t = open(".atc/evidence/evidence.yaml", encoding="utf-8").read()
           t = re.sub(r"(?m)^bound_commit: [^\n]*", "bound_commit: " + sha, t)
           t = re.sub(r"(?m)^(tests:\n  status:) [^\n]*", r"\1 pass_with_evidence", t)
@@ -195,7 +195,7 @@ jobs:
               "  result: PASS\n"
               "  runner: github-actions\n"
               "  jobs: npm-tests,rust-core,differential\n"
-              "  source_tree_file: evidence/source-tree.txt\n"
+              "  source_tree_file: source-tree.txt\n"
               "  source_tree_sha256: " + source_tree_sha256 + "\n"
           )
           if re.search(r"(?m)^test_run:\n(?:  [^\n]*\n)+", t):
