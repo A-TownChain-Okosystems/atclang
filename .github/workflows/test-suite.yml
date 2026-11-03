@@ -187,24 +187,24 @@ jobs:
           t = re.sub(r"(?m)^(tests:\n  status:) [^\n]*", r"\1 pass_with_evidence", t)
           t = re.sub(r"(?m)^  evidence: [^\n]*\n?", "", t)
           block = (
-              "test_run:\\n"
-              "  workflow: " + wf + "\\n"
-              "  run_id: " + rid + "\\n"
-              "  commit: " + sha + "\\n"
-              "  timestamp: " + ts + "\\n"
-              "  result: PASS\\n"
-              "  runner: github-actions\\n"
-              "  jobs: npm-tests,rust-core,differential\\n"
-              "  source_tree_file: evidence/source-tree.txt\\n"
-              "  source_tree_sha256: " + source_tree_sha256 + "\\n"
+              "test_run:\n"
+              "  workflow: " + wf + "\n"
+              "  run_id: " + rid + "\n"
+              "  commit: " + sha + "\n"
+              "  timestamp: " + ts + "\n"
+              "  result: PASS\n"
+              "  runner: github-actions\n"
+              "  jobs: npm-tests,rust-core,differential\n"
+              "  source_tree_file: evidence/source-tree.txt\n"
+              "  source_tree_sha256: " + source_tree_sha256 + "\n"
           )
-          if re.search(r"(?m)^test_run:\\n(?:  [^\\n]*\\n)+", t):
-              t = re.sub(r"(?m)^test_run:\\n(?:  [^\\n]*\\n)+", block, t)
+          if re.search(r"(?m)^test_run:\n(?:  [^\n]*\n)+", t):
+              t = re.sub(r"(?m)^test_run:\n(?:  [^\n]*\n)+", block, t)
           else:
-              t = t.rstrip() + "\\n" + block
+              t = t.rstrip() + "\n" + block
           open("evidence/evidence.yaml", "w", encoding="utf-8").write(t)
           digest = hashlib.sha256(open("evidence/evidence.yaml", "rb").read()).hexdigest()
-          open("evidence/evidence.yaml.sha256", "w", encoding="utf-8").write(digest + "  evidence.yaml\\n")
+          open("evidence/evidence.yaml.sha256", "w", encoding="utf-8").write(digest + "  evidence.yaml\n")
           PY
       - name: Upload immutable evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
