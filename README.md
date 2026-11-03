@@ -23,7 +23,7 @@ Konsens- oder Produktionsfreigabe.
 ## Features
 
 - ATCLang-Frontend mit deterministischer Semantik (Konsens-Pflicht)
-- Rust-Consensus-Core (`crates/atc-core`): Bytecode-Verifizierer mit
+- Rust-Canonical-Core (`crates/atc-core`): Bytecode-Verifizierer mit
   fail-closed Bounds-Checking (Stack, Locals, Functions)
 - Rust-only implementation path; Python reference VM removed from the active repository on 2026-09-17
 - Security-Gate (Static Analysis, fail-closed): Verbots-Import- und
@@ -32,8 +32,9 @@ Konsens- oder Produktionsfreigabe.
 
 ## Architecture boundary
 
-**Rust is canonical**: `crates/atc-core` ist der produktive Konsens-Kern
-(Bytecode-Verifizierer, Differential-Test-Ziel). Die Python-Referenz-Pipeline
+**Rust is canonical**: `crates/atc-core` ist der kanonische Rust-Pfad für den
+aktuell implementierten Teilumfang (Bytecode-Verifizierer, Differential-Test-Ziel);
+die vollständige Produktions- und Konsensfreigabe ist weiterhin offen. Die Python-Referenz-Pipeline
 (Former: `src/atclang`) ist seit 2026-09-17 vollstaendig dokumentiert unter
 `docs/reference/python/` und aus dem Repository entfernt — Rust-only.
 
@@ -63,7 +64,6 @@ The current release state is determined by the applicable standards, conformance
 - `docs/reference/python/` — archivierte, aus dem früheren Python-Quellbestand erzeugte Referenzdokumentation; kein aktiver Runtime-Code.
 - `tools/` — Python-basierte Audit-, Conformance- und CI-Werkzeuge; keine Konsens-Ausführungsinstanz.
 - `specs/` — normative language, ABI, bytecode, IR, semantics, VM and standard-library specifications.
-- `tools/` — deterministic/differential and CI-independent audit tooling.
 
 ## Requirements
 
