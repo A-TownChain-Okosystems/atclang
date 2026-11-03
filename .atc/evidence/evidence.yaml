@@ -5,7 +5,7 @@ schema_version: "1.0.0"
 repository: atclang
 generated: "2026-11-03"
 generated_by: "evidence reconciliation"
-bound_commit: 8db5ba27f38e619c068d754bdb103080cefc16cf
+bound_commit: UNVERIFIED
 maturity_class: A
 r_level: R4
 implementation:
