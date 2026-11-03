@@ -207,7 +207,7 @@ def audit_evidence(findings: list[str]) -> None:
     checked-out commit and identifies its immutable source-tree evidence.
     """
     evidence = read(ROOT / ".atc/evidence/evidence.yaml")
-    expected = os.environ.get("GITHUB_SHA")
+    expected = os.environ.get("EXECUTION_SHA") or os.environ.get("GITHUB_SHA")
     if not expected:
         return
 
