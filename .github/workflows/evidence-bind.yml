@@ -22,13 +22,15 @@ jobs:
           python3 - <<'PY'
           import datetime, os, re
           sha = os.environ["GITHUB_SHA"]
-          rid = os.environ["GITHUB_RUN_ID"]
           ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
           p = ".atc/evidence/evidence.yaml"
           t = open(p, encoding="utf-8").read()
-          t = re.sub(r"bound_commit: [^\n]*", "bound_commit: " + sha, t)
-          t = re.sub(r"(?m)^(tests:\n  status:) [^\n]*", r"\1 pass_with_evidence", t)
-          t = re.sub(r"(?m)^  evidence: [^\n]*", "  evidence: CI-Independent ATCLang Audit run " + rid + " @ " + ts, t)
+          t = re.sub(r"(?m)^bound_commit: [^\n]*", "bound_commit: " + sha, t)
+          t = re.sub(r"(?m)^generated: [^\n]*", 'generated: "' + ts[:10] + '"', t)
+          t = re.sub(r"(?m)^generated_by: [^\n]*", 'generated_by: "main-commit binder; tests not executed"', t)
+          t = re.sub(r"(?m)^(tests:\n  status:) [^\n]*", r"\1 not_run", t)
+          t = re.sub(r"(?m)^  evidence: [^\n]*\n?", "", t)
+          t = re.sub(r"(?m)^test_run:\n(?:  [^\n]*\n)+", "", t)
           open(p, "w", encoding="utf-8").write(t)
           PY
           git config user.name "ShivaCoreDev"
