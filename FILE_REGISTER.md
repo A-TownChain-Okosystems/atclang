@@ -91,6 +91,7 @@
 - `crates/atc-core/src/value.rs`
 - `crates/atc-core/src/vm.rs`
 - `crates/atc-core/tests/cli.rs`
+- `crates/atc-core/tests/contract_e1_failclosed.rs`
 - `crates/atc-core/tests/differential.rs`
 - `crates/atc-core/tests/run.rs`
 - `crates/atc-core/tests/stdlib_reference_conformance.rs`
@@ -100,6 +101,7 @@
 - `docs/ATCLANG_1.0_RELEASE_GATE.md`
 - `docs/ATCLANG_BASELINE_V1.md`
 - `docs/ENGINEERING_AUDIT.md`
+- `docs/EXECUTION_STATE_MODEL.md`
 - `docs/REPOSITORY_STANDARD.md`
 - `docs/audits/REPOSITORY-AUDIT-2026-09-16.md`
 - `docs/history/CLOSURE-REGISTER-2026-09-16.md`
