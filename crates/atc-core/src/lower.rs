@@ -199,10 +199,11 @@ impl<'a> FnLowerer<'a> {
                 "Funktionsdefinition ist nur auf Programmebene erlaubt (in {})",
                 self.function_name
             ))),
-            Stmt::Use { .. }
-            | Stmt::Struct { .. }
-            | Stmt::Enum { .. }
-            | Stmt::Contract { .. } => Err(LowerError::new(
+            Stmt::Contract { .. } => Err(LowerError::new(format!(
+                "Vertragsdeklaration ist auf Funktionsebene nicht ausfuehrbar (in {})",
+                self.function_name
+            ))),
+            Stmt::Use { .. } | Stmt::Struct { .. } | Stmt::Enum { .. } => Err(LowerError::new(
                 "Native Deklaration ist nur Metadatum und kann nicht als Statement ausgefuehrt werden",
             )),
         }
@@ -356,8 +357,113 @@ fn lower_user_function(
     finish_function(lowerer, f.name.clone(), f.params.len() as u16)
 }
 
+/// Erster Vertrag der Deklarationsliste, sofern vorhanden.
+///
+/// Vertraege sind auf Programmebene erlaubt; alles andere waere bereits im
+/// Parser ein Fehler. Der Rumpf liegt heute nur als ausgeglichener Tokenstrom
+/// vor (keine Semantik, kein IR) — genau deshalb muss das Lowering ihn
+/// ablehnen statt ihn zu verwerfen.
+fn find_contract(stmts: &[Stmt]) -> Option<(&str, &[String], &[String])> {
+    for s in stmts {
+        if let Stmt::Contract {
+            name,
+            bases,
+            body_tokens,
+        } = s
+        {
+            return Some((name.as_str(), bases.as_slice(), body_tokens.as_slice()));
+        }
+    }
+    None
+}
+
+/// Zaehlt die im Tokenstrom sichtbaren Bestandteile eines Vertragsrumpfs:
+/// (Funktionen, Zustandsfelder, Events, require-Guards).
+///
+/// Die Zaehlung ist eine ehrliche Untergrenze des Verlusts: sie benennt, was ein
+/// Ersatzprogramm verschluckt haette. Sie ist keine Semantikpruefung.
+fn contract_surface(body_tokens: &[String]) -> (usize, usize, usize, usize) {
+    let mut fns = 0usize;
+    let mut states = 0usize;
+    let mut events = 0usize;
+    let mut guards = 0usize;
+    for t in body_tokens {
+        match t.as_str() {
+            "fn" | "function" => fns += 1,
+            "state" => states += 1,
+            "event" => events += 1,
+            "require" => guards += 1,
+            _ => {}
+        }
+    }
+    (fns, states, events, guards)
+}
+
+/// E1 (Audit 12.11.2026, F1) — fail-closed Gate fuer Quellen, deren deklarierte
+/// Logik nicht zu Bytecode gesenkt wird.
+///
+/// Vertragsruempfe werden heute nicht gesenkt. Sie duerfen deshalb nicht
+/// uebersprungen werden: ein Vertrag, dessen Logik verworfen wird, ist kein
+/// ausfuehrbares Programm. Die Ablehnung steht vor jedem Aufbau, damit kein
+/// Ersatzprogramm (`ConstI64(0); Return`) und kein falsches Exit-Code-0
+/// entstehen kann. Compiler-Erfolg ist kein ausfuehrbarer Vertrag.
+///
+/// Dasselbe Gate nutzen `atc check` und `atc run`, damit Pruefung und
+/// Ausfuehrung fuer diesen Befund nicht auseinanderlaufen.
+pub fn executable_subset_gate(prog: &Program) -> Result<(), LowerError> {
+    let Some((name, bases, body_tokens)) = find_contract(&prog.statements) else {
+        return Ok(());
+    };
+    let (fns, states, events, guards) = contract_surface(body_tokens);
+    let basis = if bases.is_empty() {
+        "ohne Basis".to_string()
+    } else {
+        format!("Basen: {}", bases.join(", "))
+    };
+    Err(LowerError::new(format!(
+        "Vertrag '{name}' ({basis}) ist nicht ausfuehrbar: ATCLang senkt Vertragsruempfe nicht \
+         zu Bytecode ({fns} Funktionen, {states} Zustandsfelder, {events} Events, {guards} \
+         require-Guards, {} Tokens im Rumpf). Der Vertrag wird abgelehnt, statt ihn mit einem \
+         Ersatzprogramm anzunehmen",
+        body_tokens.len()
+    )))
+}
+
+/// Ein Programm ohne Einstiegspunkt ist nicht ausfuehrbar: es gibt weder
+/// Top-Level-Code noch eine Funktion `main`.
+///
+/// Das Lowering selbst bleibt fuer Deklarationsmodule nutzbar (Werkzeuge,
+/// spaetere Verknuepfung); `run` und ein Deployment duerfen daraus aber keinen
+/// Erfolg machen. Frueher ergab diese Lage eine leere `__main__` mit
+/// `ConstI64(0); Return` — also Ausgabe 0 und Exit 0 fuer "nichts".
+pub fn require_entry_point(prog: &Program) -> Result<(), LowerError> {
+    let has_top_level = prog.statements.iter().any(|s| {
+        matches!(
+            s,
+            Stmt::Let(_)
+                | Stmt::Return { .. }
+                | Stmt::Expr(_)
+                | Stmt::If { .. }
+                | Stmt::While { .. }
+        )
+    });
+    let has_main = prog
+        .statements
+        .iter()
+        .any(|s| matches!(s, Stmt::Fn(f) if f.name == "main"));
+    if has_top_level || has_main {
+        return Ok(());
+    }
+    Err(LowerError::new(
+        "Programm enthaelt keinen ausfuehrbaren Einstiegspunkt: weder Top-Level-Code noch eine \
+         Funktion `main`. Eine leere __main__ wird nicht als Programm ausgefuehrt",
+    ))
+}
+
 /// Lowered ein komplettes Programm: Entry + alle Funktionen, alles verifiziert.
 pub fn lower_program(prog: &Program) -> Result<CompiledProgram, LowerError> {
+    // E1 fail-closed vor jedem Aufbau (siehe `executable_subset_gate`).
+    executable_subset_gate(prog)?;
     // Funktionsindex-Tabelle: Index 0 reserviert fuer __main__.
     let mut fn_ids: HashMap<String, (u16, u16)> = HashMap::new();
     fn_ids.insert(ENTRY.to_string(), (0, 0));
@@ -403,7 +509,7 @@ pub fn lower_program(prog: &Program) -> Result<CompiledProgram, LowerError> {
                 | Stmt::Use { .. }
                 | Stmt::Struct { .. }
                 | Stmt::Enum { .. }
-                | Stmt::Contract { .. }
+                | Stmt::Contract { .. } // oben fail-closed abgelehnt, hier nie erreicht
         ) {
             continue;
         }
@@ -412,7 +518,9 @@ pub fn lower_program(prog: &Program) -> Result<CompiledProgram, LowerError> {
     }
     let entry_fn = finish_function(main_lowerer, ENTRY.to_string(), 0)?;
 
-    // Entry-Auswahl: fn main nur nutzen, wenn __main__ leer ist.
+    // Entry-Auswahl: fn main nur nutzen, wenn __main__ leer ist. Ob ueberhaupt
+    // ein Einstiegspunkt existiert, prueft `require_entry_point` an der
+    // Ausfuehrungs-/Deployment-Grenze — nicht das Lowering.
     let entry = if main_has_code {
         0
     } else {
